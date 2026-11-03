@@ -47,7 +47,10 @@
     "orSeparator": "oder",
     "oidcDenied": "Die SSO-Anmeldung wurde abgebrochen oder abgelehnt.",
     "oidcNoAccount": "Kein Konto für Ihre SSO-Identität gefunden. Kontaktieren Sie Ihren Administrator.",
-    "oidcError": "Bei der SSO-Anmeldung ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut."
+    "oidcError": "Bei der SSO-Anmeldung ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
+    "repoMovedTitle": "Meerkat CRM ist umgezogen",
+    "repoMovedBody": "Dieses Docker-Image erhält keine Updates mehr. Administratoren: Ersetzen Sie in Ihrer docker-compose.yml oder Ihrem docker-run-Befehl {{oldPath}} durch {{newPath}}, laden Sie dann das Image herunter und starten Sie den Container neu.",
+    "repoMovedLink": "Zum neuen Repository"
   },
   "passwordReset": {
     "title": "Passwort zurücksetzen",

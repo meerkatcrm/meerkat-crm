@@ -47,7 +47,10 @@
     "orSeparator": "oppure",
     "oidcDenied": "Il login SSO è stato annullato o negato.",
     "oidcNoAccount": "Nessun account trovato per la tua identità SSO. Contatta il tuo amministratore.",
-    "oidcError": "Si è verificato un errore durante il login SSO. Riprova."
+    "oidcError": "Si è verificato un errore durante il login SSO. Riprova.",
+    "repoMovedTitle": "Meerkat CRM si è trasferito",
+    "repoMovedBody": "Questa immagine Docker non riceve più aggiornamenti. Amministratori: nel file docker-compose.yml o nel comando docker run, sostituite {{oldPath}} con {{newPath}}, quindi scaricate l'immagine e riavviate il container.",
+    "repoMovedLink": "Vai al nuovo repository"
   },
   "passwordReset": {
     "title": "Reimposta Password",

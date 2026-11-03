@@ -10,6 +10,8 @@ import {
   Button,
   Typography,
   Alert,
+  AlertTitle,
+  Link as MuiLink,
   Paper,
   Stack,
   Divider
@@ -26,6 +28,10 @@ const OIDC_ERROR_MAP: Record<string, string> = {
   oidc_no_account: 'login.oidcNoAccount',
   oidc_error: 'login.oidcError',
 };
+
+const OLD_IMAGE_PATH = 'ghcr.io/fbuchner/';
+const NEW_IMAGE_PATH = 'ghcr.io/meerkatcrm/';
+const NEW_REPOSITORY_URL = 'https://github.com/meerkatcrm/meerkat-crm';
 
 export default function LoginPage({ setToken }: LoginPageProps) {
   const { t } = useTranslation();
@@ -68,8 +74,15 @@ export default function LoginPage({ setToken }: LoginPageProps) {
   };
 
   return (
-    <Box sx={{ maxWidth: 400, mx: 'auto', mt: 8 }}>
-      <Paper sx={{ p: 4 }}>
+    <Box sx={{ mt: 8 }}>
+      <Alert severity="warning" sx={{ maxWidth: 720, mx: 'auto', mb: 2, overflowWrap: 'anywhere' }}>
+        <AlertTitle>{t('login.repoMovedTitle')}</AlertTitle>
+        {t('login.repoMovedBody', { oldPath: OLD_IMAGE_PATH, newPath: NEW_IMAGE_PATH })}{' '}
+        <MuiLink href={NEW_REPOSITORY_URL} target="_blank" rel="noopener noreferrer">
+          {t('login.repoMovedLink')}
+        </MuiLink>
+      </Alert>
+      <Paper sx={{ p: 4, maxWidth: 400, mx: 'auto', boxSizing: 'border-box' }}>
         <Box sx={{ display: 'flex', justifyContent: 'center' }}>
           <Box
             component="img"
