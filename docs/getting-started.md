@@ -9,12 +9,12 @@ nav_order: 2
 
 ### Docker compose
 
-Meerkat CRM ships as a single all-in-one image that bundles the frontend and backend into one container, published in the github registry as `ghcr.io/fbuchner/meerkat-crm`.
+Meerkat CRM ships as a single all-in-one image that bundles the frontend and backend into one container, published in the github registry as `ghcr.io/meerkatcrm/meerkat-crm`.
 Images are available for linux/amd64 and linux/arm64.
 
 You can use either the `:latest` tag or a specific version (e.g. `:0.9` or `:0.9.1`).
 
-Copy the [sample docker compose file](https://github.com/fbuchner/meerkat-crm/blob/main/docker-compose.yml) as well as [sample env file](https://github.com/fbuchner/meerkat-crm/blob/main/.env.example) and rename the env file to `.env`.
+Copy the [sample docker compose file](https://github.com/meerkatcrm/meerkat-crm/blob/main/docker-compose.yml) as well as [sample env file](https://github.com/meerkatcrm/meerkat-crm/blob/main/.env.example) and rename the env file to `.env`.
 
 After adjusting the environment variables as needed you can run:
 ```docker compose up -d```
@@ -49,7 +49,7 @@ After adjusting the environment variables as needed you can run:
 
 SSO is disabled unless all three of `OIDC_PROVIDER_URL`, `OIDC_CLIENT_ID`, and `OIDC_CLIENT_SECRET` are set.
 
-Other variables are found in the [sample env file](https://github.com/fbuchner/meerkat-crm/blob/main/.env.example).
+Other variables are found in the [sample env file](https://github.com/meerkatcrm/meerkat-crm/blob/main/.env.example).
 
 The backend process runs as a non-root user (default UID/GID 1001), and a startup script chowns the data and photo directories to that user. Run `id` on your host to find your UID and GID and set them as `PUID`/`PGID` in your `.env` file if you prefer folders to be owned by your host user (optional).
 

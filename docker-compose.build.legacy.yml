@@ -10,7 +10,7 @@
 
 services:
   backend:
-    image: ghcr.io/fbuchner/meerkat-crm-backend:${IMAGE_TAG:-latest}
+    image: ghcr.io/meerkatcrm/meerkat-crm-backend:${IMAGE_TAG:-latest}
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -28,7 +28,7 @@ services:
       start_period: 10s
 
   frontend:
-    image: ghcr.io/fbuchner/meerkat-crm-frontend:${IMAGE_TAG:-latest}
+    image: ghcr.io/meerkatcrm/meerkat-crm-frontend:${IMAGE_TAG:-latest}
     build:
       context: ./frontend
       dockerfile: Dockerfile

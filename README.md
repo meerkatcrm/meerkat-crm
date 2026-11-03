@@ -12,7 +12,7 @@
 ## About the project
 Meerkat CRM (Contact Relationship Management) is a self-hosted solution to keep track of your important contacts. As your digital rolodex it reminds you of birthdays, helps you to keep in mind dietary habits as well as names of spouses of contacts - and much more.
 
-You can find the detailed documentation here: [fbuchner.github.io/meerkat-crm/](https://fbuchner.github.io/meerkat-crm/)
+You can find the detailed documentation here: [meerkatcrm.github.io/meerkat-crm/](https://meerkatcrm.github.io/meerkat-crm/)
 
 
 > [!TIP]
@@ -54,14 +54,14 @@ You can find the detailed documentation here: [fbuchner.github.io/meerkat-crm/](
 
 ### Docker (Recommended)
 
-Meerkat CRM ships as a single all-in-one image (`ghcr.io/fbuchner/meerkat-crm`)
+Meerkat CRM ships as a single all-in-one image (`ghcr.io/meerkatcrm/meerkat-crm`)
 that bundles the frontend and backend into one container. The easiest way to run
 it is with Docker Compose:
 
 1. **Download the Docker Compose file:**
     ```sh
-    curl -O https://raw.githubusercontent.com/fbuchner/meerkat-crm/main/docker-compose.yml
-    curl -O https://raw.githubusercontent.com/fbuchner/meerkat-crm/main/.env.example
+    curl -O https://raw.githubusercontent.com/meerkatcrm/meerkat-crm/main/docker-compose.yml
+    curl -O https://raw.githubusercontent.com/meerkatcrm/meerkat-crm/main/.env.example
     ```
 
 2. **Configure environment:**
@@ -89,7 +89,7 @@ docker run -d --name meerkat --restart unless-stopped \
   -e JWT_SECRET_KEY='<paste a secret here, changing it will invalidate logins>' \
   -v "$(pwd)/data:/app/data" \
   -v "$(pwd)/photos:/app/static/photos" \
-  ghcr.io/fbuchner/meerkat-crm:latest
+  ghcr.io/meerkatcrm/meerkat-crm:latest
 ```
 
 All other settings are optional, see [`.env.example`](.env.example) for e-mail notifications, CardDAV, and SSO. Pass them with additional `-e` flags, or use `--env-file .env`.
@@ -98,7 +98,7 @@ All other settings are optional, see [`.env.example`](.env.example) for e-mail n
 ## Contributing
 
 ### Bugs and feature requests
-This application is under development. You can [open an issue](https://github.com/fbuchner/meerkat-crm/issues/new/choose) to report a bug or request a new feature.
+This application is under development. You can [open an issue](https://github.com/meerkatcrm/meerkat-crm/issues/new/choose) to report a bug or request a new feature.
 
 You can also participate and open up a pull request. 
 
@@ -109,7 +109,7 @@ To set up this repository for development, follow these steps:
 
 1. **Clone the repository:**
     ```sh
-    git clone https://github.com/fbuchner/meerkat-crm.git
+    git clone https://github.com/meerkatcrm/meerkat-crm.git
     cd meerkat-crm
     ```
 
