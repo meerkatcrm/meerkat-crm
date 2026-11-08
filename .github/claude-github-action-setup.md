@@ -99,18 +99,18 @@ instead and swap the `claude_code_oauth_token:` line in `claude.yml` for
 1. **Create a key** at <https://openrouter.ai/settings/keys> with a credit limit that
    resets daily, then add it:
    ```bash
-   gh secret set OPENROUTER_API_KEY --repo fbuchner/meerkat-crm
+   gh secret set OPENROUTER_API_KEY --repo meerkatcrm/meerkat-crm
    ```
 2. **Create the labels:**
    ```bash
-   gh label create ai-review --repo fbuchner/meerkat-crm --color 1D76DB --description "Run AI review on this PR"
+   gh label create ai-review --repo meerkatcrm/meerkat-crm --color 1D76DB --description "Run AI review on this PR"
    ```
    ```bash
-   gh label create needs-human-review --repo fbuchner/meerkat-crm --color D93F0B --description "Sensitive paths, or flagged by AI review"
+   gh label create needs-human-review --repo meerkatcrm/meerkat-crm --color D93F0B --description "Sensitive paths, or flagged by AI review"
    ```
 3. **Try it on an existing PR.** This prints the review and posts nothing:
    ```bash
-   GITHUB_TOKEN=$(gh auth token) OPENROUTER_API_KEY=... python3 .github/ai-review/review.py --dry-run --repo fbuchner/meerkat-crm --pr 123
+   GITHUB_TOKEN=$(gh auth token) OPENROUTER_API_KEY=... python3 .github/ai-review/review.py --dry-run --repo meerkatcrm/meerkat-crm --pr 123
    ```
 4. **Merge the workflow.** Review starts on the next PR opened or pushed after that.
 
@@ -121,7 +121,7 @@ python3 -m unittest discover -s .github/ai-review
 
 ### Claude Code steps
 
-1. **Install the Claude GitHub App** on `fbuchner/meerkat-crm`:
+1. **Install the Claude GitHub App** on `meerkatcrm/meerkat-crm`:
    <https://github.com/apps/claude>. Repository-admin rights are required. The app
    supplies the short-lived, repo-scoped token the action uses for git and the API;
    the workflows do not need a personal access token.
@@ -133,7 +133,7 @@ python3 -m unittest discover -s .github/ai-review
    Actions → *New repository secret* → name `CLAUDE_CODE_OAUTH_TOKEN`, paste the
    token as the value. Or from the CLI:
    ```bash
-   gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo fbuchner/meerkat-crm
+   gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo meerkatcrm/meerkat-crm
    ```
 4. **Allow Actions to open pull requests** if it is not already allowed: Settings →
    Actions → General → Workflow permissions → tick *Allow GitHub Actions to create
