@@ -236,6 +236,20 @@ func (c *Contact) employmentMatches(e *EmploymentHistory) bool {
 		e.JobTitle == c.JobTitle && e.Role == c.Role
 }
 
+// EndedEmploymentMatches reports whether the values are exactly those of the most
+// recently ended entry. All-blank values never match, and need no query.
+func (c *Contact) EndedEmploymentMatches(tx *gorm.DB, organization, department, jobTitle, role string) (bool, error) {
+	if organization == "" && department == "" && jobTitle == "" && role == "" {
+		return false, nil
+	}
+	last, err := c.latestClosedEntry(tx)
+	if err != nil || last == nil {
+		return false, err
+	}
+	return last.Organization == organization && last.Department == department &&
+		last.JobTitle == jobTitle && last.Role == role, nil
+}
+
 // resetEmploymentScalars writes the scalars of the given entry to the contact,
 // or blanks them when entry is nil (no current job).
 func (c *Contact) resetEmploymentScalars(tx *gorm.DB, entry *EmploymentHistory) error {

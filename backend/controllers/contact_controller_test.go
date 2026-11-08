@@ -904,10 +904,7 @@ func setupEmploymentPut(t *testing.T) (*gorm.DB, *gin.Engine, uint) {
 // putContact sends the body and returns the contact from the response.
 func putContact(t *testing.T, router *gin.Engine, id uint, body string) models.Contact {
 	t.Helper()
-	req, _ := http.NewRequest("PUT", "/contacts/"+strconv.Itoa(int(id)), bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
+	w := doRequest(router, "PUT", "/contacts/"+strconv.Itoa(int(id)), bytes.NewBufferString(body), "application/json")
 	require.Equal(t, http.StatusOK, w.Code)
 
 	var got models.Contact
@@ -949,6 +946,7 @@ func TestUpdateContact_EmploymentFieldsBlankOrMissingKeepValues(t *testing.T) {
 	for _, body := range []string{
 		`{"firstname":"Erin"}`,
 		`{"firstname":"Erin","organization":"","department":"","job_title":"","role":""}`,
+		`{"firstname":"Erin","organization":"   ","job_title":"\t"}`,
 	} {
 		got := putContact(t, router, contact.ID, body)
 		assert.Equal(t, "Acme", got.Organization)
@@ -1028,4 +1026,39 @@ func TestUpdateContact_EmploymentFieldsEndedJobDoesNotOverwriteCurrent(t *testin
 	assert.Equal(t, "Globex", entries[0].Organization)
 	assert.Empty(t, entries[0].EndDate)
 	assert.Equal(t, "Acme", entries[1].Organization)
+}
+
+// The ended job left department blank and the current job fills it, so merging
+// before the stale check would hide the match and overwrite the current job.
+func TestUpdateContact_EmploymentFieldsEndedJobWithFewerFieldsDoesNotOverwriteCurrent(t *testing.T) {
+	db, router, userID := setupEmploymentPut(t)
+
+	contact := models.Contact{UserID: userID, Firstname: "Erin", Organization: "Globex", Department: "Sales", JobTitle: "Manager"}
+	require.NoError(t, db.Create(&contact).Error)
+	require.NoError(t, db.Create(&models.EmploymentHistory{
+		UserID: userID, ContactID: contact.ID, Organization: "Acme", JobTitle: "Engineer", EndDate: "2020-01-01",
+	}).Error)
+
+	got := putContact(t, router, contact.ID, `{"firstname":"Erin","organization":"Acme","job_title":"Engineer"}`)
+
+	assert.Equal(t, "Globex", got.Organization)
+	assert.Equal(t, "Sales", got.Department)
+	assert.Equal(t, "Manager", got.JobTitle)
+	entries := employmentEntries(t, db, contact.ID)
+	require.Len(t, entries, 2)
+	assert.Equal(t, "Globex", entries[0].Organization)
+	assert.Equal(t, "Sales", entries[0].Department)
+	assert.Equal(t, "Manager", entries[0].JobTitle)
+}
+
+func TestUpdateContact_EmploymentFieldsWhitespaceCreatesNoEntry(t *testing.T) {
+	db, router, userID := setupEmploymentPut(t)
+
+	contact := models.Contact{UserID: userID, Firstname: "Erin"}
+	require.NoError(t, db.Create(&contact).Error)
+
+	got := putContact(t, router, contact.ID, `{"firstname":"Erin","organization":"   "}`)
+
+	assert.Empty(t, got.Organization)
+	assert.Empty(t, employmentEntries(t, db, contact.ID))
 }
