@@ -106,7 +106,7 @@ type Contact struct {
 
 	Archived bool `gorm:"default:false" json:"archived"`
 
-	// RevertStaleEmployment is set by CardDAV and remote address book pulls so a
+	// RevertStaleEmployment is set by CardDAV, remote address book pulls and PUT /contacts/:id so a
 	// re-push of the job the user just ended doesn't resurrect it. Not persisted. Imports leave
 	// it unset on purpose: they are deliberate writes (e.g. rehired at the same
 	// company) and reopen the job.
@@ -172,7 +172,7 @@ func (c *Contact) AfterSave(tx *gorm.DB) error {
 // syncCurrentEmploymentHistory keeps the "current" (open-ended) EmploymentHistory
 // entry in step with the denormalized Organization/Department/JobTitle/Role
 // scalars whenever a Contact is saved directly (CSV/Monica import, CardDAV
-// sync; PUT /contacts/:id ignores these fields). Editing history
+// sync, PUT /contacts/:id). Editing history
 // through its own CRUD endpoints is the other half of the sync: those
 // recompute the scalars and save the Contact (services.RecomputeContactEmploymentScalars),
 // which lands back here as a no-op because the values already match.
@@ -234,6 +234,20 @@ func (c *Contact) syncCurrentEmploymentHistory(tx *gorm.DB) error {
 func (c *Contact) employmentMatches(e *EmploymentHistory) bool {
 	return e.Organization == c.Organization && e.Department == c.Department &&
 		e.JobTitle == c.JobTitle && e.Role == c.Role
+}
+
+// EndedEmploymentMatches reports whether the values are exactly those of the most
+// recently ended entry. All-blank values never match, and need no query.
+func (c *Contact) EndedEmploymentMatches(tx *gorm.DB, organization, department, jobTitle, role string) (bool, error) {
+	if organization == "" && department == "" && jobTitle == "" && role == "" {
+		return false, nil
+	}
+	last, err := c.latestClosedEntry(tx)
+	if err != nil || last == nil {
+		return false, err
+	}
+	return last.Organization == organization && last.Department == department &&
+		last.JobTitle == jobTitle && last.Role == role, nil
 }
 
 // resetEmploymentScalars writes the scalars of the given entry to the contact,
