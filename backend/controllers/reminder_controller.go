@@ -42,9 +42,17 @@ func CreateReminder(c *gin.Context) {
 		return
 	}
 
-	// Assign the ContactID to the reminder to link it to the contact
+	// Assign the ContactID to the reminder to link it to the contact. A contact nested
+	// in the body must go: on create GORM would let it override ContactID.
 	reminder.ContactID = &contact.ID
+	reminder.Contact = models.Contact{}
 	reminder.UserID = userID
+
+	// The rest of this state is the server's, whatever the body says.
+	reminder.Model = gorm.Model{}
+	reminder.Completed = false
+	reminder.EmailSent = false
+	reminder.LastSent = nil
 
 	// Set hours, minutes, seconds to 0 to ensure reminders are found when comparing for "until date"
 	reminder.RemindAt = time.Date(reminder.RemindAt.Year(),
@@ -57,9 +65,6 @@ func CreateReminder(c *gin.Context) {
 		apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to save reminder").WithError(err))
 		return
 	}
-
-	// Clear the Contact association to avoid including it in the response
-	reminder.Contact = models.Contact{}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Reminder created successfully", "reminder": reminder})
 }
@@ -310,11 +315,9 @@ func CompleteReminder(c *gin.Context) {
 		action = "skipped"
 	}
 
-	// If reoccur from completion, calculate next reminder time
-	// Default to true if not specified (nil)
-	reoccurFromCompletion := reminder.ReoccurFromCompletion == nil || *reminder.ReoccurFromCompletion
-	if reoccurFromCompletion && reminder.Recurrence != "once" {
-		reminder.RemindAt = services.CalculateNextReminderTime(reminder)
+	// Recurring reminders always come back, on a date that is not already due.
+	if reminder.Recurrence != "once" {
+		reminder.RemindAt = services.NextOccurrenceAfterToday(reminder)
 		// Reset completed and email_sent flags for recurring reminders
 		reminder.Completed = false
 		reminder.EmailSent = false

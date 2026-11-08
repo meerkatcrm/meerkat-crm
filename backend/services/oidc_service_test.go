@@ -797,8 +797,6 @@ func TestFindOrProvisionUser_AutoProvision(t *testing.T) {
 	})
 
 	t.Run("a second provider user without an email can also sign up", func(t *testing.T) {
-		t.Skip("bug: FindOrProvisionUser stores email as an empty string, which collides on the UNIQUE email column")
-
 		db := newImportSessionTestDB(t)
 		_, err := FindOrProvisionUser(db, &OIDCClaims{Subject: "subject-1", Provider: testOIDCProvider, Name: "Jane"}, oidcConfig(true, false))
 		require.NoError(t, err)
@@ -810,8 +808,6 @@ func TestFindOrProvisionUser_AutoProvision(t *testing.T) {
 	})
 
 	t.Run("username held by a deleted account gets a suffix", func(t *testing.T) {
-		t.Skip("bug: the username availability check skips soft-deleted rows, which still hold the UNIQUE username")
-
 		db := newImportSessionTestDB(t)
 		gone := seedLocalUser(t, db, "jane", "gone@example.com")
 		require.NoError(t, db.Delete(&gone).Error)

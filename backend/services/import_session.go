@@ -8,6 +8,7 @@ import (
 	"meerkat/config"
 	apperrors "meerkat/errors"
 	"meerkat/models"
+	"strings"
 	"sync"
 	"time"
 
@@ -194,6 +195,17 @@ func (m *ImportSessionManager) PreviewCSV(db *gorm.DB, userID uint, req models.I
 	}, nil
 }
 
+// rejectInvalidRow records a row that failed validation as skipped: the client's action
+// cannot force it in. It returns false for a valid row.
+func rejectInvalidRow(result *models.ImportResult, preview models.ImportRowPreview) bool {
+	if len(preview.ValidationErrors) == 0 {
+		return false
+	}
+	result.Errors = append(result.Errors, fmt.Sprintf("Row %d: Failed validation: %s", preview.RowIndex+1, strings.Join(preview.ValidationErrors, "; ")))
+	result.Skipped++
+	return true
+}
+
 // Confirm executes a CSV or VCF import using the per-row actions in req, then deletes
 // the session. Photo processing is handled separately by ConfirmVCF.
 func (m *ImportSessionManager) Confirm(db *gorm.DB, userID uint, req models.ImportConfirmRequest, log *zerolog.Logger) (*models.ImportResult, *apperrors.AppError) {
@@ -218,6 +230,10 @@ func (m *ImportSessionManager) Confirm(db *gorm.DB, userID uint, req models.Impo
 			}
 
 			result.TotalProcessed++
+
+			if action != "skip" && rejectInvalidRow(&result, preview) {
+				continue
+			}
 
 			switch action {
 			case "skip":
@@ -354,6 +370,11 @@ func (m *ImportSessionManager) ConfirmVCF(db *gorm.DB, userID uint, req models.I
 			}
 
 			result.TotalProcessed++
+
+			if action != "skip" && rejectInvalidRow(&result, preview) {
+				continue
+			}
+
 			vcfData := sessionData.vcfContacts[preview.RowIndex]
 
 			switch action {

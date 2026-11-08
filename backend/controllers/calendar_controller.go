@@ -109,10 +109,16 @@ func UpdateCalendarSubscription(c *gin.Context) {
 		return
 	}
 
-	if _, err := services.NormalizeCalendarURL(input.URL); err != nil {
+	normalized, err := services.NormalizeCalendarURL(input.URL)
+	if err != nil {
 		apperrors.AbortWithError(c, apperrors.ErrInvalidInput("url", "must be an http, https, or webcal URL"))
 		return
 	}
+
+	// The stored password belongs to the origin it was entered for, so it must not
+	// follow the subscription to another server.
+	storedURL, urlErr := services.NormalizeCalendarURL(subscription.URL)
+	originChanged := urlErr != nil || !services.SameCredentialOrigin(storedURL, normalized)
 
 	subscription.Name = input.Name
 	subscription.URL = input.URL
@@ -127,7 +133,7 @@ func UpdateCalendarSubscription(c *gin.Context) {
 		subscription.FutureDays = *input.FutureDays
 	}
 
-	if input.ClearPassword {
+	if input.ClearPassword || (originChanged && input.Password == "") {
 		subscription.PasswordEncrypted = ""
 	} else if input.Password != "" {
 		passwordEncrypted, err := services.EncryptCredential(currentConfig(c).JWTSecretKey, input.Password)
@@ -219,7 +225,9 @@ func calendarSyncError(err error) *apperrors.AppError {
 	case errors.Is(err, services.ErrCalendarUnreachable):
 		return apperrors.ErrExternal("Calendar", "calendar could not be reached")
 	default:
-		return apperrors.ErrOperationFailed("Calendar sync", err.Error())
+		// The caller logs the concrete error with a request ID. Internal detail
+		// (database errors, internal hostnames) must not reach the client.
+		return apperrors.ErrOperationFailed("Calendar sync", "an unexpected error occurred")
 	}
 }
 

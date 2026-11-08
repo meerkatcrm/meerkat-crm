@@ -101,7 +101,6 @@ func TestCreateCalendarSubscription_HonoursExplicitOptions(t *testing.T) {
 }
 
 func TestCreateCalendarSubscription_ZeroValuesAreNotReplacedByColumnDefaults(t *testing.T) {
-	skipKnownBug(t, "calendar_controller.go:86 db.Create drops false/0 for columns with a gorm default tag, so sync_enabled=false and past_days=0 are stored as true and 5")
 	f := setupCalendars(t)
 
 	w := doJSON(t, f.router, http.MethodPost, "/calendars", gin.H{"name": "Work", "url": "https://cal.example.com/", "sync_enabled": false, "past_days": 0, "future_days": 0})
@@ -197,7 +196,6 @@ func TestUpdateCalendarSubscription_FieldsAndPasswordHandling(t *testing.T) {
 }
 
 func TestUpdateCalendarSubscription_ChangingHostDropsTheStoredPassword(t *testing.T) {
-	skipKnownBug(t, "calendar_controller.go:118-139 keeps the stored password when url moves to another host, so the next sync sends it there")
 	f := setupCalendars(t)
 	subscription := f.seed(t, f.user.ID, "https://cal.example.com/", "original")
 
@@ -205,6 +203,20 @@ func TestUpdateCalendarSubscription_ChangingHostDropsTheStoredPassword(t *testin
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 
 	assert.Empty(t, f.reload(t, subscription.ID).PasswordEncrypted, "credentials stored for one host must not follow the subscription to another")
+}
+
+func TestUpdateCalendarSubscription_WebcalKeepsThePasswordButADowngradeDropsIt(t *testing.T) {
+	f := setupCalendars(t)
+	subscription := f.seed(t, f.user.ID, "https://cal.example.com/", "original")
+	path := fmt.Sprintf("/calendars/%d", subscription.ID)
+
+	w := doJSON(t, f.router, http.MethodPut, path, gin.H{"name": "n", "url": "webcal://cal.example.com/feed"})
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.NotEmpty(t, f.reload(t, subscription.ID).PasswordEncrypted, "webcal means https, on the same host")
+
+	w = doJSON(t, f.router, http.MethodPut, path, gin.H{"name": "n", "url": "http://cal.example.com/"})
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.Empty(t, f.reload(t, subscription.ID).PasswordEncrypted)
 }
 
 func TestDeleteCalendarSubscription_RemovesLinksButKeepsActivities(t *testing.T) {
@@ -346,7 +358,6 @@ func TestCalendarSyncError_MapsSentinels(t *testing.T) {
 }
 
 func TestCalendarSyncError_DoesNotExposeInternalDetail(t *testing.T) {
-	skipKnownBug(t, "calendar_controller.go:222 puts err.Error() of unexpected errors into the API response, which contactSyncError deliberately does not")
 	appErr := calendarSyncError(errors.New("db at 10.0.0.5 exploded"))
 	assert.NotContains(t, fmt.Sprintf("%s %v", appErr.Message, appErr.Details), "10.0.0.5")
 }

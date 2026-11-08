@@ -411,7 +411,6 @@ func TestCompleteReminder_SkippingRecurringReschedulesWithoutATimelineEntry(t *t
 }
 
 func TestCompleteReminder_RecurringNotFromCompletionKeepsRecurring(t *testing.T) {
-	skipKnownBug(t, "reminder_controller.go:315-316 reschedules only when reoccur_from_completion is true, so completing any other recurring reminder ends it for good")
 	f := setupReminders(t)
 	notFromCompletion := false
 	due := todayUTC().AddDate(0, 0, -2)
@@ -426,6 +425,39 @@ func TestCompleteReminder_RecurringNotFromCompletionKeepsRecurring(t *testing.T)
 	reloaded := f.reload(t, reminder.ID)
 	assert.False(t, reloaded.Completed, "a weekly reminder must come back next week")
 	assert.True(t, due.AddDate(0, 0, 7).Equal(reloaded.RemindAt.UTC()), "scheduled from the original date, got %s", reloaded.RemindAt)
+}
+
+func TestCompleteReminder_SeveralPeriodsOverdueIsNoLongerDue(t *testing.T) {
+	f := setupReminders(t)
+	notFromCompletion := false
+	due := todayUTC().AddDate(0, 0, -22)
+	reminder := f.newReminder(t, func(r *models.Reminder) {
+		r.RemindAt = due
+		r.ReoccurFromCompletion = &notFromCompletion
+	})
+
+	w := doRequest(f.router, http.MethodPost, fmt.Sprintf("/reminders/%d/complete", reminder.ID), nil, "")
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	reloaded := f.reload(t, reminder.ID)
+	assert.True(t, due.AddDate(0, 0, 28).Equal(reloaded.RemindAt.UTC()), "the first date on the schedule after today, got %s", reloaded.RemindAt)
+	assert.False(t, reloaded.EmailSent)
+}
+
+func TestCreateReminder_BodyCannotSetServerState(t *testing.T) {
+	f := setupReminders(t)
+
+	w := doJSON(t, f.router, http.MethodPost, fmt.Sprintf("/contacts/%d/reminders", f.contact.ID), gin.H{
+		"message": "Call", "recurrence": "monthly", "contact_id": f.contact.ID, "remind_at": "2030-05-17T00:00:00Z",
+		"ID": 999999, "completed": true, "email_sent": true,
+	})
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	var created models.Reminder
+	require.NoError(t, f.db.First(&created).Error)
+	assert.NotEqual(t, uint(999999), created.ID)
+	assert.False(t, created.Completed)
+	assert.False(t, created.EmailSent)
 }
 
 func TestCreateReminder_NormalizesDateAndForcesOwner(t *testing.T) {
@@ -445,7 +477,6 @@ func TestCreateReminder_NormalizesDateAndForcesOwner(t *testing.T) {
 }
 
 func TestCreateReminder_BodyCannotRetargetTheContact(t *testing.T) {
-	skipKnownBug(t, "reminder_controller.go:55 creates the reminder with the client-supplied contact association, which overrides the contact from the URL")
 	f := setupReminders(t)
 
 	w := doJSON(t, f.router, http.MethodPost, fmt.Sprintf("/contacts/%d/reminders", f.contact.ID), gin.H{
