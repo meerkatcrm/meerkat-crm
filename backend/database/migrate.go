@@ -23,6 +23,7 @@ func InitDB(dbPath string) (*gorm.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
+	defer sqlDB.Close()
 
 	// Run migrations
 	if err := RunMigrations(sqlDB); err != nil {
