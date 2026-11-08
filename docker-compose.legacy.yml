@@ -1,12 +1,13 @@
-# Meerkat CRM Docker Compose - Production
+# Meerkat CRM Docker Compose - Separate backend and frontend images (legacy)
 #
-# Pulls pre-built images from GitHub Container Registry.
+# Pulls pre-built images from GitHub Container Registry. New installs should use
+# docker-compose.yml, which runs the all-in-one image.
 #
 # USAGE:
-#   docker compose up -d
+#   docker compose -f docker-compose.legacy.yml up -d
 #
-# To build locally instead, use docker-compose.build.yml:
-#   docker compose -f docker-compose.build.yml up -d --build
+# To build locally instead, use docker-compose.build.legacy.yml:
+#   docker compose -f docker-compose.build.legacy.yml up -d --build
 
 services:
   backend:
