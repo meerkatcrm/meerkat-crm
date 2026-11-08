@@ -1,6 +1,7 @@
 package services
 
 import (
+	"errors"
 	"fmt"
 	"meerkat/config"
 	"meerkat/i18n"
@@ -22,6 +23,9 @@ const DefaultReminderMinInterval = 1 * time.Hour
 // ReminderMinInterval can be overridden for testing
 var ReminderMinInterval = DefaultReminderMinInterval
 
+// errJobSkipped rolls back acquireJobLock's transaction when the job should not run.
+var errJobSkipped = errors.New("job skipped")
+
 // getInstanceID returns a unique identifier for this server instance
 func getInstanceID() string {
 	hostname, err := os.Hostname()
@@ -33,13 +37,14 @@ func getInstanceID() string {
 
 // acquireJobLock attempts to acquire a lock for the given job.
 // Returns true if the lock was acquired, false if the job was run recently
-// or is currently locked by another instance.
+// or is currently locked by another instance. A database failure is returned as
+// an error, because the job did not run and the caller should say so.
 func acquireJobLock(db *gorm.DB, jobName string, minInterval time.Duration) (bool, error) {
 	now := time.Now()
 	instanceID := getInstanceID()
 	lockTimeout := 5 * time.Minute // Consider locks stale after 5 minutes
 
-	return db.Transaction(func(tx *gorm.DB) error {
+	err := db.Transaction(func(tx *gorm.DB) error {
 		var job models.JobExecution
 
 		// Try to find existing job execution record
@@ -71,7 +76,7 @@ func acquireJobLock(db *gorm.DB, jobName string, minInterval time.Duration) (boo
 				Dur("since_last_run", timeSinceLastRun).
 				Dur("min_interval", minInterval).
 				Msg("Skipping job - ran too recently")
-			return fmt.Errorf("job ran too recently")
+			return errJobSkipped
 		}
 
 		// Check if another instance has the lock
@@ -83,7 +88,7 @@ func acquireJobLock(db *gorm.DB, jobName string, minInterval time.Duration) (boo
 					Str("locked_by", job.LockedBy).
 					Dur("lock_age", lockAge).
 					Msg("Skipping job - locked by another instance")
-				return fmt.Errorf("job locked by another instance")
+				return errJobSkipped
 			}
 			// Lock is stale, we can take over
 			if lockAge >= lockTimeout {
@@ -104,7 +109,14 @@ func acquireJobLock(db *gorm.DB, jobName string, minInterval time.Duration) (boo
 
 		logger.Info().Str("job", jobName).Str("instance", instanceID).Msg("Acquired job lock")
 		return nil
-	}) == nil, nil
+	})
+	if errors.Is(err, errJobSkipped) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // releaseJobLock releases the lock and updates the last run time
