@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"cmp"
 	"database/sql"
 	"errors"
 	apperrors "meerkat/errors"
@@ -419,8 +420,19 @@ func UpdateContact(c *gin.Context) {
 	contact.Prefix = contactInput.Prefix
 	contact.MiddleName = contactInput.MiddleName
 	contact.Suffix = contactInput.Suffix
-	// Organization, Department, JobTitle and Role are derived from the current
-	// employment history entry and deliberately not updatable here.
+	// Organization, Department, JobTitle and Role mirror the current employment
+	// history entry. Saving the contact applies a change to that entry, or creates
+	// one if there is none (Contact.syncCurrentEmploymentHistory). The input can't
+	// tell a missing field from a blank one, so blank keeps the stored value: a
+	// partial PUT must not wipe the rest of the job. Clearing a field goes through
+	// the employment history endpoints.
+	contact.Organization = cmp.Or(contactInput.Organization, contact.Organization)
+	contact.Department = cmp.Or(contactInput.Department, contact.Department)
+	contact.JobTitle = cmp.Or(contactInput.JobTitle, contact.JobTitle)
+	contact.Role = cmp.Or(contactInput.Role, contact.Role)
+	// A client holding an old copy of the contact must not bring back a job the
+	// user has since ended.
+	contact.RevertStaleEmployment = true
 	contact.Anniversary = contactInput.Anniversary
 	contact.IsDeceased = contactInput.IsDeceased
 	contact.DeceasedDate = contactInput.DeceasedDate

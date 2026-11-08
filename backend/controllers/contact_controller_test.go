@@ -14,8 +14,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 func TestGetContacts(t *testing.T) {
@@ -887,30 +889,143 @@ func TestUpdateContact_RejectsDeceasedDateBeforeBirthday(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
-func TestUpdateContact_IgnoresDerivedEmploymentFields(t *testing.T) {
+// setupEmploymentPut returns a router with PUT /contacts/:id and the test user's ID.
+func setupEmploymentPut(t *testing.T) (*gorm.DB, *gin.Engine, uint) {
+	t.Helper()
 	db, router := setupRouter()
 
 	var user models.User
-	db.First(&user)
+	require.NoError(t, db.First(&user).Error)
 
 	router.PUT("/contacts/:id", withValidated(func() any { return &models.ContactInput{} }), UpdateContact)
+	return db, router, user.ID
+}
 
-	contact := models.Contact{UserID: user.ID, Firstname: "Erin", Organization: "Acme"}
+// putContact sends the body and returns the contact from the response.
+func putContact(t *testing.T, router *gin.Engine, id uint, body string) models.Contact {
+	t.Helper()
+	req, _ := http.NewRequest("PUT", "/contacts/"+strconv.Itoa(int(id)), bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var got models.Contact
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &got))
+	return got
+}
+
+func employmentEntries(t *testing.T, db *gorm.DB, contactID uint) []models.EmploymentHistory {
+	t.Helper()
+	var entries []models.EmploymentHistory
+	require.NoError(t, db.Where("contact_id = ?", contactID).Order("id").Find(&entries).Error)
+	return entries
+}
+
+func TestUpdateContact_EmploymentFieldsUpdateCurrentEntry(t *testing.T) {
+	db, router, userID := setupEmploymentPut(t)
+
+	contact := models.Contact{UserID: userID, Firstname: "Erin", Organization: "Acme", JobTitle: "Engineer"}
 	require.NoError(t, db.Create(&contact).Error)
 
-	// Neither a blanking nor a differing PUT may touch the derived fields.
-	for _, body := range []string{`{"firstname":"Erin"}`, `{"firstname":"Erin","organization":"Other"}`} {
-		req, _ := http.NewRequest("PUT", "/contacts/"+strconv.Itoa(int(contact.ID)), bytes.NewBufferString(body))
-		req.Header.Set("Content-Type", "application/json")
-		w := httptest.NewRecorder()
-		router.ServeHTTP(w, req)
-		require.Equal(t, http.StatusOK, w.Code)
+	got := putContact(t, router, contact.ID, `{"firstname":"Erin","organization":"Globex"}`)
 
-		var got models.Contact
-		require.NoError(t, db.First(&got, contact.ID).Error)
+	// The field left out of the body keeps its value, on the contact and on the entry.
+	assert.Equal(t, "Globex", got.Organization)
+	assert.Equal(t, "Engineer", got.JobTitle)
+	entries := employmentEntries(t, db, contact.ID)
+	require.Len(t, entries, 1, "a change corrects the current entry rather than adding one")
+	assert.Equal(t, "Globex", entries[0].Organization)
+	assert.Equal(t, "Engineer", entries[0].JobTitle)
+	assert.Empty(t, entries[0].EndDate)
+}
+
+func TestUpdateContact_EmploymentFieldsBlankOrMissingKeepValues(t *testing.T) {
+	db, router, userID := setupEmploymentPut(t)
+
+	contact := models.Contact{UserID: userID, Firstname: "Erin", Organization: "Acme", JobTitle: "Engineer"}
+	require.NoError(t, db.Create(&contact).Error)
+
+	for _, body := range []string{
+		`{"firstname":"Erin"}`,
+		`{"firstname":"Erin","organization":"","department":"","job_title":"","role":""}`,
+	} {
+		got := putContact(t, router, contact.ID, body)
 		assert.Equal(t, "Acme", got.Organization)
+		assert.Equal(t, "Engineer", got.JobTitle)
 	}
-	var entry models.EmploymentHistory
-	require.NoError(t, db.Where("contact_id = ?", contact.ID).First(&entry).Error)
-	assert.Equal(t, "Acme", entry.Organization)
+	entries := employmentEntries(t, db, contact.ID)
+	require.Len(t, entries, 1)
+	assert.Equal(t, "Acme", entries[0].Organization)
+	assert.Equal(t, "Engineer", entries[0].JobTitle)
+	assert.Empty(t, entries[0].EndDate)
+}
+
+func TestUpdateContact_EmploymentFieldsRoundTripAddsNoEntry(t *testing.T) {
+	db, router, userID := setupEmploymentPut(t)
+
+	contact := models.Contact{UserID: userID, Firstname: "Erin", Organization: "Acme", JobTitle: "Engineer"}
+	require.NoError(t, db.Create(&contact).Error)
+
+	// A client that sends back what it read, as many times as it likes.
+	for range 2 {
+		putContact(t, router, contact.ID, `{"firstname":"Erin","organization":"Acme","job_title":"Engineer"}`)
+	}
+	assert.Len(t, employmentEntries(t, db, contact.ID), 1)
+}
+
+func TestUpdateContact_EmploymentFieldsCreateEntryWhenNoneCurrent(t *testing.T) {
+	db, router, userID := setupEmploymentPut(t)
+
+	contact := models.Contact{UserID: userID, Firstname: "Erin"}
+	require.NoError(t, db.Create(&contact).Error)
+
+	got := putContact(t, router, contact.ID, `{"firstname":"Erin","organization":"Acme","role":"CTO"}`)
+
+	assert.Equal(t, "Acme", got.Organization)
+	assert.Equal(t, "CTO", got.Role)
+	entries := employmentEntries(t, db, contact.ID)
+	require.Len(t, entries, 1)
+	assert.Equal(t, "Acme", entries[0].Organization)
+	assert.Equal(t, "CTO", entries[0].Role)
+	assert.Empty(t, entries[0].EndDate)
+}
+
+func TestUpdateContact_EmploymentFieldsDoNotReviveEndedJob(t *testing.T) {
+	db, router, userID := setupEmploymentPut(t)
+
+	contact := models.Contact{UserID: userID, Firstname: "Erin"}
+	require.NoError(t, db.Create(&contact).Error)
+	require.NoError(t, db.Create(&models.EmploymentHistory{
+		UserID: userID, ContactID: contact.ID, Organization: "Acme", EndDate: "2020-01-01",
+	}).Error)
+
+	got := putContact(t, router, contact.ID, `{"firstname":"Erin","organization":"Acme"}`)
+
+	assert.Empty(t, got.Organization, "the response shows the state after the stale value is dropped")
+	var stored models.Contact
+	require.NoError(t, db.First(&stored, contact.ID).Error)
+	assert.Empty(t, stored.Organization)
+	entries := employmentEntries(t, db, contact.ID)
+	require.Len(t, entries, 1)
+	assert.Equal(t, "2020-01-01", entries[0].EndDate)
+}
+
+func TestUpdateContact_EmploymentFieldsEndedJobDoesNotOverwriteCurrent(t *testing.T) {
+	db, router, userID := setupEmploymentPut(t)
+
+	contact := models.Contact{UserID: userID, Firstname: "Erin", Organization: "Globex"}
+	require.NoError(t, db.Create(&contact).Error)
+	require.NoError(t, db.Create(&models.EmploymentHistory{
+		UserID: userID, ContactID: contact.ID, Organization: "Acme", EndDate: "2020-01-01",
+	}).Error)
+
+	got := putContact(t, router, contact.ID, `{"firstname":"Erin","organization":"Acme"}`)
+
+	assert.Equal(t, "Globex", got.Organization)
+	entries := employmentEntries(t, db, contact.ID)
+	require.Len(t, entries, 2)
+	assert.Equal(t, "Globex", entries[0].Organization)
+	assert.Empty(t, entries[0].EndDate)
+	assert.Equal(t, "Acme", entries[1].Organization)
 }

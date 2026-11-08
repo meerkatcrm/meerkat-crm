@@ -157,17 +157,21 @@ export async function createContact(
   return result.contact || result;
 }
 
-// Update contact
+// Update contact.
+// Callers pass the whole contact, so the employment fields are removed here: the UI
+// changes them only through the employment history endpoints, and a stale copy in
+// another tab must not overwrite a newer job.
 export async function updateContact(
   id: string | number,
   data: Partial<Contact>
 ): Promise<Contact> {
+  const { organization, department, job_title, role, ...payload } = data;
   const response = await apiFetch(
     `${API_BASE_URL}/contacts/${id}`,
     {
       method: 'PUT',
       headers: getAuthHeaders(),
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     }
   );
 

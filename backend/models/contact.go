@@ -106,7 +106,7 @@ type Contact struct {
 
 	Archived bool `gorm:"default:false" json:"archived"`
 
-	// RevertStaleEmployment is set by CardDAV and remote address book pulls so a
+	// RevertStaleEmployment is set by CardDAV, remote address book pulls and PUT /contacts/:id so a
 	// re-push of the job the user just ended doesn't resurrect it. Not persisted. Imports leave
 	// it unset on purpose: they are deliberate writes (e.g. rehired at the same
 	// company) and reopen the job.
@@ -172,7 +172,7 @@ func (c *Contact) AfterSave(tx *gorm.DB) error {
 // syncCurrentEmploymentHistory keeps the "current" (open-ended) EmploymentHistory
 // entry in step with the denormalized Organization/Department/JobTitle/Role
 // scalars whenever a Contact is saved directly (CSV/Monica import, CardDAV
-// sync; PUT /contacts/:id ignores these fields). Editing history
+// sync, PUT /contacts/:id). Editing history
 // through its own CRUD endpoints is the other half of the sync: those
 // recompute the scalars and save the Contact (services.RecomputeContactEmploymentScalars),
 // which lands back here as a no-op because the values already match.
