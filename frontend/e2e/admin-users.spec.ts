@@ -23,7 +23,11 @@ test.describe('Admin users', () => {
     }).toPass();
 
     await row.getByRole('button', { name: 'Delete' }).click();
-    await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('button', { name: 'Delete' }).click();
+    // An open dialog hides the page from role locators, so the row count alone
+    // reads 0 before the delete has finished. The dialog closes once it has.
+    await expect(dialog).toBeHidden();
     await expect(row).toHaveCount(0);
 
     const anonymous = await request.newContext({ storageState: LOGGED_OUT });
