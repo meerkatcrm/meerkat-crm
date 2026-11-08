@@ -46,6 +46,9 @@ After adjusting the environment variables as needed you can run:
 | `OIDC_TRUST_EMAIL` | When `true`, skips the `email_verified`  requirement when linking an OIDC identity to an existing account by email. Safe to enable for self-hosted providers (e.g. Authentik) where you control all user accounts. Default is `false` |
 | `REMINDER_TIME` | Time of day at which reminder emails are sent, in `HH:MM` format (24-hour). Default is `12:00` |
 | `REMINDER_TIMEZONE` | Timezone used for scheduling reminder emails. Must be a valid [IANA timezone name](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) (e.g. `Europe/Berlin`). Default is `UTC` |
+| `MONICA_BLOCK_PRIVATE_URLS` | When set to `true`, Monica imports refuse URLs that resolve to private or loopback addresses (SSRF protection for cloud or multi-tenant setups). Default is `false` |
+| `AUTH_RATE_LIMIT_BURST` | Per-IP burst limit for the login, registration, password reset and SSO endpoints. Leave unset in production, as raising it weakens brute-force protection. Default is `50` |
+| `API_RATE_LIMIT_BURST` | Per-IP burst limit for the authenticated API. Leave unset in production. Default is `500` |
 
 SSO is disabled unless all three of `OIDC_PROVIDER_URL`, `OIDC_CLIENT_ID`, and `OIDC_CLIENT_SECRET` are set.
 
