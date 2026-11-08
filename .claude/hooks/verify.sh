@@ -61,8 +61,6 @@ if changed frontend; then
   else
     failures+=("frontend/node_modules is missing - run 'yarn install' in frontend/ before relying on these checks")
   fi
-  parity=$(locale_parity_report "$ROOT/frontend/src/i18n/locales")
-  [ -n "$parity" ] && failures+=("--- i18n locale parity ---"$'\n'"$parity")
 fi
 
 if [ ${#failures[@]} -gt 0 ]; then

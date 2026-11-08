@@ -65,6 +65,11 @@ migration → `models/contact.go` → `models/dtos.go` → `middleware/validatio
 `frontend/src/contactFields.ts` → `ContactDetailPage.tsx` allowlist →
 `components/ContactInformation.tsx` → six locale files → tests both sides.
 
+Also check whether other services must respect the field (a deceased contact is
+excluded from `services/birthday_service.go`). Where the app can be run, round-trip it:
+save a value, reload, edit an unrelated field, save, and confirm the value survived.
+Unit tests miss this.
+
 **Migrations** are numbered sequentially (`000026_*.up.sql` / `.down.sql`) and
 embedded in the binary. Always write the matching `.down.sql`.
 
