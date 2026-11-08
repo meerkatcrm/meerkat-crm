@@ -82,5 +82,6 @@
 - Ensure all changes are committed and pushed to `main`
 - Create a tag using semantic versioning: `git tag v1.5.3`
 - Push the tag to GitHub: `git push origin v1.5.3`
-- This triggers a GitHub Actions workflow that automatically builds and publishes Docker images to GHCR
+- This triggers a GitHub Actions workflow that automatically builds and publishes Docker images to GHCR, and creates a draft GitHub release
+- Write the release notes in the draft, above the Docker Images section, and publish it
 - Users can then deploy the new version by setting `IMAGE_TAG=v1.5.3` (or by just using `:latest`) in their `.env` and running `docker compose up -d`
