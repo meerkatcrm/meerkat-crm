@@ -76,6 +76,7 @@ export default function EditableField({
                   autoFocus
                   error={!!showError}
                   placeholder={placeholder}
+                  slotProps={{ htmlInput: { 'aria-label': label } }}
                 />
                 <IconButton size="small" color="primary" onClick={() => onEditSave(field)} aria-label={t('common.save')}>
                   <SaveIcon fontSize="small" />

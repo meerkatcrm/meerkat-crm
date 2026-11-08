@@ -48,7 +48,8 @@ test.describe('Dashboard content', () => {
     const contact = await createTestContact(page.request, {
       firstname: 'Birthday',
       lastname: 'Person',
-      birthday: `1990-${date}`,
+      // A leap year, so this is a valid date even when it lands on February 29.
+      birthday: `1992-${date}`,
       circles: ['Friends'],
     });
 

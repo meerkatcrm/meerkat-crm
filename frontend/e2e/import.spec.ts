@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { test, expect, LOGGED_OUT, signInAsNewUser, uniqueUser } from './fixtures';
+import { test, expect, LOGGED_OUT, signInAsNewUser, uniqueUser, listContacts } from './fixtures';
 import { API_BASE_URL } from './global-setup';
 
 // Each test gets its own user, because import looks for duplicates across all of a user's contacts.
@@ -18,10 +18,6 @@ async function openImport(page: Page) {
 
 async function chooseFile(page: Page, name: string, mimeType: string, content: string) {
   await page.locator('#import-file-input').setInputFiles({ name, mimeType, buffer: Buffer.from(content) });
-}
-
-async function storedContacts(page: Page) {
-  return (await (await page.request.get(`${API_BASE_URL}/contacts?limit=10`)).json()).contacts;
 }
 
 test.describe('Import dialog', () => {
@@ -45,7 +41,7 @@ test.describe('Import dialog', () => {
     await expect(dialog.getByText('Import Complete')).toBeVisible();
     await dialog.getByRole('button', { name: 'Done' }).click();
 
-    const contacts = await storedContacts(page);
+    const contacts = await listContacts(page.request);
     expect(contacts).toHaveLength(1);
     const stored = await (await page.request.get(`${API_BASE_URL}/contacts/${contacts[0].ID}`)).json();
     expect(stored.phones.map((p: { value: string }) => p.value)).toContain('+1 555-0200');
@@ -68,7 +64,7 @@ test.describe('Import dialog', () => {
     await expect(dialog.getByText('1 rows skipped')).toBeVisible();
     await dialog.getByRole('button', { name: 'Done' }).click();
 
-    const contacts = await storedContacts(page);
+    const contacts = await listContacts(page.request);
     expect(contacts).toHaveLength(1);
     const stored = await (await page.request.get(`${API_BASE_URL}/contacts/${contacts[0].ID}`)).json();
     expect(stored.phones.map((p: { value: string }) => p.value)).toEqual(['+1 555-0100']);
@@ -87,7 +83,7 @@ test.describe('Import dialog', () => {
     await expect(dialog.getByText('Import Complete')).toBeVisible();
     await dialog.getByRole('button', { name: 'Done' }).click();
 
-    const contacts = await storedContacts(page);
+    const contacts = await listContacts(page.request);
     expect(contacts).toHaveLength(1);
     const stored = await (await page.request.get(`${API_BASE_URL}/contacts/${contacts[0].ID}`)).json();
     expect(stored).toMatchObject({ firstname: 'Csv', lastname: 'Person' });
@@ -100,6 +96,6 @@ test.describe('Import dialog', () => {
     const dialog = await openImport(page);
     await chooseFile(page, 'notes.txt', 'text/plain', 'not contacts');
     await expect(dialog.getByRole('alert').filter({ hasText: 'valid CSV or VCF' })).toBeVisible();
-    expect(await storedContacts(page)).toHaveLength(0);
+    expect(await listContacts(page.request)).toHaveLength(0);
   });
 });

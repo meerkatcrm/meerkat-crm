@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { test, expect, LOGGED_OUT, signInAsNewUser, uniqueUser, createTestContact } from './fixtures';
+import { test, expect, LOGGED_OUT, signInAsNewUser, uniqueUser, createTestContact, listContacts } from './fixtures';
 import { API_BASE_URL } from './global-setup';
 
 // http://fixtures/ is the static server in docker-compose.test.yml.
@@ -14,7 +14,8 @@ async function addCalendar(page: Page, name: string, url: string) {
   const dialog = page.getByRole('dialog');
   await dialog.getByRole('textbox', { name: /^Name/ }).fill(name);
   await dialog.getByRole('textbox', { name: /^Calendar URL/ }).fill(url);
-  // The fixture event has a fixed date, so widen the window to keep it inside.
+  // The fixture event is dated October 2026, so this window (the maximum) keeps
+  // it inside until October 2036. Move the date in calendar.ics before then.
   await dialog.getByRole('spinbutton', { name: 'Days in the past' }).fill('3650');
   await dialog.getByRole('button', { name: 'Save' }).click();
   await expect(dialog).toBeHidden();
@@ -52,8 +53,7 @@ test.describe('Calendar sync', () => {
     await expect(row).toHaveCount(0);
 
     await page.reload();
-    await expect(page.getByRole('button', { name: 'Add calendar' })).toBeVisible();
-    await expect(row).toHaveCount(0);
+    await expect(page.getByText('No calendars connected yet.')).toBeVisible();
   });
 });
 
@@ -94,10 +94,20 @@ test.describe('Contact sync and the phone sync filter', () => {
     await page.getByRole('option', { name: /^Import only/ }).click();
     await dialog.getByRole('button', { name: 'Save' }).click();
     await expect(dialog).toBeHidden({ timeout: 15000 });
-    await expect(page.getByRole('alert').filter({ hasText: 'Sync complete: 1 imported' })).toBeVisible({ timeout: 20000 });
 
-    const contacts = await (await page.request.get(`${API_BASE_URL}/contacts?limit=10`)).json();
-    expect(contacts.contacts.map((c: { firstname: string }) => c.firstname)).toEqual(['Allowed']);
+    // Read the outcome from the API: the page only announces a sync it saw running.
+    await expect
+      .poll(
+        async () => {
+          const body = await (await page.request.get(`${API_BASE_URL}/carddav/connection`)).json();
+          const connection = body.connection ?? body;
+          return connection.sync_running ? 'running' : connection.last_sync_status;
+        },
+        { timeout: 20000 }
+      )
+      .toBe('success');
+    const contacts = await listContacts(page.request);
+    expect(contacts.map((c: { firstname: string }) => c.firstname)).toEqual(['Allowed']);
 
     await page.goto('/contacts');
     await expect(page.getByText('Allowed Friend')).toBeVisible();
@@ -108,7 +118,6 @@ test.describe('Contact sync and the phone sync filter', () => {
     await page.getByRole('button', { name: 'Disconnect' }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Disconnect' }).click();
     await expect(page.getByRole('button', { name: 'Connect server' })).toBeVisible();
-    const after = await (await page.request.get(`${API_BASE_URL}/contacts?limit=10`)).json();
-    expect(after.contacts).toHaveLength(1);
+    expect(await listContacts(page.request)).toHaveLength(1);
   });
 });

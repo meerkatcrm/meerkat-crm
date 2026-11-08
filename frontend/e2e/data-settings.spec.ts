@@ -78,7 +78,7 @@ test.describe('Custom fields', () => {
 
     await page.goto(`/contacts/${contact.ID}`);
     await itemWithButton(page, 'Favourite snack', 'Edit').getByRole('button', { name: 'Edit', exact: true }).click({ force: true });
-    await page.getByRole('textbox').last().fill('Scorpions');
+    await page.getByRole('textbox', { name: 'Favourite snack' }).fill('Scorpions');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByText('Scorpions')).toBeVisible();
 
@@ -92,8 +92,9 @@ test.describe('Custom fields', () => {
     await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
     await expect(page.getByRole('listitem').filter({ hasText: 'Favourite snack' })).toHaveCount(0);
 
+    // The other field showing proves the names have loaded before checking for absence.
     await page.goto(`/contacts/${contact.ID}`);
-    await expect(page.getByRole('tab', { name: /reminders/i })).toBeVisible();
+    await expect(page.getByText('Shoe size')).toBeVisible();
     await expect(page.getByText('Favourite snack')).toHaveCount(0);
   });
 });

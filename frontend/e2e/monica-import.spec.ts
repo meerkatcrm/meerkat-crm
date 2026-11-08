@@ -1,5 +1,4 @@
-import { test, expect, LOGGED_OUT, signInAsNewUser, uniqueUser } from './fixtures';
-import { API_BASE_URL } from './global-setup';
+import { test, expect, LOGGED_OUT, signInAsNewUser, uniqueUser, listContacts } from './fixtures';
 
 // http://fixtures/ serves a small Monica API from e2e/fixture-server (see docker-compose.test.yml).
 test.use({ storageState: LOGGED_OUT });
@@ -29,7 +28,7 @@ test.describe('Monica import', () => {
     await expect(done).toBeVisible({ timeout: MONICA_TIMEOUT });
     await done.click();
 
-    const contacts = (await (await page.request.get(`${API_BASE_URL}/contacts?limit=10`)).json()).contacts;
+    const contacts = await listContacts(page.request);
     expect(contacts.map((c: { firstname: string }) => c.firstname).sort()).toEqual(['Max', 'Mona']);
 
     const mona = contacts.find((c: { firstname: string }) => c.firstname === 'Mona');
@@ -42,7 +41,7 @@ test.describe('Monica import', () => {
     await expect(page.getByText('E2E Monica reminder')).toBeVisible();
   });
 
-  test('shows an error and stays on the first step when Monica cannot be reached', async ({ page }) => {
+  test('shows an error and stays on the first step when the URL is not a Monica API', async ({ page }) => {
     await signInAsNewUser(page, uniqueUser('e2e_monica_bad'));
 
     await page.goto('/settings/data');
@@ -52,9 +51,9 @@ test.describe('Monica import', () => {
     await dialog.getByLabel(/^API token/).fill('e2e-token');
     await dialog.getByRole('button', { name: 'Connect' }).click();
 
-    await expect(dialog.getByRole('alert').filter({ hasNotText: 'API token' })).toBeVisible({ timeout: 15000 });
+    await expect(dialog.getByRole('alert').filter({ hasText: 'did not respond like a Monica API' })).toBeVisible({ timeout: 15000 });
     await expect(dialog.getByRole('button', { name: 'Fetch data' })).toHaveCount(0);
-    const contacts = (await (await page.request.get(`${API_BASE_URL}/contacts?limit=10`)).json()).contacts;
+    const contacts = await listContacts(page.request);
     expect(contacts).toHaveLength(0);
   });
 });
