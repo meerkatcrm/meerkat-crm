@@ -290,13 +290,14 @@ func TestCalendarSyncMatchesByContentWhenUIDsChange(t *testing.T) {
 	// on every request; unchanged events must still be recognized.
 	requests := 0
 	eventStart := icalDate(3)
+	otherEventStart := icalDate(5)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests++
 		w.Header().Set("Content-Type", "text/calendar")
 		fmt.Fprintf(w, "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Test//EN\n"+
 			"BEGIN:VEVENT\nUID:generated-%d-a\nSUMMARY:Bioabfall\nDTSTART:%s\nEND:VEVENT\n"+
 			"BEGIN:VEVENT\nUID:generated-%d-b\nSUMMARY:Restabfall\nDTSTART:%s\nEND:VEVENT\n"+
-			"END:VCALENDAR\n", requests, eventStart, requests, icalDate(5))
+			"END:VCALENDAR\n", requests, eventStart, requests, otherEventStart)
 	}))
 	defer server.Close()
 
