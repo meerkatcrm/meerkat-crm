@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"meerkat/logger"
+	"strings"
 
 	"github.com/glebarez/sqlite"
 	"github.com/golang-migrate/migrate/v4"
@@ -29,12 +30,28 @@ func InitDB(dbPath string) (*gorm.DB, error) {
 	}
 
 	// Open GORM connection
-	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(immediateTxDSN(dbPath)), &gorm.Config{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect with GORM: %w", err)
 	}
 
 	return db, nil
+}
+
+// immediateTxDSN makes every transaction take SQLite's write lock at BEGIN.
+//
+// By default a transaction starts as a reader and upgrades on its first write.
+// When another connection is already writing, that upgrade fails with
+// SQLITE_BUSY at once: SQLite does not apply busy_timeout, because waiting while
+// holding a read lock could deadlock. Any transaction that reads before writing
+// would be exposed to this. With BEGIN IMMEDIATE the wait happens at BEGIN, where
+// the driver's 5s busy_timeout applies.
+func immediateTxDSN(dbPath string) string {
+	sep := "?"
+	if strings.Contains(dbPath, "?") {
+		sep = "&"
+	}
+	return dbPath + sep + "_txlock=immediate"
 }
 
 // RunMigrations runs all pending database migrations

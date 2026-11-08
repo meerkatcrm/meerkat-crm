@@ -79,18 +79,18 @@ func main() {
 	schedule(s.Every(5).Minutes().Do(func() {
 		services.ProcessWebhookRetries(db, *cfg)
 	}))
-	// Sync calendar subscriptions regularly (rate-limited via job lock)
+	// Sync calendar subscriptions regularly (rate-limited via job lock).
+	// Interval jobs also run once when the scheduler starts, so unlike the daily
+	// reminder task above they need no separate startup call.
 	calendarSyncTask := func() {
 		services.SyncCalendarsWithRateLimit(db, *cfg)
 	}
 	schedule(s.Every(cfg.CalDAVSyncIntervalHours).Hours().Do(calendarSyncTask))
-	go calendarSyncTask() // Run initially once on startup (rate-limited to prevent duplicates)
 	// Sync CardDAV contact connections regularly (rate-limited via job lock)
 	contactSyncTask := func() {
 		services.SyncContactsWithRateLimit(db, *cfg)
 	}
 	schedule(s.Every(cfg.CardDAVSyncIntervalHours).Hours().Do(contactSyncTask))
-	go contactSyncTask() // Run initially once on startup (rate-limited to prevent duplicates)
 	go s.StartBlocking()
 
 	r := gin.Default()
