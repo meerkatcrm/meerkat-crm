@@ -138,3 +138,19 @@ func TestAcquireJobLock_SkipIsNotAnError(t *testing.T) {
 	assert.NoError(t, err)
 	assert.False(t, acquired)
 }
+
+func TestAcquireJobLock_SkipsWhileAnotherInstanceHoldsLock(t *testing.T) {
+	db := setupFileDB(t)
+	lockedAt := time.Now()
+	require.NoError(t, db.Create(&models.JobExecution{
+		JobName:   "job_a",
+		LastRunAt: time.Now().Add(-48 * time.Hour),
+		LockedAt:  &lockedAt,
+		LockedBy:  "other-instance",
+	}).Error)
+
+	acquired, err := acquireJobLock(db, "job_a", time.Hour)
+
+	assert.NoError(t, err)
+	assert.False(t, acquired)
+}
