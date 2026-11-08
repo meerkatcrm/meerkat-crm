@@ -64,8 +64,8 @@ test('checking the Deceased checkbox and saving calls onUpdateContact with is_de
   );
 
   const heartIcon = screen.getByTestId('HeartBrokenIcon');
-  const deceasedField = heartIcon.closest('.MuiBox-root')?.parentElement as HTMLElement;
-  fireEvent.click(within(deceasedField as HTMLElement).getByLabelText('Edit'));
+  const deceasedField = heartIcon.closest('.MuiBox-root') as HTMLElement;
+  fireEvent.click(within(deceasedField).getByLabelText('Edit'));
   fireEvent.click(screen.getByRole('checkbox', { name: /deceased/i }));
   fireEvent.click(screen.getByText('Save'));
 

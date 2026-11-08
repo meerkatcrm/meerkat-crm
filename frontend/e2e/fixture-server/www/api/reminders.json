@@ -1,0 +1,23 @@
+{
+  "data": [
+    {
+      "title": "E2E Monica reminder",
+      "description": "",
+      "frequency_type": "year",
+      "frequency_number": 1,
+      "initial_date": "2026-03-15",
+      "next_expected_date": "2036-03-15",
+      "contact": {
+        "id": 1,
+        "first_name": "Mona",
+        "last_name": "Imported",
+        "complete_name": "Mona Imported"
+      }
+    }
+  ],
+  "meta": {
+    "current_page": 1,
+    "last_page": 1,
+    "total": 1
+  }
+}

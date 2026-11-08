@@ -1,0 +1,109 @@
+{
+  "data": [
+    {
+      "id": 1,
+      "first_name": "Mona",
+      "last_name": "Imported",
+      "nickname": "",
+      "gender_type": "O",
+      "is_partial": false,
+      "is_dead": false,
+      "description": "",
+      "food_preferences": "",
+      "information": {
+        "dates": {
+          "birthdate": {
+            "date": "1980-05-20T00:00:00Z",
+            "is_age_based": false,
+            "is_year_unknown": false
+          },
+          "deceased_date": {
+            "date": null
+          }
+        },
+        "career": {
+          "job": "Engineer",
+          "company": "Monica Inc"
+        },
+        "avatar": {
+          "url": null,
+          "source": "default"
+        },
+        "how_you_met": {
+          "general_information": null
+        }
+      },
+      "tags": [
+        {
+          "name": "Monica Friends"
+        }
+      ],
+      "addresses": [],
+      "contactFields": [
+        {
+          "content": "mona@example.com",
+          "contact_field_type": {
+            "name": "Email",
+            "protocol": "mailto:",
+            "type": "email"
+          }
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "first_name": "Max",
+      "last_name": "Imported",
+      "nickname": "",
+      "gender_type": "O",
+      "is_partial": false,
+      "is_dead": false,
+      "description": "",
+      "food_preferences": "",
+      "information": {
+        "dates": {
+          "birthdate": {
+            "date": "1980-05-20T00:00:00Z",
+            "is_age_based": false,
+            "is_year_unknown": false
+          },
+          "deceased_date": {
+            "date": null
+          }
+        },
+        "career": {
+          "job": "Engineer",
+          "company": "Monica Inc"
+        },
+        "avatar": {
+          "url": null,
+          "source": "default"
+        },
+        "how_you_met": {
+          "general_information": null
+        }
+      },
+      "tags": [
+        {
+          "name": "Monica Friends"
+        }
+      ],
+      "addresses": [],
+      "contactFields": [
+        {
+          "content": "max@example.com",
+          "contact_field_type": {
+            "name": "Email",
+            "protocol": "mailto:",
+            "type": "email"
+          }
+        }
+      ]
+    }
+  ],
+  "meta": {
+    "current_page": 1,
+    "last_page": 1,
+    "total": 2
+  }
+}
