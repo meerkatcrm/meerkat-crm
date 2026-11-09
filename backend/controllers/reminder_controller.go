@@ -120,10 +120,14 @@ func UpdateReminder(c *gin.Context) {
 	// Updateable fields
 	reminder.Message = updatedReminder.Message
 	reminder.ByMail = updatedReminder.ByMail
-	reminder.RemindAt = time.Date(updatedReminder.RemindAt.Year(),
+	remindAt := time.Date(updatedReminder.RemindAt.Year(),
 		updatedReminder.RemindAt.Month(),
 		updatedReminder.RemindAt.Day(), 0, 0, 0, 0,
 		updatedReminder.RemindAt.Location())
+	// A new date is a new occurrence, which has not been emailed yet. Compared as
+	// dates, because a stored row can have a time of day that remindAt has just lost.
+	dateChanged := remindAt.UTC().Format(time.DateOnly) != reminder.RemindAt.UTC().Format(time.DateOnly)
+	reminder.RemindAt = remindAt
 	reminder.Recurrence = updatedReminder.Recurrence
 	reminder.ReoccurFromCompletion = updatedReminder.ReoccurFromCompletion
 	reminder.ContactID = updatedReminder.ContactID
@@ -140,7 +144,21 @@ func UpdateReminder(c *gin.Context) {
 		}
 	}
 
-	db.Updates(&reminder)
+	// Updates skips zero values, so a field left out of the request keeps its value
+	// and the reset of email_sent needs a write of its own.
+	saveErr := db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Updates(&reminder).Error; err != nil {
+			return err
+		}
+		if dateChanged {
+			return tx.Model(&reminder).Update("email_sent", false).Error
+		}
+		return nil
+	})
+	if saveErr != nil {
+		apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to update reminder").WithError(saveErr))
+		return
+	}
 
 	// Clear the Contact association to avoid including it in the response
 	reminder.Contact = models.Contact{}

@@ -181,7 +181,10 @@ func SendReminders(db *gorm.DB, config config.Config) error {
 	// Get the current time in the configured reminder timezone
 	loc := config.GetReminderLocation()
 	now := time.Now().In(loc)
-	endOfDay := time.Date(now.Year(), now.Month(), now.Day(), 23, 59, 59, 0, loc)
+	// remind_at holds a calendar date at midnight UTC, so today's date in the reminder
+	// timezone is compared as a UTC bound too. An offset here would make the query depend
+	// on SQLite comparing these columns as text, and send a day early west of UTC if not.
+	endOfDay := time.Date(now.Year(), now.Month(), now.Day(), 23, 59, 59, 0, time.UTC)
 
 	// Fetch reminders that are:
 	// - Set to be sent by email

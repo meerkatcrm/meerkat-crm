@@ -397,6 +397,12 @@ func TestMapMonicaReminderBirthdaysReoccurFromReminderDate(t *testing.T) {
 		{"contact has no birthday", "year", birthday, "", false},
 		{"monthly reminder on the birthday", "month", birthday, "06-15", false},
 		{"weekly reminder on the birthday", "week", birthday, "06-15", false},
+		{"Feb 29 birthday on Feb 29", "year", "2028-02-29T00:00:00Z", "02-29", true},
+		{"Feb 29 birthday on Feb 28", "year", "2027-02-28T00:00:00Z", "02-29", true},
+		{"Feb 29 birthday on Mar 1", "year", "2027-03-01T00:00:00Z", "02-29", true},
+		{"Feb 29 birthday on another day", "year", "2027-02-27T00:00:00Z", "02-29", false},
+		{"Feb 28 birthday on Mar 1", "year", "2027-03-01T00:00:00Z", "02-28", false},
+		{"Mar 1 birthday on Feb 28", "year", "2027-02-28T00:00:00Z", "03-01", false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

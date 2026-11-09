@@ -403,11 +403,20 @@ func nextRecurrenceOnOrAfter(remindAt time.Time, recurrence string, now time.Tim
 // Monica's reminders endpoint exposes no "this is a birthday" flag, and the
 // generated title is written in the Monica user's own language, so matching
 // the date is the signal that holds regardless of locale.
+//
+// A birthday reminder is a calendar date, as in the frontend's
+// findBirthdayReminder. Monica sends these dates in UTC or without a time, so
+// this compares the same date. Like there, a Feb 29 birthday also accepts the
+// neighbouring dates it falls on in a non-leap year.
 func isBirthdayReminder(recurrence string, remindAt time.Time, birthdayMonthDay string) bool {
 	if recurrence != "yearly" || birthdayMonthDay == "" {
 		return false
 	}
-	return remindAt.Format("01-02") == birthdayMonthDay
+	monthDay := remindAt.Format("01-02")
+	if monthDay == birthdayMonthDay {
+		return true
+	}
+	return birthdayMonthDay == "02-29" && (monthDay == "02-28" || monthDay == "03-01")
 }
 
 // birthdayMonthDayByMonicaID indexes the "MM-DD" of every known person's

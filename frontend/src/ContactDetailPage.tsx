@@ -31,7 +31,7 @@ import {
   updateReminder,
   deleteReminder
 } from './api/reminders';
-import { computeNextBirthdayOccurrence, findBirthdayReminder, buildBirthdayReminderPayload } from './utils/birthdayReminder';
+import { findBirthdayReminder, buildBirthdayReminderPayload, buildBirthdayReminderUpdate } from './utils/birthdayReminder';
 import {
   Box,
   Card,
@@ -429,9 +429,9 @@ export default function ContactDetailPage() {
             await deleteReminder(existingReminder.ID);
             await refreshReminders();
           } else {
-            const nextOccurrence = computeNextBirthdayOccurrence(valueToSave);
-            if (nextOccurrence) {
-              await updateReminder(existingReminder.ID, { remind_at: nextOccurrence.toISOString() });
+            const update = buildBirthdayReminderUpdate(existingReminder, valueToSave);
+            if (update) {
+              await updateReminder(existingReminder.ID, update);
               await refreshReminders();
             }
           }

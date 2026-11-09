@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 )
 
@@ -491,4 +492,62 @@ func TestSendRemindersWithRateLimit_AllowsAfterInterval(t *testing.T) {
 	// Verify last run time was updated
 	db.Where("job_name = ?", models.JobNameDailyReminders).First(&job)
 	assert.True(t, job.LastRunAt.After(firstRunTime), "LastRunAt should be updated after second run")
+}
+
+// A birthday reminder is stored as midnight UTC of its calendar date. It is due on
+// that date in the reminder timezone, not at the instant midnight UTC falls there.
+func TestSendReminders_DueOnCalendarDate(t *testing.T) {
+	for _, zone := range []string{"UTC", "Europe/Berlin", "America/Los_Angeles", "Australia/Sydney", "Pacific/Auckland", "Pacific/Kiritimati", "Pacific/Pago_Pago"} {
+		t.Run(zone, func(t *testing.T) {
+			db, _ := setupRouter()
+
+			user := models.User{Username: "reminder-user", Password: "password123", Email: "owner@example.com"}
+			require.NoError(t, db.Create(&user).Error)
+			contact := models.Contact{UserID: user.ID, Firstname: "Jane", Lastname: "Doe"}
+			require.NoError(t, db.Create(&contact).Error)
+
+			cfg := config.Config{
+				UseResend:        true,
+				ResendAPIKey:     "test_api_key",
+				ResendFromEmail:  "noreply@example.com",
+				ReminderTimezone: zone,
+			}
+			// GetReminderLocation falls back to UTC, which would pass here without testing anything.
+			require.Equal(t, zone, cfg.GetReminderLocation().String())
+			now := time.Now().In(cfg.GetReminderLocation())
+			calendarDate := func(days int) time.Time {
+				return time.Date(now.Year(), now.Month(), now.Day()+days, 0, 0, 0, 0, time.UTC)
+			}
+
+			byMail, reoccurFromCompletion := true, false
+			for message, remindAt := range map[string]time.Time{
+				"yesterday": calendarDate(-1),
+				"today":     calendarDate(0),
+				"tomorrow":  calendarDate(1),
+			} {
+				require.NoError(t, db.Create(&models.Reminder{
+					UserID:                user.ID,
+					ContactID:             &contact.ID,
+					Message:               message,
+					ByMail:                &byMail,
+					RemindAt:              remindAt,
+					Recurrence:            "yearly",
+					ReoccurFromCompletion: &reoccurFromCompletion,
+				}).Error)
+			}
+
+			var sent []string
+			originalSender := sendReminderEmailFn
+			sendReminderEmailFn = func(_ models.User, reminders []models.Reminder, _ config.Config, _ *gorm.DB) error {
+				for _, reminder := range reminders {
+					sent = append(sent, reminder.Message)
+				}
+				return nil
+			}
+			defer func() { sendReminderEmailFn = originalSender }()
+
+			require.NoError(t, SendReminders(db, cfg))
+			assert.ElementsMatch(t, []string{"yesterday", "today"}, sent)
+		})
+	}
 }
