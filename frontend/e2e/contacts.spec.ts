@@ -14,6 +14,26 @@ test.describe('Contacts', () => {
     await expect(page.getByRole('button', { name: /add/i })).toBeVisible();
   });
 
+  test('should keep toolbar buttons intact on narrow or zoomed windows', async ({ page }) => {
+    await page.goto('/contacts');
+    const buttons = [/find duplicates/i, /^import$/i, /add contact/i].map((name) =>
+      page.getByRole('button', { name }),
+    );
+
+    // 1200 is a full-width window on a 1440 point display at 120% browser zoom.
+    for (const width of [1200, 1024, 768]) {
+      await page.setViewportSize({ width, height: 800 });
+      for (const button of buttons) {
+        const overflow = await button.evaluate((el) => el.scrollWidth - el.clientWidth);
+        expect(overflow, `button overflow at ${width}px`).toBeLessThanOrEqual(0);
+      }
+      const pageOverflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(pageOverflow, `page overflow at ${width}px`).toBeLessThanOrEqual(0);
+    }
+  });
+
   test('should find seeded contacts via search', async ({ page }) => {
     await page.goto('/contacts');
     await waitForLoading(page);
