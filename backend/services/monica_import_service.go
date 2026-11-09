@@ -405,8 +405,8 @@ func nextRecurrenceOnOrAfter(remindAt time.Time, recurrence string, now time.Tim
 // the date is the signal that holds regardless of locale.
 //
 // A birthday reminder is a calendar date, as in the frontend's
-// findBirthdayReminder. monicaParseTime reads Monica's dates as UTC, so this
-// compares the same UTC date. Like there, a Feb 29 birthday also accepts the
+// findBirthdayReminder. Monica sends these dates in UTC or without a time, so
+// this compares the same date. Like there, a Feb 29 birthday also accepts the
 // neighbouring dates it falls on in a non-leap year.
 func isBirthdayReminder(recurrence string, remindAt time.Time, birthdayMonthDay string) bool {
 	if recurrence != "yearly" || birthdayMonthDay == "" {

@@ -512,6 +512,8 @@ func TestSendReminders_DueOnCalendarDate(t *testing.T) {
 				ResendFromEmail:  "noreply@example.com",
 				ReminderTimezone: zone,
 			}
+			// GetReminderLocation falls back to UTC, which would pass here without testing anything.
+			require.Equal(t, zone, cfg.GetReminderLocation().String())
 			now := time.Now().In(cfg.GetReminderLocation())
 			calendarDate := func(days int) time.Time {
 				return time.Date(now.Year(), now.Month(), now.Day()+days, 0, 0, 0, 0, time.UTC)

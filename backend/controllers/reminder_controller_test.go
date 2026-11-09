@@ -699,3 +699,81 @@ func TestBirthdayReminder_StaysOnCalendarDate(t *testing.T) {
 	w = send("PUT", fmt.Sprintf("/reminders/%d", reminder.ID), bytes.NewBufferString(`{"remind_at":"2027-05-01T00:00:00.000Z"}`))
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
+
+// A reminder already emailed for its old date must email again on its new one.
+func TestUpdateReminder_ResetsEmailSentOnlyWhenTheDateChanges(t *testing.T) {
+	db, router := setupRouter()
+	router.PUT("/reminders/:id", middleware.ValidateJSONMiddleware(&models.Reminder{}), UpdateReminder)
+
+	var user models.User
+	db.First(&user)
+	contact := models.Contact{UserID: user.ID, Firstname: "Jamie", Lastname: "Smith"}
+	require.NoError(t, db.Create(&contact).Error)
+
+	byMail, reoccurFromCompletion := true, false
+	reminder := models.Reminder{
+		UserID:                user.ID,
+		ContactID:             &contact.ID,
+		Message:               "Birthday",
+		ByMail:                &byMail,
+		RemindAt:              time.Date(2027, 3, 15, 9, 0, 0, 0, time.UTC),
+		Recurrence:            "yearly",
+		ReoccurFromCompletion: &reoccurFromCompletion,
+		EmailSent:             true,
+	}
+	require.NoError(t, db.Create(&reminder).Error)
+
+	update := func(message, remindAt string) models.Reminder {
+		body := fmt.Sprintf(`{"message":%q,"by_mail":true,"remind_at":%q,`+
+			`"recurrence":"yearly","reoccur_from_completion":false,"contact_id":%d}`, message, remindAt, contact.ID)
+		req, _ := http.NewRequest("PUT", fmt.Sprintf("/reminders/%d", reminder.ID), bytes.NewBufferString(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+		var stored models.Reminder
+		require.NoError(t, db.First(&stored, reminder.ID).Error)
+		return stored
+	}
+
+	assert.True(t, update("Edited", "2027-03-15T00:00:00.000Z").EmailSent, "same date, same occurrence")
+	assert.False(t, update("Edited", "2027-04-20T00:00:00.000Z").EmailSent, "new date, new occurrence")
+}
+
+// by_mail and reoccur_from_completion are optional, and leaving them out keeps them.
+func TestUpdateReminder_KeepsFieldsLeftOutOfTheRequest(t *testing.T) {
+	db, router := setupRouter()
+	router.PUT("/reminders/:id", middleware.ValidateJSONMiddleware(&models.Reminder{}), UpdateReminder)
+
+	var user models.User
+	db.First(&user)
+	contact := models.Contact{UserID: user.ID, Firstname: "Jamie", Lastname: "Smith"}
+	require.NoError(t, db.Create(&contact).Error)
+
+	byMail, reoccurFromCompletion := true, false
+	reminder := models.Reminder{
+		UserID:                user.ID,
+		ContactID:             &contact.ID,
+		Message:               "Birthday",
+		ByMail:                &byMail,
+		RemindAt:              time.Date(2027, 3, 15, 0, 0, 0, 0, time.UTC),
+		Recurrence:            "yearly",
+		ReoccurFromCompletion: &reoccurFromCompletion,
+	}
+	require.NoError(t, db.Create(&reminder).Error)
+
+	body := fmt.Sprintf(`{"message":"Edited","remind_at":"2027-04-20T00:00:00.000Z","recurrence":"yearly","contact_id":%d}`, contact.ID)
+	req, _ := http.NewRequest("PUT", fmt.Sprintf("/reminders/%d", reminder.ID), bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	var stored models.Reminder
+	require.NoError(t, db.First(&stored, reminder.ID).Error)
+	require.NotNil(t, stored.ByMail)
+	assert.True(t, *stored.ByMail)
+	require.NotNil(t, stored.ReoccurFromCompletion)
+	assert.False(t, *stored.ReoccurFromCompletion)
+}
