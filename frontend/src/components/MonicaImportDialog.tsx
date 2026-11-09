@@ -40,6 +40,7 @@ import WarningIcon from '@mui/icons-material/Warning';
 import ErrorIcon from '@mui/icons-material/Error';
 import CloseIcon from '@mui/icons-material/Close';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import { importStepperSx } from './importStepperSx';
 import { useSnackbar } from '../context/SnackbarContext';
 import { getErrorMessage } from '../utils/errorHandler';
 import {
@@ -854,7 +855,7 @@ export default function MonicaImportDialog({
       </DialogTitle>
 
       <DialogContent dividers>
-        <Stepper activeStep={STEP_INDEX[step]} sx={{ mb: 3 }}>
+        <Stepper activeStep={STEP_INDEX[step]} sx={importStepperSx}>
           {STEP_KEYS.map((key) => (
             <Step key={key}>
               <StepLabel>{t(`settings.monicaImport.steps.${key}`)}</StepLabel>

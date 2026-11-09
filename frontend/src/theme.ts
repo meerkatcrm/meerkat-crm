@@ -1,6 +1,16 @@
 // theme.ts
 import { createTheme } from "@mui/material/styles";
 
+// Long translated labels wrap to a second row instead of squeezing their neighbour.
+const dialogActionsOverride = {
+  styleOverrides: {
+    root: {
+      flexWrap: "wrap",
+      rowGap: 8,
+    },
+  },
+} as const;
+
 export const lightTheme = createTheme({
   palette: {
     mode: "light",
@@ -63,6 +73,8 @@ export const lightTheme = createTheme({
   },
 
   components: {
+    MuiDialogActions: dialogActionsOverride,
+
     MuiCard: {
       styleOverrides: {
         root: {
@@ -149,6 +161,8 @@ export const darkTheme = createTheme({
   },
 
   components: {
+    MuiDialogActions: dialogActionsOverride,
+
     MuiCard: {
       styleOverrides: {
         root: {

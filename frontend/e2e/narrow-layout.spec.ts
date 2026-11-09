@@ -3,7 +3,7 @@ import { test, expect, createTestContact, deleteTestContact } from './fixtures';
 // Narrow CSS widths are also what a desktop browser gets at high zoom: 600 px is
 // 240% on a 1440 px display. A page must never scroll sideways as a whole. Wide
 // content such as a data table scrolls inside its own container instead.
-const PAGES = ['/network', '/users', '/settings', '/settings/data', '/api-tokens', '/activities'];
+const PAGES = ['/contacts', '/network', '/users', '/settings', '/settings/data', '/api-tokens', '/activities'];
 const WIDTHS = [600, 375];
 
 // German labels run longest, so they are the first to overflow or clip.
@@ -41,4 +41,14 @@ test('the logout button keeps its accessible name at phone width', async ({ page
   await page.setViewportSize({ width: 375, height: 800 });
   await page.goto('/settings');
   await expect(page.getByRole('button', { name: 'Logout' })).toBeVisible();
+});
+
+test('the import dialog does not scroll sideways at phone width', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 800 });
+  await page.goto('/contacts');
+  await page.getByRole('button', { name: 'Import', exact: true }).click();
+  const content = page.getByRole('dialog').locator('.MuiDialogContent-root');
+  await expect(content).toBeVisible();
+  const overflow = await content.evaluate((el) => el.scrollWidth - el.clientWidth);
+  expect(overflow).toBe(0);
 });

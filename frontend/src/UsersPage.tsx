@@ -297,7 +297,7 @@ export default function UsersPage() {
 
       {/* Edit User Dialog */}
       <AppDialog open={editDialogOpen} onClose={handleEditClose} maxWidth="sm" fullWidth>
-        <form onSubmit={handleEditSubmit}>
+        <form onSubmit={handleEditSubmit} style={{ display: 'contents' }}>
           <DialogTitle>{t('users.editDialog.title')}</DialogTitle>
           <DialogContent>
             <Stack spacing={2} sx={{ mt: 1 }}>
