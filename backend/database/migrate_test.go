@@ -182,3 +182,35 @@ func TestImmediateTxDSN(t *testing.T) {
 		}
 	}
 }
+
+func TestMigration33_KeepsFieldsOfUnconfiguredUsers(t *testing.T) {
+	db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "test.db"))
+	require.NoError(t, err)
+	defer db.Close()
+	db.SetMaxOpenConns(1)
+	m := newMigrator(t, db)
+	require.NoError(t, m.Migrate(32))
+
+	const previousDefaults = `["emails","phones","addresses","nickname","gender","birthday","how_we_met","food_preference","work_information","contact_information"]`
+	_, err = db.Exec(`INSERT INTO users (id, username, password, email, enabled_contact_fields) VALUES
+		(1, 'unconfigured', 'hash', 'a@example.com', NULL),
+		(2, 'configured', 'hash', 'b@example.com', '["emails"]'),
+		(3, 'none', 'hash', 'c@example.com', '[]')`)
+	require.NoError(t, err)
+
+	fields := func(id int) sql.NullString {
+		var v sql.NullString
+		require.NoError(t, db.QueryRow(`SELECT enabled_contact_fields FROM users WHERE id = ?`, id).Scan(&v))
+		return v
+	}
+
+	require.NoError(t, m.Migrate(33))
+	assert.Equal(t, previousDefaults, fields(1).String)
+	assert.Equal(t, `["emails"]`, fields(2).String)
+	assert.Equal(t, `[]`, fields(3).String)
+
+	require.NoError(t, m.Migrate(32))
+	assert.False(t, fields(1).Valid, "the untouched value goes back to NULL")
+	assert.Equal(t, `["emails"]`, fields(2).String)
+	assert.Equal(t, `[]`, fields(3).String)
+}
