@@ -205,7 +205,7 @@ func TestMigration33_KeepsFieldsOfUsersWithWorkInformation(t *testing.T) {
 		(1, 'b', '', NULL),
 		(2, 'c', 'Notes on the job', NULL),
 		(3, 'd', 'Notes on the job', NULL),
-		(5, 'e', '   ', NULL),
+		(5, 'e', ' ' || char(9) || char(13) || char(10), NULL),
 		(5, 'f', NULL, NULL),
 		(6, 'g', 'Notes on the job', CURRENT_TIMESTAMP)`)
 	require.NoError(t, err)

@@ -10,5 +10,5 @@ WHERE enabled_contact_fields IS NULL
     SELECT 1 FROM contacts
     WHERE contacts.user_id = users.id
       AND contacts.deleted_at IS NULL
-      AND TRIM(COALESCE(contacts.work_information, '')) != ''
+      AND TRIM(COALESCE(contacts.work_information, ''), char(9) || char(10) || char(13) || ' ') != ''
   );
