@@ -47,6 +47,7 @@
 - Stop and clean up: `docker compose -f docker-compose.test.yml down -v`
 - The suite seeds and deletes data on whatever it points at, so never run it against a dev database. It targets `http://localhost:7300` unless `PLAYWRIGHT_BASE_URL` says otherwise, and the dev server uses that port too: check that the test stack is what's listening there.
 - The suite expects a fresh stack. Users created by the registration and isolation specs are not removed, and the first account registered on a stack becomes its admin, so run `down -v` before a new run.
+- The stack also runs Mailpit, which captures outgoing mail, and a static `fixtures` server standing in for a remote calendar feed and a Monica API. Its files are in [frontend/e2e/fixture-server](frontend/e2e/fixture-server).
 - Tests run automatically in CI on push/PR to main via [.github/workflows/e2e-tests.yml](.github/workflows/e2e-tests.yml).
 
 **CardDAV client sync tests**

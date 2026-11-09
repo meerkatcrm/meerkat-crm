@@ -80,6 +80,9 @@ test.describe('Employment history', () => {
 
       await expect(dialog).toBeHidden();
       await expect(page.getByText(`${org} Renamed`)).toBeVisible();
+
+      await openTab(page, contact.ID);
+      await expect(page.getByText(`${org} Renamed`)).toBeVisible();
     } finally {
       await deleteTestContact(page.request, contact.ID);
     }
@@ -100,6 +103,10 @@ test.describe('Employment history', () => {
 
       await expect(page.getByText('Current', { exact: true })).toBeHidden();
       await expect(page.getByRole('button', { name: /end this job/i })).toBeHidden();
+
+      await openTab(page, contact.ID);
+      await expect(page.getByText(org)).toBeVisible();
+      await expect(page.getByText('Current', { exact: true })).toBeHidden();
     } finally {
       await deleteTestContact(page.request, contact.ID);
     }
@@ -118,6 +125,9 @@ test.describe('Employment history', () => {
       await page.getByRole('button', { name: /^delete$/i }).click();
 
       await expect(page.getByText(org)).toBeHidden();
+      await expect(page.getByText(/no employment history yet/i)).toBeVisible();
+
+      await openTab(page, contact.ID);
       await expect(page.getByText(/no employment history yet/i)).toBeVisible();
     } finally {
       await deleteTestContact(page.request, contact.ID);

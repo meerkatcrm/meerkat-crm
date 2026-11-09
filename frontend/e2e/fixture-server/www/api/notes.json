@@ -1,0 +1,20 @@
+{
+  "data": [
+    {
+      "body": "E2E Monica note",
+      "is_favorited": false,
+      "created_at": "2026-01-02T10:00:00Z",
+      "contact": {
+        "id": 1,
+        "first_name": "Mona",
+        "last_name": "Imported",
+        "complete_name": "Mona Imported"
+      }
+    }
+  ],
+  "meta": {
+    "current_page": 1,
+    "last_page": 1,
+    "total": 1
+  }
+}

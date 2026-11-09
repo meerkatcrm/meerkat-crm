@@ -81,6 +81,11 @@ export async function deleteTestContact(
   await request.delete(`${API_BASE_URL}/contacts/${id}`).catch(() => {});
 }
 
+/** The contacts the given client's user can see (at most a test's worth). */
+export async function listContacts(request: APIRequestContext): Promise<any[]> {
+  return (await (await request.get(`${API_BASE_URL}/contacts?limit=10`)).json()).contacts;
+}
+
 export interface UserCredentials {
   username: string;
   email: string;

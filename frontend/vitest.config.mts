@@ -19,6 +19,8 @@ export default defineConfig({
       reporter: ['text-summary', 'html'],
       include: ['src/**/*.{ts,tsx}'],
       exclude: ['src/**/*.{test,spec}.{ts,tsx}', 'src/setupTests.ts', 'src/i18n/locales/**'],
+      // A floor just under the measured numbers, so coverage can't quietly slide.
+      thresholds: { statements: 51, branches: 46, functions: 42, lines: 52 },
     },
   },
 });

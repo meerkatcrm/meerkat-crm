@@ -49,6 +49,15 @@ services:
     ports:
       - "8025:8025"
 
+  # Static stand-in for remote servers: an .ics feed and a Monica API. The app
+  # reaches it at http://fixtures/, which the E2E suite types into its forms.
+  fixtures:
+    image: nginx:1.29-alpine
+    container_name: meerkat-test-fixtures
+    volumes:
+      - ./frontend/e2e/fixture-server/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./frontend/e2e/fixture-server/www:/usr/share/nginx/html:ro
+
 volumes:
   test-data:
   test-photos:
