@@ -180,7 +180,7 @@ export default function ContactsPage() {
             />
           }
           label={t('contacts.showArchived')}
-          sx={{ ml: 0.5, whiteSpace: 'nowrap' }}
+          sx={{ m: 0, whiteSpace: 'nowrap' }}
         />
         <Stack
           direction={{ xs: 'column', sm: 'row' }}

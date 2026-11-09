@@ -16,6 +16,7 @@ test.describe('Contacts', () => {
 
   test('should keep toolbar buttons intact on narrow or zoomed windows', async ({ page }) => {
     await page.goto('/contacts');
+    await waitForLoading(page);
     const buttons = [/find duplicates/i, /^import$/i, /add contact/i].map((name) =>
       page.getByRole('button', { name }),
     );
