@@ -48,7 +48,7 @@ jobs:
           total=$(go tool cover -func=coverage.out | tail -n 1 | awk '{print $3}' | tr -d '%')
           # A floor just under the measured number, so coverage can't quietly slide.
           # "+ 0" makes unparseable output fail: awk compares non-numeric text as a string, and "n/a" >= "70".
-          awk -v total="$total" 'BEGIN { exit !(total + 0 >= 70) }' || { echo "Coverage $total% is below the 70% floor"; exit 1; }
+          awk -v total="$total" 'BEGIN { exit !(total + 0 >= 70) }' || { echo "Coverage floor of 70% not met (total: '$total')"; exit 1; }
 
   frontend:
     permissions:
