@@ -157,7 +157,8 @@ export default function CustomFieldsSettings() {
                     {fieldNames.map((name, index) => (
                       <ListItem
                         key={index}
-                        sx={{ px: 0 }}
+                        // Keep the text clear of the absolutely positioned action buttons.
+                        sx={{ pl: 0, pr: 15, overflowWrap: 'anywhere' }}
                         secondaryAction={
                           <>
                             <IconButton

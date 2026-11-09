@@ -283,7 +283,7 @@ export default function WebhooksSettings() {
                   <Box key={wh.id}>
                     <ListItem
                       // Keep the text clear of the absolutely positioned action buttons.
-                      sx={{ pl: 0, pr: 13, overflowWrap: 'anywhere' }}
+                      sx={{ pl: 0, pr: 15, overflowWrap: 'anywhere' }}
                       secondaryAction={
                         <Box sx={{ display: 'flex', gap: 0.5 }}>
                           <IconButton

@@ -11,6 +11,15 @@ const dialogActionsOverride = {
   },
 } as const;
 
+// Messages can contain long URLs, which would otherwise scroll sideways inside the alert.
+const alertOverride = {
+  styleOverrides: {
+    root: {
+      overflowWrap: "anywhere",
+    },
+  },
+} as const;
+
 export const lightTheme = createTheme({
   palette: {
     mode: "light",
@@ -74,6 +83,7 @@ export const lightTheme = createTheme({
 
   components: {
     MuiDialogActions: dialogActionsOverride,
+    MuiAlert: alertOverride,
 
     MuiCard: {
       styleOverrides: {
@@ -162,6 +172,7 @@ export const darkTheme = createTheme({
 
   components: {
     MuiDialogActions: dialogActionsOverride,
+    MuiAlert: alertOverride,
 
     MuiCard: {
       styleOverrides: {

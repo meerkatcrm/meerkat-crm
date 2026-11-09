@@ -383,7 +383,7 @@ export default function ContactSyncSettings() {
         <DialogContent>
           {step === 'server' ? (
             <Stack spacing={2} sx={{ mt: 1 }}>
-              <Alert severity="info" sx={{ py: 0.5, overflowWrap: 'anywhere' }}>
+              <Alert severity="info" sx={{ py: 0.5 }}>
                 {t('settings.contactSync.dialogInfo')}
               </Alert>
               {dialogError && <Alert severity="error" sx={{ py: 0 }}>{dialogError}</Alert>}
