@@ -188,6 +188,11 @@ func SendReminders(db *gorm.DB, config config.Config) error {
 	// - Due today or before
 	// - Not completed
 	// - Email not yet sent for this occurrence
+	//
+	// remind_at holds a calendar date at midnight UTC. SQLite compares these columns
+	// as text, so the offset on endOfDay is ignored and the date decides: a reminder
+	// is due on its date in the reminder timezone. Comparing them as instants would
+	// send a day early west of UTC, which TestSendReminders_DueOnCalendarDate guards.
 	err := db.Where("by_mail = ? AND remind_at <= ? AND completed = ? AND email_sent = ?",
 		true, endOfDay, false, false).Find(&reminders).Error
 	if err != nil {

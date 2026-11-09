@@ -221,7 +221,7 @@ test('with the option on, a yearly reminder is created for the next birthday', a
   expect(reminders.createReminder).toHaveBeenCalledWith(42, {
     message: 'Birthday of Anna Schmidt',
     by_mail: true,
-    remind_at: new Date(2027, 3, 30, 9).toISOString(),
+    remind_at: '2027-04-30T00:00:00.000Z',
     recurrence: 'yearly',
     reoccur_from_completion: false,
     contact_id: 42,

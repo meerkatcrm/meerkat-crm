@@ -654,3 +654,48 @@ func TestReminderCompletions_ListAndDelete(t *testing.T) {
 	assert.Len(t, f.completions(t, f.user.ID), 2)
 	assert.Equal(t, http.StatusNotFound, doRequest(f.router, http.MethodDelete, fmt.Sprintf("/reminder-completions/%d", older.ID), nil, "").Code, "already deleted")
 }
+
+// The requests the frontend sends for a birthday reminder, through the real validation:
+// the date survives as a calendar date, and a birthday change keeps the rest of the row.
+func TestBirthdayReminder_StaysOnCalendarDate(t *testing.T) {
+	db, router := setupRouter()
+	router.POST("/contacts/:id/reminders", middleware.ValidateJSONMiddleware(&models.Reminder{}), CreateReminder)
+	router.PUT("/reminders/:id", middleware.ValidateJSONMiddleware(&models.Reminder{}), UpdateReminder)
+
+	var user models.User
+	db.First(&user)
+	contact := models.Contact{UserID: user.ID, Firstname: "Jamie", Lastname: "Smith"}
+	require.NoError(t, db.Create(&contact).Error)
+
+	body := func(remindAt string) *bytes.Buffer {
+		return bytes.NewBufferString(fmt.Sprintf(`{"message":"Birthday","by_mail":true,"remind_at":%q,`+
+			`"recurrence":"yearly","reoccur_from_completion":false,"contact_id":%d}`, remindAt, contact.ID))
+	}
+	send := func(method, path string, payload *bytes.Buffer) *httptest.ResponseRecorder {
+		req, _ := http.NewRequest(method, path, payload)
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		return w
+	}
+
+	w := send("POST", fmt.Sprintf("/contacts/%d/reminders", contact.ID), body("2027-03-15T00:00:00.000Z"))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	var reminder models.Reminder
+	require.NoError(t, db.First(&reminder).Error)
+	assert.True(t, reminder.RemindAt.Equal(time.Date(2027, 3, 15, 0, 0, 0, 0, time.UTC)), reminder.RemindAt.String())
+
+	w = send("PUT", fmt.Sprintf("/reminders/%d", reminder.ID), body("2027-04-20T00:00:00.000Z"))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	require.NoError(t, db.First(&reminder, reminder.ID).Error)
+	assert.True(t, reminder.RemindAt.Equal(time.Date(2027, 4, 20, 0, 0, 0, 0, time.UTC)), reminder.RemindAt.String())
+	assert.Equal(t, "Birthday", reminder.Message)
+	assert.Equal(t, "yearly", reminder.Recurrence)
+	assert.False(t, *reminder.ReoccurFromCompletion)
+
+	// A date alone is not a valid update, which is why the frontend sends the whole reminder.
+	w = send("PUT", fmt.Sprintf("/reminders/%d", reminder.ID), bytes.NewBufferString(`{"remind_at":"2027-05-01T00:00:00.000Z"}`))
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}

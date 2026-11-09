@@ -22,20 +22,30 @@ export function parseBirthdayMonthDay(birthdayISO: string): { month: number; day
   return { month, day };
 }
 
-// Next occurrence (this year or next) of the given birthday, at 09:00 local time.
+// The birthday's date in the given year as a UTC timestamp. A Feb 29 birthday
+// falls on Feb 28 in a non-leap year, which is where the backend's addYears
+// puts a yearly reminder too.
+function birthdayInYear(year: number, { month, day }: { month: number; day: number }): number {
+  const lastDayOfMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  return Date.UTC(year, month, Math.min(day, lastDayOfMonth));
+}
+
+// A birthday reminder is a calendar date, not an instant: its next occurrence
+// is midnight UTC of the birthday, whatever the browser's timezone. The backend
+// keeps only the UTC date, and the rest of the app reads it back with UTC getters.
+//
+// "Today" is the browser's own date. On the birthday itself this schedules next
+// year: the daily email already lists today's birthdays, and a reminder set after
+// that email went out would only arrive tomorrow.
 export function computeNextBirthdayOccurrence(birthdayISO: string): Date | undefined {
   const monthDay = parseBirthdayMonthDay(birthdayISO);
   if (!monthDay) return undefined;
 
-  const today = new Date();
-  const nextBirthday = new Date(today.getFullYear(), monthDay.month, monthDay.day);
+  const now = new Date();
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const thisYear = birthdayInYear(now.getFullYear(), monthDay);
 
-  if (nextBirthday < today) {
-    nextBirthday.setFullYear(today.getFullYear() + 1);
-  }
-
-  nextBirthday.setHours(9, 0, 0, 0);
-  return nextBirthday;
+  return new Date(thisYear > today ? thisYear : birthdayInYear(now.getFullYear() + 1, monthDay));
 }
 
 export function buildBirthdayReminderPayload(
@@ -56,18 +66,47 @@ export function buildBirthdayReminderPayload(
   };
 }
 
+// A birthday can change while its reminder stays: PUT /reminders/:id validates a
+// whole reminder, so everything but the date is sent back as it is.
+export function buildBirthdayReminderUpdate(
+  reminder: Reminder,
+  birthdayISO: string
+): ReminderFormData | undefined {
+  const nextOccurrence = computeNextBirthdayOccurrence(birthdayISO);
+  if (!nextOccurrence) return undefined;
+
+  return {
+    message: reminder.message,
+    by_mail: reminder.by_mail,
+    remind_at: nextOccurrence.toISOString(),
+    recurrence: reminder.recurrence,
+    reoccur_from_completion: reminder.reoccur_from_completion,
+    contact_id: reminder.contact_id
+  };
+}
+
+function fallsOnBirthday(remindAt: Date, { month, day }: { month: number; day: number }): boolean {
+  const reminderMonth = remindAt.getUTCMonth();
+  const reminderDay = remindAt.getUTCDate();
+  if (reminderMonth === month && reminderDay === day) return true;
+
+  // Feb 29 has no date of its own in most years: yearly reminders sit on Feb 28,
+  // and ones created before the clamp in birthdayInYear rolled over to Mar 1.
+  if (month !== 1 || day !== 29) return false;
+  return (reminderMonth === 1 && reminderDay === 28) || (reminderMonth === 2 && reminderDay === 1);
+}
+
 // Heuristic match: a birthday reminder is a yearly, calendar-pinned reminder
-// whose month/day matches the contact's birthday. There is no dedicated
-// "type" field on Reminder, so this convention is relied on across the app
-// (see backend/services/monica_import_service.go's isBirthdayReminder).
+// whose UTC date matches the contact's birthday. There is no dedicated "type"
+// field on Reminder, so this convention is relied on across the app (see
+// backend/services/monica_import_service.go's isBirthdayReminder).
 export function findBirthdayReminder(reminders: Reminder[], birthdayISO: string): Reminder | undefined {
   const monthDay = parseBirthdayMonthDay(birthdayISO);
   if (!monthDay) return undefined;
 
   const matches = reminders.filter((reminder) => {
     if (reminder.recurrence !== 'yearly' || reminder.reoccur_from_completion) return false;
-    const remindAt = new Date(reminder.remind_at);
-    return remindAt.getMonth() === monthDay.month && remindAt.getDate() === monthDay.day;
+    return fallsOnBirthday(new Date(reminder.remind_at), monthDay);
   });
 
   if (matches.length === 0) return undefined;
