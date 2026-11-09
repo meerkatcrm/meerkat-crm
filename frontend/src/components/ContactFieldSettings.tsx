@@ -128,7 +128,7 @@ export default function ContactFieldSettings() {
                   {t('settings.contactFields.hideEmptyDescription')}
                 </Typography>
               </Box>
-              <Box sx={{ columnCount: { xs: 1, sm: 2, md: 3 }, columnGap: 3 }}>
+              <Box sx={{ columns: '220px 3', columnGap: 3 }}>
                 {CONTACT_FIELD_GROUPS.map((group) => {
                   const fields = CONTACT_FIELDS.filter((f) => f.group === group);
                   if (fields.length === 0) return null;

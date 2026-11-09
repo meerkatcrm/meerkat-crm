@@ -459,13 +459,12 @@ export function parsePartialDateInputWithFormat(input: string, format: DateForma
     format === 'eu' ? trimmed.match(/^(\d{1,2})\.(\d{4})$/)
     : format === 'us' ? trimmed.match(/^(\d{1,2})\/(\d{4})$/)
     : null;
-  if (iso || display) {
-    const year = iso ? iso[1] : display![2];
-    const month = (iso ? iso[2] : display![1]).padStart(2, '0');
-    return isCalendarDate(year, month, '01') ? `${year}-${month}` : null;
-  }
+  const yearAndMonth = iso ? [iso[1], iso[2]] : display && [display[2], display[1]];
+  if (!yearAndMonth) return parseDateInputWithFormat(trimmed, format);
 
-  return parseDateInputWithFormat(trimmed, format);
+  const [year, rawMonth] = yearAndMonth;
+  const month = rawMonth.padStart(2, '0');
+  return isCalendarDate(year, month, '01') ? `${year}-${month}` : null;
 }
 
 export function autoFormatBirthdayInputWithFormat(newValue: string, prevValue: string, format: DateFormat): string {
