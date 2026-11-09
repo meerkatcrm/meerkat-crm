@@ -61,6 +61,7 @@ export default function ContactFieldSettings() {
       setError('');
       await updateEnabledContactFields(Array.from(next));
     } catch (err) {
+      setEnabled(enabled);
       setError(err instanceof Error ? err.message : t('settings.contactFields.saveError'));
     } finally {
       setSaving(false);
