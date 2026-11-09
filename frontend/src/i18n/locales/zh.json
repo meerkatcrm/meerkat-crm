@@ -863,10 +863,14 @@
     "endMessage": "将此工作标记为已结束（结束日期设为今天）？",
     "deleteMessage": "删除此工作经历？",
     "detailsRequired": "请填写组织、职位、部门或角色之一",
-    "dateFormatError": "日期必须为 YYYY、YYYY-MM 或 YYYY-MM-DD",
+    "dateFormatError": "日期必须为 {{formats}}",
     "startDate": "开始日期",
     "endDate": "结束日期",
-    "dateFormatHelp": "YYYY、YYYY-MM 或 YYYY-MM-DD",
+    "dateFormats": {
+      "eu": "YYYY、MM.YYYY 或 DD.MM.YYYY",
+      "us": "YYYY、MM/YYYY 或 MM/DD/YYYY",
+      "iso": "YYYY、YYYY-MM 或 YYYY-MM-DD"
+    },
     "endDateHelp": "如果这是当前工作，请留空",
     "notes": "备注",
     "unknownDate": "未知",

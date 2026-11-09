@@ -5,6 +5,7 @@ import AppDialog from './AppDialog';
 import { useTranslation } from 'react-i18next';
 import { EmploymentHistoryEntry, EmploymentHistoryFormData } from '../api/employmentHistory';
 import { getErrorMessage } from '../utils/errorHandler';
+import { useDateFormat } from '../DateFormatProvider';
 
 interface AddEmploymentHistoryDialogProps {
   open: boolean;
@@ -13,8 +14,6 @@ interface AddEmploymentHistoryDialogProps {
   entry?: EmploymentHistoryEntry | null;
 }
 
-const PARTIAL_DATE_RE = /^\d{4}(-\d{2}(-\d{2})?)?$/;
-
 export default function AddEmploymentHistoryDialog({
   open,
   onClose,
@@ -22,6 +21,8 @@ export default function AddEmploymentHistoryDialog({
   entry,
 }: AddEmploymentHistoryDialogProps) {
   const { t } = useTranslation();
+  const { dateFormat, formatDate, parsePartialDateInput } = useDateFormat();
+  const dateFormats = t(`employmentHistory.dateFormats.${dateFormat}`);
   const [organization, setOrganization] = useState('');
   const [department, setDepartment] = useState('');
   const [jobTitle, setJobTitle] = useState('');
@@ -49,29 +50,29 @@ export default function AddEmploymentHistoryDialog({
       setDepartment(entry.department || '');
       setJobTitle(entry.job_title || '');
       setRole(entry.role || '');
-      setStartDate(entry.start_date || '');
-      setEndDate(entry.end_date || '');
+      setStartDate(formatDate(entry.start_date || ''));
+      setEndDate(formatDate(entry.end_date || ''));
       setNotes(entry.notes || '');
       setError('');
     } else {
       resetForm();
     }
-  }, [entry, open]);
+  }, [entry, open, formatDate]);
 
   const handleClose = () => {
     resetForm();
     onClose();
   };
 
-  const validDate = (v: string) => v === '' || PARTIAL_DATE_RE.test(v);
-
   const handleSave = async () => {
     if (![organization, jobTitle, department, role].some((v) => v.trim())) {
       setError(t('employmentHistory.detailsRequired'));
       return;
     }
-    if (!validDate(startDate) || !validDate(endDate)) {
-      setError(t('employmentHistory.dateFormatError'));
+    const parsedStartDate = parsePartialDateInput(startDate);
+    const parsedEndDate = parsePartialDateInput(endDate);
+    if (parsedStartDate === null || parsedEndDate === null) {
+      setError(t('employmentHistory.dateFormatError', { formats: dateFormats }));
       return;
     }
 
@@ -82,8 +83,8 @@ export default function AddEmploymentHistoryDialog({
         department: department.trim() || undefined,
         job_title: jobTitle.trim() || undefined,
         role: role.trim() || undefined,
-        start_date: startDate.trim() || undefined,
-        end_date: endDate.trim() || undefined,
+        start_date: parsedStartDate || undefined,
+        end_date: parsedEndDate || undefined,
         notes: notes.trim() || undefined,
       });
       handleClose();
@@ -132,15 +133,15 @@ export default function AddEmploymentHistoryDialog({
           <Box sx={{ display: 'flex', gap: 2 }}>
             <TextField
               label={t('employmentHistory.startDate')}
-              placeholder={t('employmentHistory.dateFormatHelp')}
-              helperText={t('employmentHistory.dateFormatHelp')}
+              placeholder={dateFormats}
+              helperText={dateFormats}
               value={startDate}
               onChange={(e) => { setStartDate(e.target.value); setError(''); }}
               fullWidth
             />
             <TextField
               label={t('employmentHistory.endDate')}
-              placeholder={t('employmentHistory.dateFormatHelp')}
+              placeholder={dateFormats}
               helperText={t('employmentHistory.endDateHelp')}
               value={endDate}
               onChange={(e) => { setEndDate(e.target.value); setError(''); }}

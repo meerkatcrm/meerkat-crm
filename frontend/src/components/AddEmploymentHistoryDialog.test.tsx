@@ -2,19 +2,25 @@ import { test, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { I18nextProvider } from 'react-i18next';
 import i18n from '../i18n/config';
+import { DateFormatProvider } from '../DateFormatProvider';
 import AddEmploymentHistoryDialog from './AddEmploymentHistoryDialog';
 
 vi.mock('../context/SnackbarContext', () => ({
   useSnackbar: () => ({ showError: vi.fn(), showSuccess: vi.fn() }),
 }));
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  window.localStorage.removeItem('dateFormat');
+});
 
 function renderDialog(props: Partial<React.ComponentProps<typeof AddEmploymentHistoryDialog>> = {}) {
   const p = { open: true, onClose: vi.fn(), onSave: vi.fn().mockResolvedValue(undefined), ...props };
   render(
     <I18nextProvider i18n={i18n}>
-      <AddEmploymentHistoryDialog {...p} />
+      <DateFormatProvider>
+        <AddEmploymentHistoryDialog {...p} />
+      </DateFormatProvider>
     </I18nextProvider>
   );
   return p;
@@ -35,8 +41,38 @@ test('rejects malformed dates', () => {
   type('Organization', 'Acme');
   type('Start Date', '15/03/2020');
   fireEvent.click(screen.getByText('Save'));
-  expect(screen.getByText('Dates must be YYYY, YYYY-MM, or YYYY-MM-DD')).toBeInTheDocument();
+  expect(screen.getByText('Dates must be YYYY, MM.YYYY, or DD.MM.YYYY')).toBeInTheDocument();
   expect(p.onSave).not.toHaveBeenCalled();
+});
+
+test.each([
+  ['eu', '15.03.2020', '03.2020'],
+  ['us', '03/15/2020', '03/2020'],
+  ['iso', '2020-03-15', '2020-03'],
+])('%s: takes dates in the preferred format and stores them as ISO', async (format, full, partial) => {
+  window.localStorage.setItem('dateFormat', format);
+  const p = renderDialog();
+  type('Organization', 'Acme');
+  type('Start Date', full);
+  type('End Date', partial);
+  fireEvent.click(screen.getByText('Save'));
+  await waitFor(() => expect(p.onClose).toHaveBeenCalled());
+  expect(p.onSave).toHaveBeenCalledWith(
+    expect.objectContaining({ start_date: '2020-03-15', end_date: '2020-03' })
+  );
+});
+
+test.each([
+  ['eu', '15.03.2020', '03.2020'],
+  ['us', '03/15/2020', '03/2020'],
+  ['iso', '2020-03-15', '2020-03'],
+])('%s: edit mode shows stored dates in the preferred format', (format, full, partial) => {
+  window.localStorage.setItem('dateFormat', format);
+  renderDialog({
+    entry: { ID: 1, CreatedAt: '', UpdatedAt: '', contact_id: 1, organization: 'Acme', start_date: '2020-03-15', end_date: '2020-03' },
+  });
+  expect(screen.getByDisplayValue(full)).toBeInTheDocument();
+  expect(screen.getByDisplayValue(partial)).toBeInTheDocument();
 });
 
 test('saves trimmed data, omits blanks, then closes', async () => {

@@ -10,6 +10,7 @@ import {
   formatBirthdayForInputWithFormat,
   parseBirthdayInputWithFormat,
   autoFormatBirthdayInputWithFormat,
+  parsePartialDateInputWithFormat,
 } from './DateFormatProvider';
 
 describe('formatDateWithFormat', () => {
@@ -62,6 +63,33 @@ describe('parseDateInputWithFormat', () => {
 
   test('a leap day is accepted in a leap year', () => {
     expect(parseDateInputWithFormat('29.02.2028', 'eu')).toBe('2028-02-29');
+  });
+});
+
+describe('parsePartialDateInputWithFormat', () => {
+  test.each([
+    ['eu', '15.3.2020', '2020-03-15'],
+    ['eu', '3.2020', '2020-03'],
+    ['us', '3/15/2020', '2020-03-15'],
+    ['us', '03/2020', '2020-03'],
+    ['iso', '2020-3', '2020-03'],
+    ['eu', '2020', '2020'],
+    ['us', '2020-03-15', '2020-03-15'],
+    ['eu', '', ''],
+  ] as const)('%s parses %s to %s', (format, input, expected) => {
+    expect(parsePartialDateInputWithFormat(input, format)).toBe(expected);
+  });
+
+  test.each([
+    ['eu', '13.2020'],
+    ['eu', '03/2020'],
+    ['eu', '31.02.2020'],
+    ['us', '03.2020'],
+    ['iso', '03.2020'],
+    ['iso', '2020-13'],
+    ['eu', '20'],
+  ] as const)('%s rejects %s', (format, input) => {
+    expect(parsePartialDateInputWithFormat(input, format)).toBeNull();
   });
 });
 

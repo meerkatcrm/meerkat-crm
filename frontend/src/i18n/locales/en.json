@@ -863,10 +863,14 @@
     "endMessage": "Mark this job as ended (sets the end date to today)?",
     "deleteMessage": "Delete this employment history entry?",
     "detailsRequired": "Enter an organization, job title, department or role",
-    "dateFormatError": "Dates must be YYYY, YYYY-MM, or YYYY-MM-DD",
+    "dateFormatError": "Dates must be {{formats}}",
     "startDate": "Start Date",
     "endDate": "End Date",
-    "dateFormatHelp": "YYYY, YYYY-MM, or YYYY-MM-DD",
+    "dateFormats": {
+      "eu": "YYYY, MM.YYYY, or DD.MM.YYYY",
+      "us": "YYYY, MM/YYYY, or MM/DD/YYYY",
+      "iso": "YYYY, YYYY-MM, or YYYY-MM-DD"
+    },
     "endDateHelp": "Leave blank if this is the current job",
     "notes": "Notes",
     "unknownDate": "Unknown",

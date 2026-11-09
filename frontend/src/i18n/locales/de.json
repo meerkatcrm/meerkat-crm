@@ -863,10 +863,14 @@
     "endMessage": "Diese Stelle als beendet markieren (Enddatum wird auf heute gesetzt)?",
     "deleteMessage": "Diesen Eintrag im Berufsverlauf löschen?",
     "detailsRequired": "Organisation, Position, Abteilung oder Rolle angeben",
-    "dateFormatError": "Daten müssen JJJJ, JJJJ-MM oder JJJJ-MM-TT sein",
+    "dateFormatError": "Daten müssen {{formats}} sein",
     "startDate": "Startdatum",
     "endDate": "Enddatum",
-    "dateFormatHelp": "JJJJ, JJJJ-MM oder JJJJ-MM-TT",
+    "dateFormats": {
+      "eu": "JJJJ, MM.JJJJ oder TT.MM.JJJJ",
+      "us": "JJJJ, MM/JJJJ oder MM/TT/JJJJ",
+      "iso": "JJJJ, JJJJ-MM oder JJJJ-MM-TT"
+    },
     "endDateHelp": "Leer lassen, wenn dies die aktuelle Stelle ist",
     "notes": "Notizen",
     "unknownDate": "Unbekannt",
