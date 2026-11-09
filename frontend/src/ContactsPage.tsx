@@ -136,9 +136,11 @@ export default function ContactsPage() {
       <Stack
         direction={{ xs: 'column', sm: 'row' }}
         spacing={1.5}
+        useFlexGap
         sx={{
           mb: 2,
-          alignItems: "center"
+          alignItems: "center",
+          flexWrap: "wrap"
         }}>
         <FormControl sx={{ minWidth: 180 }} size="small">
           <InputLabel id="circle-select-label">{t('contacts.filterByCircle')}</InputLabel>
@@ -178,32 +180,39 @@ export default function ContactsPage() {
             />
           }
           label={t('contacts.showArchived')}
-          sx={{ ml: 0.5, whiteSpace: 'nowrap' }}
+          sx={{ m: 0, whiteSpace: 'nowrap' }}
         />
-        <Button
-          variant="outlined"
-          startIcon={<CallMergeIcon />}
-          onClick={() => navigate('/contacts/duplicates')}
-          sx={{ whiteSpace: 'nowrap' }}
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={1.5}
+          useFlexGap
+          sx={{ alignItems: 'center', flexWrap: 'wrap' }}
         >
-          {t('contacts.duplicates.button')}
-        </Button>
-        <Button
-          variant="outlined"
-          startIcon={<FileUploadIcon />}
-          onClick={() => setImportDialogOpen(true)}
-          sx={{ whiteSpace: 'nowrap' }}
-        >
-          {t('contacts.import.button', 'Import')}
-        </Button>
-        <Button
-          variant="outlined"
-          startIcon={<PersonAddIcon />}
-          onClick={() => setAddDialogOpen(true)}
-          sx={{ whiteSpace: 'nowrap' }}
-        >
-          {t('contacts.add.button')}
-        </Button>
+          <Button
+            variant="outlined"
+            startIcon={<CallMergeIcon />}
+            onClick={() => navigate('/contacts/duplicates')}
+            sx={{ whiteSpace: 'nowrap' }}
+          >
+            {t('contacts.duplicates.button')}
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<FileUploadIcon />}
+            onClick={() => setImportDialogOpen(true)}
+            sx={{ whiteSpace: 'nowrap' }}
+          >
+            {t('contacts.import.button', 'Import')}
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<PersonAddIcon />}
+            onClick={() => setAddDialogOpen(true)}
+            sx={{ whiteSpace: 'nowrap' }}
+          >
+            {t('contacts.add.button')}
+          </Button>
+        </Stack>
       </Stack>
       {(totalContacts > 0 || searchQuery || selectedCircle) && (
         <Box sx={{ mb: 2, p: 1.5, bgcolor: 'action.hover', borderRadius: 1, display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
