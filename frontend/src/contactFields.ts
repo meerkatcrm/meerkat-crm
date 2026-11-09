@@ -69,21 +69,13 @@ export const CONTACT_FIELD_GROUPS: ContactFieldDef['group'][] = [
   'meerkat',
 ];
 
-// Default-enabled set = the fields shown today, so existing users see no change.
-// New vCard fields (prefix/middle/suffix, org/dept/title/role, urls, impps, anniversary)
-// are opt-in via Settings.
-export const DEFAULT_ENABLED_CONTACT_FIELDS: ContactFieldKey[] = [
-  'emails',
-  'phones',
-  'addresses',
-  'nickname',
-  'gender',
-  'birthday',
-  'how_we_met',
-  'food_preference',
-  'work_information',
-  'contact_information',
-];
+// Opt-in via Settings: kept for historic reasons, the employment history covers both in more detail.
+const OPT_IN_CONTACT_FIELDS: ContactFieldKey[] = ['role', 'work_information'];
+
+// Applies to users who never configured their fields; a saved selection is left alone.
+export const DEFAULT_ENABLED_CONTACT_FIELDS: ContactFieldKey[] = CONTACT_FIELDS
+  .map((field) => field.key)
+  .filter((key) => !OPT_IN_CONTACT_FIELDS.includes(key));
 
 // vCard TYPE options for typed multi-value fields (emails/phones/addresses/urls).
 export const CONTACT_TYPE_OPTIONS = ['home', 'work', 'cell', 'fax', 'other'] as const;

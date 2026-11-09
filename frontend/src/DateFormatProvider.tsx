@@ -12,6 +12,7 @@ interface DateFormatContextValue {
   parseBirthdayInput: (input: string) => string | null;
   autoFormatBirthdayInput: (newValue: string, prevValue: string) => string;
   parseDateInput: (input: string) => string | null;
+  parsePartialDateInput: (input: string) => string | null;
   autoFormatDateInput: (newValue: string, prevValue: string) => string;
   getBirthdayPlaceholder: () => string;
   getBirthdayFormatHint: () => string;
@@ -442,6 +443,30 @@ export function parseDateInputWithFormat(input: string, format: DateFormat): str
   return null;
 }
 
+/**
+ * Parse a date that may be only a year or a month and year (e.g. the start of a job)
+ * from the user's display format to YYYY, YYYY-MM or YYYY-MM-DD for storage. ISO input
+ * is accepted in every format, as in parseDateInputWithFormat. Returns null if invalid.
+ */
+export function parsePartialDateInputWithFormat(input: string, format: DateFormat): string | null {
+  if (!input || input.trim() === '') return '';
+
+  const trimmed = input.trim();
+  if (/^\d{4}$/.test(trimmed)) return trimmed;
+
+  const iso = trimmed.match(/^(\d{4})-(\d{1,2})$/);
+  const display =
+    format === 'eu' ? trimmed.match(/^(\d{1,2})\.(\d{4})$/)
+    : format === 'us' ? trimmed.match(/^(\d{1,2})\/(\d{4})$/)
+    : null;
+  const yearAndMonth = iso ? [iso[1], iso[2]] : display && [display[2], display[1]];
+  if (!yearAndMonth) return parseDateInputWithFormat(trimmed, format);
+
+  const [year, rawMonth] = yearAndMonth;
+  const month = rawMonth.padStart(2, '0');
+  return isCalendarDate(year, month, '01') ? `${year}-${month}` : null;
+}
+
 export function autoFormatBirthdayInputWithFormat(newValue: string, prevValue: string, format: DateFormat): string {
   const newDigits = newValue.replace(/[^0-9]/g, '');
   const prevDigits = prevValue.replace(/[^0-9]/g, '');
@@ -544,6 +569,11 @@ export function DateFormatProvider({ children }: { children: ReactNode }) {
     [dateFormat]
   );
 
+  const parsePartialDateInput = useCallback(
+    (input: string) => parsePartialDateInputWithFormat(input, dateFormat),
+    [dateFormat]
+  );
+
   const autoFormatDateInput = useCallback(
     (newValue: string, prevValue: string) =>
       autoFormatBirthdayInputWithFormat(newValue, prevValue, dateFormat),
@@ -601,6 +631,7 @@ export function DateFormatProvider({ children }: { children: ReactNode }) {
       parseBirthdayInput,
       autoFormatBirthdayInput,
       parseDateInput,
+      parsePartialDateInput,
       autoFormatDateInput,
       getBirthdayPlaceholder,
       getBirthdayFormatHint,
@@ -608,7 +639,7 @@ export function DateFormatProvider({ children }: { children: ReactNode }) {
       getDateFnsFormat,
       calculateAge,
     }),
-    [dateFormat, formatDate, formatDateTime, formatBirthday, formatBirthdayForInput, parseBirthdayInput, autoFormatBirthdayInput, parseDateInput, autoFormatDateInput, getBirthdayPlaceholder, getBirthdayFormatHint, getDatePlaceholder, getDateFnsFormat, calculateAge]
+    [dateFormat, formatDate, formatDateTime, formatBirthday, formatBirthdayForInput, parseBirthdayInput, autoFormatBirthdayInput, parseDateInput, parsePartialDateInput, autoFormatDateInput, getBirthdayPlaceholder, getBirthdayFormatHint, getDatePlaceholder, getDateFnsFormat, calculateAge]
   );
 
   return (

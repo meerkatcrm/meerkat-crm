@@ -61,6 +61,7 @@ export default function ContactFieldSettings() {
       setError('');
       await updateEnabledContactFields(Array.from(next));
     } catch (err) {
+      setEnabled(enabled);
       setError(err instanceof Error ? err.message : t('settings.contactFields.saveError'));
     } finally {
       setSaving(false);
@@ -128,35 +129,37 @@ export default function ContactFieldSettings() {
                   {t('settings.contactFields.hideEmptyDescription')}
                 </Typography>
               </Box>
-              {CONTACT_FIELD_GROUPS.map((group) => {
-                const fields = CONTACT_FIELDS.filter((f) => f.group === group);
-                if (fields.length === 0) return null;
-                return (
-                  <Box key={group}>
-                    <Typography variant="overline" sx={{
-                      color: "text.secondary"
-                    }}>
-                      {t(`settings.contactFields.groups.${group}`)}
-                    </Typography>
-                    <Stack>
-                      {fields.map((f) => (
-                        <FormControlLabel
-                          key={f.key}
-                          control={
-                            <Switch
-                              size="small"
-                              checked={enabled.has(f.key)}
-                              disabled={saving}
-                              onChange={() => handleToggle(f.key)}
-                            />
-                          }
-                          label={t(f.labelKey)}
-                        />
-                      ))}
-                    </Stack>
-                  </Box>
-                );
-              })}
+              <Box sx={{ columns: '220px 3', columnGap: 3 }}>
+                {CONTACT_FIELD_GROUPS.map((group) => {
+                  const fields = CONTACT_FIELDS.filter((f) => f.group === group);
+                  if (fields.length === 0) return null;
+                  return (
+                    <Box key={group} sx={{ breakInside: 'avoid', pb: 1.5 }}>
+                      <Typography variant="overline" sx={{
+                        color: "text.secondary"
+                      }}>
+                        {t(`settings.contactFields.groups.${group}`)}
+                      </Typography>
+                      <Stack>
+                        {fields.map((f) => (
+                          <FormControlLabel
+                            key={f.key}
+                            control={
+                              <Switch
+                                size="small"
+                                checked={enabled.has(f.key)}
+                                disabled={saving}
+                                onChange={() => handleToggle(f.key)}
+                              />
+                            }
+                            label={t(f.labelKey)}
+                          />
+                        ))}
+                      </Stack>
+                    </Box>
+                  );
+                })}
+              </Box>
             </>
           )}
         </Stack>

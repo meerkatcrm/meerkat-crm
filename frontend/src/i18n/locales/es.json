@@ -863,10 +863,14 @@
     "endMessage": "¿Marcar este empleo como finalizado (la fecha de fin se establece en hoy)?",
     "deleteMessage": "¿Eliminar esta entrada del historial laboral?",
     "detailsRequired": "Indica una organización, cargo, departamento o rol",
-    "dateFormatError": "Las fechas deben ser AAAA, AAAA-MM o AAAA-MM-DD",
+    "dateFormatError": "Las fechas deben ser {{formats}}",
     "startDate": "Fecha de inicio",
     "endDate": "Fecha de fin",
-    "dateFormatHelp": "AAAA, AAAA-MM o AAAA-MM-DD",
+    "dateFormats": {
+      "eu": "AAAA, MM.AAAA o DD.MM.AAAA",
+      "us": "AAAA, MM/AAAA o MM/DD/AAAA",
+      "iso": "AAAA, AAAA-MM o AAAA-MM-DD"
+    },
     "endDateHelp": "Dejar en blanco si es el empleo actual",
     "notes": "Notas",
     "unknownDate": "Desconocida",

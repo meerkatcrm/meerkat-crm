@@ -863,10 +863,14 @@
     "endMessage": "Marquer ce poste comme terminé (la date de fin sera définie à aujourd'hui) ?",
     "deleteMessage": "Supprimer cette entrée du parcours professionnel ?",
     "detailsRequired": "Indiquez une organisation, un poste, un service ou un rôle",
-    "dateFormatError": "Les dates doivent être au format AAAA, AAAA-MM ou AAAA-MM-JJ",
+    "dateFormatError": "Les dates doivent être au format {{formats}}",
     "startDate": "Date de début",
     "endDate": "Date de fin",
-    "dateFormatHelp": "AAAA, AAAA-MM ou AAAA-MM-JJ",
+    "dateFormats": {
+      "eu": "AAAA, MM.AAAA ou JJ.MM.AAAA",
+      "us": "AAAA, MM/AAAA ou MM/JJ/AAAA",
+      "iso": "AAAA, AAAA-MM ou AAAA-MM-JJ"
+    },
     "endDateHelp": "Laisser vide s'il s'agit du poste actuel",
     "notes": "Notes",
     "unknownDate": "Inconnue",

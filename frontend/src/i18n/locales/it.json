@@ -863,10 +863,14 @@
     "endMessage": "Segnare questo lavoro come terminato (la data di fine sarà impostata a oggi)?",
     "deleteMessage": "Eliminare questa voce dello storico lavorativo?",
     "detailsRequired": "Indica un'organizzazione, una posizione, un reparto o un ruolo",
-    "dateFormatError": "Le date devono essere AAAA, AAAA-MM o AAAA-MM-GG",
+    "dateFormatError": "Le date devono essere {{formats}}",
     "startDate": "Data di inizio",
     "endDate": "Data di fine",
-    "dateFormatHelp": "AAAA, AAAA-MM o AAAA-MM-GG",
+    "dateFormats": {
+      "eu": "AAAA, MM.AAAA o GG.MM.AAAA",
+      "us": "AAAA, MM/AAAA o MM/GG/AAAA",
+      "iso": "AAAA, AAAA-MM o AAAA-MM-GG"
+    },
     "endDateHelp": "Lasciare vuoto se è il lavoro attuale",
     "notes": "Note",
     "unknownDate": "Sconosciuta",
