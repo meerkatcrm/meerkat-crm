@@ -211,7 +211,7 @@ export default function CustomFieldsSettings() {
                     onChange={(e) => setNewFieldName(e.target.value)}
                     onKeyDown={handleKeyDown}
                     disabled={saving}
-                    sx={{ flexGrow: 1 }}
+                    sx={{ flexGrow: 1, minWidth: 0 }}
                     slotProps={{ htmlInput: { maxLength: 100 } }}
                   />
                   <Button
@@ -220,6 +220,7 @@ export default function CustomFieldsSettings() {
                     startIcon={<AddIcon />}
                     onClick={handleAddField}
                     disabled={saving || !newFieldName.trim()}
+                    sx={{ flexShrink: 0 }}
                   >
                     {t('settings.customFields.add')}
                   </Button>

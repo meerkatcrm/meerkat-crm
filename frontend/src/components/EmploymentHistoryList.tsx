@@ -72,8 +72,8 @@ export default function EmploymentHistoryList({
             }}
           >
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <Box sx={{ flex: 1 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box sx={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
                   <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
                     {title}
                   </Typography>

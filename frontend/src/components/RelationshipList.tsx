@@ -98,7 +98,7 @@ export default function RelationshipList({
             }}
           >
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <Box sx={{ flex: 1 }}>
+              <Box sx={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>
                 {linkedContact ? (
                   <Link
                     component="button"
@@ -174,7 +174,7 @@ export default function RelationshipList({
                 variant="outlined"
                 sx={{ p: 2, bgcolor: 'action.hover' }}
               >
-                <Box sx={{ flex: 1 }}>
+                <Box sx={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>
                   <Typography variant="body2" sx={{
                     color: "text.secondary"
                   }}>

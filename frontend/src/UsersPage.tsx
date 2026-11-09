@@ -209,7 +209,7 @@ export default function UsersPage() {
 
   return (
     <Box sx={{ maxWidth: 1200, mx: 'auto', mt: 2, p: 2 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
         <Typography variant="h5">
           {t('users.title')}
         </Typography>
@@ -229,7 +229,8 @@ export default function UsersPage() {
         </Alert>
       )}
 
-      <TableContainer component={Paper}>
+      <Paper>
+        <TableContainer>
         <Table>
           <TableHead>
             <TableRow>
@@ -282,6 +283,7 @@ export default function UsersPage() {
             )}
           </TableBody>
         </Table>
+        </TableContainer>
         <TablePagination
           component="div"
           count={total}
@@ -291,7 +293,7 @@ export default function UsersPage() {
           onRowsPerPageChange={handleChangeRowsPerPage}
           rowsPerPageOptions={[10, 25, 50]}
         />
-      </TableContainer>
+      </Paper>
 
       {/* Edit User Dialog */}
       <AppDialog open={editDialogOpen} onClose={handleEditClose} maxWidth="sm" fullWidth>

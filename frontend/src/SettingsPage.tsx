@@ -115,13 +115,13 @@ export default function SettingsPage() {
           </Box>
           <Divider sx={{ mb: 1.5 }} />
 
-          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: 'flex-start', gap: 2 }}>
             <img
               src="/meerkat-crm-logo.svg"
               alt="Meerkat CRM Logo"
               style={{ height: 100, flexShrink: 0 }}
             />
-            <Stack spacing={1}>
+            <Stack spacing={1} sx={{ minWidth: 0 }}>
               <Typography variant="body2" sx={{
                 color: "text.secondary"
               }}>
@@ -139,6 +139,7 @@ export default function SettingsPage() {
                   target="_blank"
                   rel="noopener noreferrer"
                   underline="hover"
+                  sx={{ overflowWrap: 'anywhere' }}
                 >
                   github.com/meerkatcrm/meerkat-crm
                 </Link>

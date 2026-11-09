@@ -576,9 +576,16 @@ export default function ContactInformation({
   const nothingShown = tally.available > 0 && tally.shown === 0;
 
   return (
-    <Card sx={{ flex: 1 }}>
+    <Card sx={{ flex: 1, minWidth: 0 }}>
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-        <Tabs value={activeTab} onChange={(_, newValue) => setActiveTab(newValue)} aria-label="contact information tabs">
+        <Tabs
+          value={activeTab}
+          onChange={(_, newValue) => setActiveTab(newValue)}
+          aria-label="contact information tabs"
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
+        >
           <Tab label={t('contactDetail.generalInfo')} />
           <Tab label={t('relationships.title')} />
           <Tab label={t('employmentHistory.title')} />

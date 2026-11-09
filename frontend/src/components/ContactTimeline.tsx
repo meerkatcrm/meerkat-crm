@@ -26,6 +26,7 @@ import { Note } from '../api/notes';
 import { Activity } from '../api/activities';
 import { ReminderCompletion } from '../api/reminders';
 import { useDateFormat } from '../DateFormatProvider';
+import { responsiveTimelineSx } from './timelineLayout';
 
 interface ContactTimelineProps {
   timelineItems: Array<{ type: 'note' | 'activity' | 'completion'; data: Note | Activity | ReminderCompletion; date: string }>;
@@ -49,7 +50,7 @@ export default function ContactTimeline({ timelineItems, onEditItem, onDeleteCom
   }
 
   return (
-    <Timeline position="right">
+    <Timeline position="right" sx={responsiveTimelineSx}>
       {timelineItems.map((item, index) => {
         const itemDate = new Date(item.date);
         const isValidDate = !isNaN(itemDate.getTime());
@@ -73,7 +74,7 @@ export default function ContactTimeline({ timelineItems, onEditItem, onDeleteCom
               </TimelineDot>
               {index < timelineItems.length - 1 && <TimelineConnector />}
             </TimelineSeparator>
-            <TimelineContent>
+            <TimelineContent sx={{ minWidth: 0, overflowWrap: 'anywhere' }}>
               <Paper
                 elevation={1}
                 sx={{
