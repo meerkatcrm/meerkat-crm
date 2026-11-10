@@ -703,3 +703,28 @@ func TestUpdateLanguageAndDateFormat_RejectUnsupportedValues(t *testing.T) {
 	assert.Equal(t, "en", updated.Language)
 	assert.Equal(t, "iso", updated.DateFormat)
 }
+
+// The config reaches these handlers through the request context (set for every
+// route in main.go); demo mode must be honoured from there.
+func TestChangePassword_RefusedInDemoMode(t *testing.T) {
+	db, router := setupRouter()
+	hash, _ := services.HashPassword(strongPassword)
+	user := models.User{Username: "demo", Email: "demo@example.com", Password: hash}
+	require.NoError(t, db.Create(&user).Error)
+
+	router.POST("/change-password", func(c *gin.Context) {
+		c.Set("cfg", config.Config{DemoMode: true})
+		c.Set("userID", user.ID)
+		c.Set("validated", &models.ChangePasswordInput{CurrentPassword: strongPassword, NewPassword: strongPasswordAnother})
+		ChangePassword(c)
+	})
+
+	req, _ := http.NewRequest("POST", "/change-password", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusForbidden, w.Code)
+
+	var stored models.User
+	require.NoError(t, db.First(&stored, user.ID).Error)
+	assert.Equal(t, hash, stored.Password)
+}

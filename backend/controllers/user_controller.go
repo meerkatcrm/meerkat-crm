@@ -225,7 +225,7 @@ func CheckPasswordStrength(context *gin.Context) {
 // RequestPasswordReset generates a reset token and sends instructions to the user.
 func RequestPasswordReset(context *gin.Context, cfg *config.Config) {
 	// Check if demo mode is enabled - password changes are disabled in demo
-	if currentConfig(context).DemoMode {
+	if cfg.DemoMode {
 		apperrors.AbortWithError(context, apperrors.ErrForbidden("Password changes are disabled in demo mode"))
 		return
 	}
