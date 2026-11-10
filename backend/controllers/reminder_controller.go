@@ -25,13 +25,8 @@ func CreateReminder(c *gin.Context) {
 	contactID := c.Param("id")
 
 	// Find the contact by the ID
-	var contact models.Contact
-	if err := db.Where("user_id = ?", userID).First(&contact, "id = ?", contactID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			apperrors.AbortWithError(c, apperrors.ErrNotFound("Contact").WithDetails("id", contactID))
-		} else {
-			apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to retrieve contact").WithError(err))
-		}
+	contact, ok := findOwned[models.Contact](c, db, userID, contactID, "Contact")
+	if !ok {
 		return
 	}
 
@@ -71,7 +66,6 @@ func CreateReminder(c *gin.Context) {
 
 func GetReminder(c *gin.Context) {
 	id := c.Param("id")
-	var reminder models.Reminder
 	db := c.MustGet("db").(*gorm.DB)
 
 	userID, ok := currentUserID(c)
@@ -79,12 +73,8 @@ func GetReminder(c *gin.Context) {
 		return
 	}
 
-	if err := db.Where("user_id = ?", userID).First(&reminder, "id = ?", id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			apperrors.AbortWithError(c, apperrors.ErrNotFound("Reminder").WithDetails("id", id))
-		} else {
-			apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to retrieve reminder").WithError(err))
-		}
+	reminder, ok := findOwned[models.Reminder](c, db, userID, id, "Reminder")
+	if !ok {
 		return
 	}
 
@@ -93,7 +83,6 @@ func GetReminder(c *gin.Context) {
 
 func UpdateReminder(c *gin.Context) {
 	id := c.Param("id")
-	var reminder models.Reminder
 	db := c.MustGet("db").(*gorm.DB)
 
 	userID, ok := currentUserID(c)
@@ -101,12 +90,8 @@ func UpdateReminder(c *gin.Context) {
 		return
 	}
 
-	if err := db.Where("user_id = ?", userID).First(&reminder, "id = ?", id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			apperrors.AbortWithError(c, apperrors.ErrNotFound("Reminder").WithDetails("id", id))
-		} else {
-			apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to retrieve reminder").WithError(err))
-		}
+	reminder, ok := findOwned[models.Reminder](c, db, userID, id, "Reminder")
+	if !ok {
 		return
 	}
 
@@ -176,13 +161,8 @@ func DeleteReminder(c *gin.Context) {
 	}
 
 	// Check if reminder exists first
-	var reminder models.Reminder
-	if err := db.Where("user_id = ?", userID).First(&reminder, "id = ?", id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			apperrors.AbortWithError(c, apperrors.ErrNotFound("Reminder").WithDetails("id", id))
-		} else {
-			apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to retrieve reminder").WithError(err))
-		}
+	reminder, ok := findOwned[models.Reminder](c, db, userID, id, "Reminder")
+	if !ok {
 		return
 	}
 
@@ -204,14 +184,8 @@ func GetRemindersForContact(c *gin.Context) {
 		return
 	}
 
-	var contact models.Contact
-
-	if err := db.Preload("Reminders", "reminders.user_id = ?", userID).Where("user_id = ?", userID).First(&contact, "id = ?", contactID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			apperrors.AbortWithError(c, apperrors.ErrNotFound("Contact").WithDetails("id", contactID))
-		} else {
-			apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to retrieve contact").WithError(err))
-		}
+	contact, ok := findOwned[models.Contact](c, db.Preload("Reminders", "reminders.user_id = ?", userID), userID, contactID, "Contact")
+	if !ok {
 		return
 	}
 
@@ -298,13 +272,8 @@ func CompleteReminder(c *gin.Context) {
 		return
 	}
 
-	var reminder models.Reminder
-	if err := db.Where("user_id = ?", userID).First(&reminder, "id = ?", id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			apperrors.AbortWithError(c, apperrors.ErrNotFound("Reminder").WithDetails("id", id))
-		} else {
-			apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to retrieve reminder").WithError(err))
-		}
+	reminder, ok := findOwned[models.Reminder](c, db, userID, id, "Reminder")
+	if !ok {
 		return
 	}
 
@@ -386,13 +355,7 @@ func GetCompletionsForContact(c *gin.Context) {
 	}
 
 	// Verify contact belongs to user
-	var contact models.Contact
-	if err := db.Where("user_id = ?", userID).First(&contact, "id = ?", contactID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			apperrors.AbortWithError(c, apperrors.ErrNotFound("Contact").WithDetails("id", contactID))
-		} else {
-			apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to retrieve contact").WithError(err))
-		}
+	if _, ok := findOwned[models.Contact](c, db, userID, contactID, "Contact"); !ok {
 		return
 	}
 
@@ -419,13 +382,8 @@ func DeleteCompletion(c *gin.Context) {
 		return
 	}
 
-	var completion models.ReminderCompletion
-	if err := db.Where("user_id = ?", userID).First(&completion, "id = ?", id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			apperrors.AbortWithError(c, apperrors.ErrNotFound("Reminder completion").WithDetails("id", id))
-		} else {
-			apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to retrieve reminder completion").WithError(err))
-		}
+	completion, ok := findOwned[models.ReminderCompletion](c, db, userID, id, "Reminder completion")
+	if !ok {
 		return
 	}
 

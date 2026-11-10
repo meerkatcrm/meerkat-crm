@@ -351,13 +351,8 @@ func UpdateContact(c *gin.Context) {
 		return
 	}
 
-	var contact models.Contact
-	if err := db.Where("user_id = ?", userID).First(&contact, "id = ?", id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			apperrors.AbortWithError(c, apperrors.ErrNotFound("Contact").WithDetails("id", id))
-		} else {
-			apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to retrieve contact").WithError(err))
-		}
+	contact, ok := findOwned[models.Contact](c, db, userID, id, "Contact")
+	if !ok {
 		return
 	}
 
@@ -415,13 +410,8 @@ func DeleteContact(c *gin.Context) {
 	}
 
 	// Check if contact exists first
-	var contact models.Contact
-	if err := db.Where("user_id = ?", userID).First(&contact, "id = ?", id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			apperrors.AbortWithError(c, apperrors.ErrNotFound("Contact").WithDetails("id", id))
-		} else {
-			apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to retrieve contact").WithError(err))
-		}
+	contact, ok := findOwned[models.Contact](c, db, userID, id, "Contact")
+	if !ok {
 		return
 	}
 
@@ -506,13 +496,8 @@ func ArchiveContact(c *gin.Context) {
 		return
 	}
 
-	var contact models.Contact
-	if err := db.Where("user_id = ?", userID).First(&contact, "id = ?", id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			apperrors.AbortWithError(c, apperrors.ErrNotFound("Contact").WithDetails("id", id))
-		} else {
-			apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to retrieve contact").WithError(err))
-		}
+	contact, ok := findOwned[models.Contact](c, db, userID, id, "Contact")
+	if !ok {
 		return
 	}
 
@@ -550,13 +535,8 @@ func UnarchiveContact(c *gin.Context) {
 		return
 	}
 
-	var contact models.Contact
-	if err := db.Where("user_id = ?", userID).First(&contact, "id = ?", id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			apperrors.AbortWithError(c, apperrors.ErrNotFound("Contact").WithDetails("id", id))
-		} else {
-			apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to retrieve contact").WithError(err))
-		}
+	contact, ok := findOwned[models.Contact](c, db, userID, id, "Contact")
+	if !ok {
 		return
 	}
 

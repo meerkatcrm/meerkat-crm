@@ -3,7 +3,6 @@ package controllers
 import (
 	"bytes"
 	"encoding/csv"
-	"errors"
 	"fmt"
 	"meerkat/carddav"
 	apperrors "meerkat/errors"
@@ -403,13 +402,8 @@ func ExportContactAsVCF(c *gin.Context, photoDir string) {
 
 	contactID := c.Param("id")
 
-	var contact models.Contact
-	if err := db.Where("user_id = ?", userID).First(&contact, "id = ?", contactID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			apperrors.AbortWithError(c, apperrors.ErrNotFound("Contact").WithDetails("id", contactID))
-		} else {
-			apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to retrieve contact").WithError(err))
-		}
+	contact, ok := findOwned[models.Contact](c, db, userID, contactID, "Contact")
+	if !ok {
 		return
 	}
 

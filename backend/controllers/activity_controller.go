@@ -187,13 +187,8 @@ func UpdateActivity(c *gin.Context) {
 		return
 	}
 
-	var activity models.Activity
-	if err := db.Preload("Contacts", "contacts.user_id = ?", userID).Where("user_id = ?", userID).First(&activity, "id = ?", id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			apperrors.AbortWithError(c, apperrors.ErrNotFound("Activity").WithDetails("id", id))
-		} else {
-			apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to retrieve activity").WithError(err))
-		}
+	activity, ok := findOwned[models.Activity](c, db.Preload("Contacts", "contacts.user_id = ?", userID), userID, id, "Activity")
+	if !ok {
 		return
 	}
 
@@ -264,13 +259,8 @@ func DeleteActivity(c *gin.Context) {
 	}
 
 	// Check if activity exists first
-	var activity models.Activity
-	if err := db.Where("user_id = ?", userID).First(&activity, "id = ?", id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			apperrors.AbortWithError(c, apperrors.ErrNotFound("Activity").WithDetails("id", id))
-		} else {
-			apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to retrieve activity").WithError(err))
-		}
+	activity, ok := findOwned[models.Activity](c, db, userID, id, "Activity")
+	if !ok {
 		return
 	}
 
@@ -295,13 +285,8 @@ func GetActivitiesForContact(c *gin.Context) {
 		return
 	}
 
-	var contact models.Contact
-	if err := db.Where("user_id = ?", userID).First(&contact, "id = ?", contactID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			apperrors.AbortWithError(c, apperrors.ErrNotFound("Contact").WithDetails("id", contactID))
-		} else {
-			apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to retrieve contact").WithError(err))
-		}
+	contact, ok := findOwned[models.Contact](c, db, userID, contactID, "Contact")
+	if !ok {
 		return
 	}
 
