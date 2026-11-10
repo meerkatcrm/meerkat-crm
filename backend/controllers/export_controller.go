@@ -10,6 +10,7 @@ import (
 	"meerkat/models"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -95,7 +96,11 @@ func ExportData(c *gin.Context) {
 	contactHeaders := []string{
 		"ID", "Firstname", "Lastname", "Nickname", "Gender", "Email", "Phone",
 		"Birthday", "Address", "How We Met", "Food Preference", "Work Information",
-		"Contact Information", "Circles", "Created At", "Updated At",
+		"Contact Information", "Circles",
+		"Prefix", "Middle Name", "Suffix", "Organization", "Department", "Job Title", "Role",
+		"Anniversary", "Deceased", "Deceased Date", "Archived",
+		"Emails", "Phones", "Addresses", "URLs", "Messaging",
+		"Created At", "Updated At",
 	}
 	// Add custom field names as additional headers
 	contactHeaders = append(contactHeaders, customFieldNames...)
@@ -121,6 +126,22 @@ func ExportData(c *gin.Context) {
 			contact.WorkInformation,
 			contact.ContactInformation,
 			strings.Join(contact.Circles, "; "),
+			contact.Prefix,
+			contact.MiddleName,
+			contact.Suffix,
+			contact.Organization,
+			contact.Department,
+			contact.JobTitle,
+			contact.Role,
+			contact.Anniversary,
+			strconv.FormatBool(contact.IsDeceased),
+			contact.DeceasedDate,
+			strconv.FormatBool(contact.Archived),
+			joinTyped(contact.Emails, func(e models.ContactEmail) (string, string) { return e.Type, e.Value }),
+			joinTyped(contact.Phones, func(p models.ContactPhone) (string, string) { return p.Type, p.Value }),
+			joinTyped(contact.Addresses, func(a models.ContactAddress) (string, string) { return a.Type, models.FormatAddress(a) }),
+			joinTyped(contact.URLs, func(u models.ContactURL) (string, string) { return u.Type, u.Value }),
+			joinTyped(contact.IMPPs, func(i models.ContactIMPP) (string, string) { return i.Type, i.Value }),
 			contact.CreatedAt.Format(time.RFC3339),
 			contact.UpdatedAt.Format(time.RFC3339),
 		}
@@ -439,4 +460,21 @@ func contactFilenameSlug(firstname, lastname string) string {
 		return "contact"
 	}
 	return slug
+}
+
+// joinTyped renders a multi-value contact field as "type: value; type: value"
+// for one CSV cell.
+func joinTyped[T any](items []T, typeAndValue func(T) (string, string)) string {
+	parts := make([]string, 0, len(items))
+	for _, item := range items {
+		kind, value := typeAndValue(item)
+		if value == "" {
+			continue
+		}
+		if kind != "" {
+			value = kind + ": " + value
+		}
+		parts = append(parts, value)
+	}
+	return strings.Join(parts, "; ")
 }

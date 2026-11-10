@@ -986,6 +986,13 @@ func MergeImportedContact(existing *models.Contact, incoming *models.Contact) {
 	if incoming.Anniversary != "" {
 		existing.Anniversary = incoming.Anniversary
 	}
+	// Like every field here, an import only adds: it never brings a contact back to life.
+	if incoming.IsDeceased {
+		existing.IsDeceased = true
+		if incoming.DeceasedDate != "" {
+			existing.DeceasedDate = incoming.DeceasedDate
+		}
+	}
 	if incoming.VCardExtra != "" {
 		existing.VCardExtra = incoming.VCardExtra
 	}
