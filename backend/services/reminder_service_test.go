@@ -1,6 +1,7 @@
 package services
 
 import (
+	"fmt"
 	"meerkat/config"
 	"meerkat/models"
 	"testing"
@@ -550,4 +551,60 @@ func TestSendReminders_DueOnCalendarDate(t *testing.T) {
 			assert.ElementsMatch(t, []string{"yesterday", "today"}, sent)
 		})
 	}
+}
+
+// A second run on the same local day (a restart after the scheduled run) must not
+// mail a birthday-only user again: nothing but the day itself marks that mail as sent.
+func TestSendRemindersWithRateLimit_SecondRunOfTheDaySkipsDailyEvents(t *testing.T) {
+	db, _ := setupRouter()
+
+	originalInterval := ReminderMinInterval
+	ReminderMinInterval = time.Millisecond
+	defer func() { ReminderMinInterval = originalInterval }()
+
+	user := models.User{Username: "birthday-only", Password: "password123", Email: "birthday-only@example.com"}
+	require.NoError(t, db.Create(&user).Error)
+	today := time.Now().UTC()
+	require.NoError(t, db.Create(&models.Contact{
+		UserID: user.ID, Firstname: "Born", Lastname: "Today",
+		Birthday: fmt.Sprintf("1990-%02d-%02d", today.Month(), today.Day()),
+	}).Error)
+
+	mailed := 0
+	originalSender := sendReminderEmailFn
+	sendReminderEmailFn = func(u models.User, reminders []models.Reminder, cfg config.Config, db *gorm.DB) error {
+		if u.ID == user.ID {
+			mailed++
+		}
+		return nil
+	}
+	defer func() { sendReminderEmailFn = originalSender }()
+
+	cfg := config.Config{UseResend: true, ResendAPIKey: "test_api_key", ResendFromEmail: "noreply@example.com", ReminderTimezone: "UTC"}
+
+	require.NoError(t, SendRemindersWithRateLimit(db, cfg))
+	assert.Equal(t, 1, mailed, "the first run of the day sends the birthday mail")
+
+	time.Sleep(5 * time.Millisecond)
+	require.NoError(t, SendRemindersWithRateLimit(db, cfg))
+	assert.Equal(t, 1, mailed, "a second run on the same day must not send it again")
+
+	// A manual trigger is explicit and still sends.
+	require.NoError(t, SendReminders(db, cfg))
+	assert.Equal(t, 2, mailed)
+}
+
+func TestNextOccurrenceAfterToday_UsesTheGivenTimezone(t *testing.T) {
+	// Far east of UTC the local date is ahead of the UTC date for part of every day;
+	// the result must be after the local date whichever half of the day this runs in.
+	loc := time.FixedZone("east", 14*3600)
+	no := false
+	reminder := models.Reminder{
+		RemindAt:              TodayIn(loc).AddDate(0, 0, -7),
+		Recurrence:            "weekly",
+		ReoccurFromCompletion: &no,
+	}
+	next := NextOccurrenceAfterToday(reminder, loc)
+	assert.True(t, next.After(TodayIn(loc)), "next occurrence %s must be after today in the reminder timezone %s", next, TodayIn(loc))
+	assert.Equal(t, TodayIn(loc).AddDate(0, 0, 7), next)
 }

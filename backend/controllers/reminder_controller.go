@@ -335,7 +335,8 @@ func CompleteReminder(c *gin.Context) {
 
 	// Recurring reminders always come back, on a date that is not already due.
 	if reminder.Recurrence != "once" {
-		reminder.RemindAt = services.NextOccurrenceAfterToday(reminder)
+		cfg := currentConfig(c)
+		reminder.RemindAt = services.NextOccurrenceAfterToday(reminder, cfg.GetReminderLocation())
 		// Reset completed and email_sent flags for recurring reminders
 		reminder.Completed = false
 		reminder.EmailSent = false
