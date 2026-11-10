@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/emersion/go-vcard"
+	"github.com/stretchr/testify/assert"
 )
 
 // TestVCardRoundTrip verifies that the multi-valued and structured vCard fields
@@ -387,4 +388,50 @@ func TestParseRevisionReadsOurOwnOutput(t *testing.T) {
 	if !got.Equal(modified) {
 		t.Errorf("round-tripped REV = %v, want %v", got, modified)
 	}
+}
+
+// A PUT replaces the card, so a property the client removed must be cleared.
+func TestVCardToContact_UpdateClearsRemovedProperties(t *testing.T) {
+	existing := &models.Contact{
+		Firstname: "Ada", Lastname: "Lovelace", Nickname: "Countess",
+		Birthday: "1815-12-10", Email: "ada@example.com", Phone: "+441234567",
+		Emails:       []models.ContactEmail{{Type: "home", Value: "ada@example.com"}},
+		Phones:       []models.ContactPhone{{Type: "cell", Value: "+441234567"}},
+		URLs:         []models.ContactURL{{Type: "home", Value: "https://example.com"}},
+		Organization: "Analytical Engines", JobTitle: "Programmer",
+		Circles: []string{"Family"}, Gender: "female", Anniversary: "1835-07-08",
+		HowWeMet: "At a lecture",
+	}
+
+	card := vcard.Card{}
+	card.SetValue(vcard.FieldVersion, "3.0")
+	card.SetValue(vcard.FieldFormattedName, "Ada Lovelace")
+	card.SetName(&vcard.Name{GivenName: "Ada", FamilyName: "Lovelace"})
+	card.Add(vcard.FieldEmail, &vcard.Field{Value: "ada@new.example"})
+
+	contact, _, _, _ := VCardToContact(card, existing)
+
+	assert.Equal(t, "ada@new.example", contact.Email)
+	assert.Len(t, contact.Emails, 1)
+	assert.Empty(t, contact.Nickname)
+	assert.Empty(t, contact.Birthday)
+	assert.Empty(t, contact.Phone)
+	assert.Empty(t, contact.Phones)
+	assert.Empty(t, contact.URLs)
+	assert.Empty(t, contact.Organization)
+	assert.Empty(t, contact.JobTitle)
+
+	// Not every client can round-trip these, and Meerkat-only fields are not in a card at all.
+	assert.Equal(t, []string{"Family"}, contact.Circles)
+	assert.Equal(t, "female", contact.Gender)
+	assert.Equal(t, "1835-07-08", contact.Anniversary)
+	assert.Equal(t, "At a lecture", contact.HowWeMet)
+}
+
+func TestContactToVCard_ExportsGender(t *testing.T) {
+	card := ContactToVCard(&models.Contact{Firstname: "Ada", Gender: "female"}, "")
+	assert.Equal(t, "F", card.Value(vcard.FieldGender))
+
+	back, _, _, _ := VCardToContact(card, nil)
+	assert.Equal(t, "female", back.Gender)
 }

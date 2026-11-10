@@ -247,6 +247,12 @@ func processAndSavePhoto(file *multipart.FileHeader, uploadDir string) (string, 
 		return "", "", fmt.Errorf("%w: unsupported file format", errInvalidPhoto)
 	}
 
+	// Check the declared size before decoding allocates memory for it.
+	src.Seek(0, 0)
+	if err := httputil.CheckImageDimensions(src); err != nil {
+		return "", "", fmt.Errorf("%w: %v", errInvalidPhoto, err)
+	}
+
 	// Rewind the file reader
 	src.Seek(0, 0)
 
