@@ -8,12 +8,6 @@ import {
   IconButton,
   Chip,
   Stack,
-  Button,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  DialogContentText,
   Tooltip
 } from '@mui/material';
 import NotificationsIcon from '@mui/icons-material/Notifications';
@@ -23,7 +17,9 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EmailIcon from '@mui/icons-material/Email';
 import RepeatIcon from '@mui/icons-material/Repeat';
 import { Reminder } from '../api/reminders';
+import ConfirmDialog from './ConfirmDialog';
 import { useDateFormat } from '../DateFormatProvider';
+import { isReminderOverdue } from '../utils/reminderDue';
 
 interface ReminderListProps {
   reminders: Reminder[];
@@ -79,12 +75,7 @@ export default function ReminderList({
     return t(`reminders.recurrence.${recurrence}`);
   };
 
-  const isOverdue = (dateString: string) => {
-    const reminderDate = new Date(dateString);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return reminderDate < today;
-  };
+  const isOverdue = isReminderOverdue;
 
   if (reminders.length === 0) {
     return (
@@ -214,28 +205,16 @@ export default function ReminderList({
         ))}
       </Stack>
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
-        <DialogTitle>{t('reminders.deleteConfirm')}</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            {t('reminders.deleteMessage')}
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)} disabled={loading !== null}>
-            {t('common.cancel')}
-          </Button>
-          <Button
-            onClick={handleDeleteConfirm}
-            color="error"
-            variant="contained"
-            disabled={loading !== null}
-          >
-            {t('common.delete')}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        title={t('reminders.deleteConfirm')}
+        message={t('reminders.deleteMessage')}
+        confirmLabel={t('common.delete')}
+        destructive
+        busy={loading !== null}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteDialogOpen(false)}
+      />
     </>
   );
 }

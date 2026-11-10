@@ -112,7 +112,7 @@ func GetProfilePicture(c *gin.Context, cfg *config.Config) {
 
 func AddPhotoToContact(c *gin.Context, cfg *config.Config) {
 	// Check if demo mode is enabled - photo uploads are disabled in demo
-	if os.Getenv("DEMO_MODE") == "true" {
+	if cfg.DemoMode {
 		apperrors.AbortWithError(c, apperrors.ErrForbidden("Photo uploads are disabled in demo mode"))
 		return
 	}
@@ -245,6 +245,12 @@ func processAndSavePhoto(file *multipart.FileHeader, uploadDir string) (string, 
 	if contentType != "image/jpeg" && contentType != "image/png" &&
 		contentType != "image/heic" && contentType != "image/heif" {
 		return "", "", fmt.Errorf("%w: unsupported file format", errInvalidPhoto)
+	}
+
+	// Check the declared size before decoding allocates memory for it.
+	src.Seek(0, 0)
+	if err := httputil.CheckImageDimensions(src); err != nil {
+		return "", "", fmt.Errorf("%w: %v", errInvalidPhoto, err)
 	}
 
 	// Rewind the file reader

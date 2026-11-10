@@ -1,4 +1,4 @@
-import { test, expect, LOGGED_OUT, signInAsNewUser, uniqueUser } from './fixtures';
+import { test, expect, LOGGED_OUT, signInAsNewUser, uniqueUser, acceptConfirm } from './fixtures';
 
 // The standalone pages hold notes with no contact and activities across contacts.
 // These lists paginate, so each test gets its own user: items that specs running
@@ -30,8 +30,8 @@ test.describe('Standalone notes page', () => {
 
     await page.reload();
     await page.getByRole('listitem').filter({ hasText: edited }).getByRole('button', { name: 'Edit' }).click({ force: true });
-    page.once('dialog', (confirm) => confirm.accept());
     await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
+    await acceptConfirm(page, /delete this item/i, 'Delete');
     await expect(page.getByText(edited)).toHaveCount(0);
 
     await page.reload();
@@ -64,8 +64,8 @@ test.describe('Standalone activities page', () => {
 
     await page.reload();
     await page.getByRole('listitem').filter({ hasText: edited }).getByRole('button', { name: 'Edit' }).click({ force: true });
-    page.once('dialog', (confirm) => confirm.accept());
     await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
+    await acceptConfirm(page, /delete this item/i, 'Delete');
     await expect(page.getByText(edited)).toHaveCount(0);
 
     await page.reload();

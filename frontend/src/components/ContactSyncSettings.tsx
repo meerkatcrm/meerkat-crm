@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import ConfirmDialog from './ConfirmDialog';
 import { useDateFormat } from '../DateFormatProvider';
 import {
   Box,
@@ -14,7 +15,6 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogContentText,
   DialogActions,
   Switch,
   Checkbox,
@@ -523,18 +523,16 @@ export default function ContactSyncSettings() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={disconnectDialogOpen} onClose={() => setDisconnectDialogOpen(false)}>
-        <DialogTitle>{t('settings.contactSync.disconnectTitle')}</DialogTitle>
-        <DialogContent>
-          <DialogContentText>{t('settings.contactSync.disconnectConfirm')}</DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDisconnectDialogOpen(false)}>{t('common.cancel')}</Button>
-          <Button color="error" variant="contained" onClick={handleDisconnect} disabled={disconnecting}>
-            {t('settings.contactSync.disconnect')}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={disconnectDialogOpen}
+        title={t('settings.contactSync.disconnectTitle')}
+        message={t('settings.contactSync.disconnectConfirm')}
+        confirmLabel={t('settings.contactSync.disconnect')}
+        destructive
+        busy={disconnecting}
+        onConfirm={handleDisconnect}
+        onCancel={() => setDisconnectDialogOpen(false)}
+      />
     </>
   );
 }

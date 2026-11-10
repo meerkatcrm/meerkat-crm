@@ -1,5 +1,7 @@
 import { test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
+import '../i18n/config';
+import { DateFormatProvider } from '../DateFormatProvider';
 import { useTimelineEditing } from './useTimelineEditing';
 import * as contactsApi from '../api/contacts';
 import * as notesApi from '../api/notes';
@@ -27,20 +29,20 @@ const activity: Activity = {
   UpdatedAt: '',
   contacts: [person],
 };
-const directory = { contacts: [person], total: 1, page: 1, limit: 1000 } as contactsApi.ContactsResponse;
 
 const quietLogs = () => vi.spyOn(console, 'error').mockImplementation(() => {});
 
 function setup() {
   const onRefresh = vi.fn().mockResolvedValue(undefined);
   const showError = vi.fn();
-  const { result } = renderHook(() => useTimelineEditing(5, onRefresh, { showError }));
+  // The default date format is eu (DD.MM.YYYY), the one the edit dialog's free-text field then uses.
+  const { result } = renderHook(() => useTimelineEditing(5, onRefresh, { showError }), { wrapper: DateFormatProvider });
   return { result, onRefresh, showError };
 }
 
 beforeEach(() => {
+  localStorage.clear();
   vi.resetAllMocks();
-  contacts.getContacts.mockResolvedValue(directory);
 });
 
 afterEach(() => {
@@ -48,11 +50,11 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-test('editing a note fills the form with its content and calendar date', async () => {
+test('editing a note fills the form with its content and its date in the display format', async () => {
   const { result } = setup();
   await act(() => result.current.handleStartEditTimelineItem('note', note));
   expect(result.current.editingTimelineItem).toEqual({ type: 'note', id: 1 });
-  expect(result.current.editTimelineValues).toEqual({ noteContent: 'Hello', noteDate: '2026-03-15' });
+  expect(result.current.editTimelineValues).toEqual({ noteContent: 'Hello', noteDate: '15.03.2026' });
   expect(contacts.getContacts).not.toHaveBeenCalled();
 });
 
@@ -62,7 +64,7 @@ test('editing a note without a date leaves the date field empty', async () => {
   expect(result.current.editTimelineValues.noteDate).toBe('');
 });
 
-test('editing an activity fills the form and loads the contact picker only once', async () => {
+test('editing an activity fills the form; the participant picker searches on its own', async () => {
   const { result } = setup();
   await act(() => result.current.handleStartEditTimelineItem('activity', activity));
   expect(result.current.editingTimelineItem).toEqual({ type: 'activity', id: 2 });
@@ -70,35 +72,11 @@ test('editing an activity fills the form and loads the contact picker only once'
     activityTitle: 'Lunch',
     activityDescription: 'Pizza',
     activityLocation: 'Berlin',
-    activityDate: '2026-04-01',
+    activityDate: '01.04.2026',
     activityContacts: [person],
   });
-  expect(result.current.allContacts).toEqual([person]);
-  await act(() => result.current.handleStartEditTimelineItem('activity', activity));
-  expect(contacts.getContacts).toHaveBeenCalledTimes(1);
-});
-
-test('the activity form still opens when the contact picker fails to load', async () => {
-  quietLogs();
-  contacts.getContacts.mockRejectedValue(new Error('offline'));
-  const { result } = setup();
-  await act(() => result.current.handleStartEditTimelineItem('activity', activity));
-  expect(result.current.editTimelineValues.activityTitle).toBe('Lunch');
-  expect(result.current.allContacts).toEqual([]);
-});
-
-test('text typed while the contact picker loads is not overwritten', async () => {
-  let resolve!: (r: contactsApi.ContactsResponse) => void;
-  contacts.getContacts.mockImplementation(() => new Promise((r) => { resolve = r; }));
-  const { result } = setup();
-
-  await act(async () => { void result.current.handleStartEditTimelineItem('activity', activity); });
-  expect(result.current.editTimelineValues.activityTitle).toBe('Lunch');
-
-  act(() => result.current.setEditTimelineValues({ ...result.current.editTimelineValues, activityTitle: 'Typed' }));
-  await act(async () => resolve(directory));
-
-  expect(result.current.editTimelineValues.activityTitle).toBe('Typed');
+  // No bulk contact fetch: the backend caps a page at 100, so it could never be complete.
+  expect(contacts.getContacts).not.toHaveBeenCalled();
 });
 
 test('cancel leaves edit mode and clears the form', async () => {
@@ -120,7 +98,7 @@ test('a note with blank content is not saved', async () => {
 test('saving a note sends the edited date, refreshes and leaves edit mode', async () => {
   const { result, onRefresh } = setup();
   await act(() => result.current.handleStartEditTimelineItem('note', note));
-  act(() => result.current.setEditTimelineValues({ noteContent: 'Changed', noteDate: '2026-03-20' }));
+  act(() => result.current.setEditTimelineValues({ noteContent: 'Changed', noteDate: '20.03.2026' }));
   await act(() => result.current.handleUpdateNote(1));
   expect(notes.updateNote).toHaveBeenCalledWith(1, {
     content: 'Changed',
@@ -129,6 +107,39 @@ test('saving a note sends the edited date, refreshes and leaves edit mode', asyn
   });
   expect(onRefresh).toHaveBeenCalledTimes(1);
   expect(result.current.editingTimelineItem).toBeNull();
+});
+
+test('a day-first date is saved as that day, not with day and month swapped', async () => {
+  const { result } = setup();
+  await act(() => result.current.handleStartEditTimelineItem('note', note));
+  act(() => result.current.setEditTimelineValues({ noteContent: 'Hello', noteDate: '01.05.2025' }));
+  await act(() => result.current.handleUpdateNote(1));
+  expect(notes.updateNote).toHaveBeenCalledWith(1, expect.objectContaining({ date: '2025-05-01T00:00:00.000Z' }));
+
+  await act(() => result.current.handleStartEditTimelineItem('activity', activity));
+  act(() => result.current.setEditTimelineValues({ ...result.current.editTimelineValues, activityDate: '30.04.2025' }));
+  await act(() => result.current.handleUpdateActivity(2));
+  expect(activities.updateActivity).toHaveBeenCalledWith(2, expect.objectContaining({ date: '2025-04-30T00:00:00.000Z' }));
+});
+
+test('an unreadable date shows a field error instead of saving, and clears on cancel', async () => {
+  const { result, showError } = setup();
+  await act(() => result.current.handleStartEditTimelineItem('note', note));
+  act(() => result.current.setEditTimelineValues({ noteContent: 'Hello', noteDate: '31.02.2026' }));
+  await act(() => result.current.handleUpdateNote(1));
+  expect(notes.updateNote).not.toHaveBeenCalled();
+  expect(result.current.editTimelineDateError).toBe('Invalid date format. Check your date format setting.');
+  expect(result.current.editingTimelineItem).toEqual({ type: 'note', id: 1 });
+  expect(showError).not.toHaveBeenCalled();
+
+  act(() => result.current.handleCancelEditTimelineItem());
+  expect(result.current.editTimelineDateError).toBe('');
+
+  await act(() => result.current.handleStartEditTimelineItem('activity', activity));
+  act(() => result.current.setEditTimelineValues({ ...result.current.editTimelineValues, activityDate: 'soon' }));
+  await act(() => result.current.handleUpdateActivity(2));
+  expect(activities.updateActivity).not.toHaveBeenCalled();
+  expect(result.current.editTimelineDateError).not.toBe('');
 });
 
 test('saving a note with its date cleared falls back to now', async () => {

@@ -1,19 +1,12 @@
 // Admin API calls for user management
-import { apiFetch, API_BASE_URL, getAuthHeaders, parseErrorResponse } from './client';
+import { apiJson } from './client';
 import type { User, UsersListResponse, UserUpdateInput } from '../types';
 
 // Get current authenticated user's information
 export async function getCurrentUser(): Promise<User> {
-  const response = await apiFetch(`${API_BASE_URL}/users/me`, {
+  return apiJson('/users/me', {
     method: 'GET',
-    headers: getAuthHeaders(),
   });
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
-
-  return response.json();
 }
 
 
@@ -27,31 +20,9 @@ export async function getUsers(
     limit: limit.toString(),
   });
 
-  const response = await apiFetch(`${API_BASE_URL}/admin/users?${params}`, {
+  return apiJson(`/admin/users?${params}`, {
     method: 'GET',
-    headers: getAuthHeaders(),
   });
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
-
-  return response.json();
-}
-
-
-// Get a single user by ID (admin only)
-export async function getUserById(id: number): Promise<User> {
-  const response = await apiFetch(`${API_BASE_URL}/admin/users/${id}`, {
-    method: 'GET',
-    headers: getAuthHeaders(),
-  });
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
-
-  return response.json();
 }
 
 
@@ -60,41 +31,24 @@ export async function updateUser(
   id: number,
   data: UserUpdateInput
 ): Promise<User> {
-  const response = await apiFetch(`${API_BASE_URL}/admin/users/${id}`, {
+  return apiJson(`/admin/users/${id}`, {
     method: 'PATCH',
-    headers: getAuthHeaders(),
     body: JSON.stringify(data),
   });
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
-
-  return response.json();
 }
 
 // Trigger reminder emails manually (admin only)
 export async function triggerReminders(): Promise<void> {
-  const response = await apiFetch(`${API_BASE_URL}/admin/trigger-reminders`, {
+  await apiJson('/admin/trigger-reminders', {
     method: 'POST',
-    headers: getAuthHeaders(),
   });
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
 }
 
 /**
  * Delete a user (admin only)
  */
 export async function deleteUser(id: number): Promise<void> {
-  const response = await apiFetch(`${API_BASE_URL}/admin/users/${id}`, {
+  await apiJson(`/admin/users/${id}`, {
     method: 'DELETE',
-    headers: getAuthHeaders(),
   });
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
 }

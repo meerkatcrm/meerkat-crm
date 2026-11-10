@@ -956,6 +956,7 @@
       "warning": "This token will not be shown again. Copy it now and store it securely.",
       "copy": "Copy",
       "copied": "Copied!",
+      "copyFailed": "Could not copy automatically. Select the text and copy it manually.",
       "done": "Done, I saved it"
     },
     "revokeDialog": {
@@ -998,5 +999,15 @@
     "triggerReminders": "Send Reminder Emails",
     "triggerRemindersSuccess": "Reminder emails sent successfully",
     "triggerRemindersError": "Failed to send reminder emails"
+  },
+  "errorBoundary": {
+    "title": "Oops! Something went wrong",
+    "message": "We encountered an unexpected error. Please try refreshing the page or return to the home page.",
+    "tryAgain": "Try Again",
+    "reloadPage": "Reload Page",
+    "goHome": "Go Home",
+    "detailsTitle": "Error Details (Development Only)",
+    "error": "Error:",
+    "componentStack": "Component Stack:"
   }
 }

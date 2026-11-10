@@ -187,9 +187,27 @@ func saveDelivery(db *gorm.DB, webhookID uint, eventType, payload string, status
 	return d
 }
 
+// webhookDeliveryRetention is how long a finished delivery record is kept. Each
+// row stores the full payload, so without a limit the table grows for ever.
+const webhookDeliveryRetention = 30 * 24 * time.Hour
+
+// pruneWebhookDeliveries removes delivery records older than the retention
+// period that are no longer waiting for a retry.
+func pruneWebhookDeliveries(db *gorm.DB, now time.Time) {
+	result := db.Unscoped().
+		Where("created_at < ? AND next_retry_at IS NULL", now.Add(-webhookDeliveryRetention)).
+		Delete(&models.WebhookDelivery{})
+	if result.Error != nil {
+		logger.Error().Err(result.Error).Msg("Failed to prune old webhook deliveries")
+	} else if result.RowsAffected > 0 {
+		logger.Info().Int64("deleted", result.RowsAffected).Msg("Pruned old webhook deliveries")
+	}
+}
+
 // ProcessWebhookRetries retries failed deliveries where NextRetryAt <= now and Attempts < maxDeliveryAttempts.
 func ProcessWebhookRetries(db *gorm.DB, cfg config.Config) {
 	now := time.Now()
+	pruneWebhookDeliveries(db, now)
 	var deliveries []models.WebhookDelivery
 	if err := db.Where("next_retry_at <= ? AND attempts < ? AND deleted_at IS NULL", now, maxDeliveryAttempts).Find(&deliveries).Error; err != nil {
 		logger.Error().Err(err).Msg("Failed to load webhook deliveries for retry")

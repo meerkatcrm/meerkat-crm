@@ -1,5 +1,4 @@
-import { apiFetch, API_BASE_URL, getAuthHeaders } from './client';
-import { handleResponse } from './errorHandling';
+import { apiJson, ApiError } from './client';
 
 export type CardDAVDirection = 'two_way' | 'pull' | 'push';
 
@@ -54,63 +53,58 @@ export interface ContactSyncStats {
 
 // Returns null when no connection is configured yet (404).
 export async function getCardDAVConnection(): Promise<CardDAVConnection | null> {
-  const response = await apiFetch(`${API_BASE_URL}/carddav/connection`, {
-    method: 'GET',
-    headers: getAuthHeaders(),
-  });
-  if (response.status === 404) {
-    return null;
+  try {
+    return await apiJson<CardDAVConnection>('/carddav/connection', {
+      errorMessage: 'Unable to load the CardDAV connection.',
+    });
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) {
+      return null;
+    }
+    throw err;
   }
-  return handleResponse(response, 'Unable to load the CardDAV connection.') as Promise<CardDAVConnection>;
 }
 
 export async function saveCardDAVConnection(
   input: CardDAVConnectionInput
 ): Promise<CardDAVConnection> {
-  const response = await apiFetch(`${API_BASE_URL}/carddav/connection`, {
+  return apiJson<CardDAVConnection>('/carddav/connection', {
     method: 'PUT',
-    headers: getAuthHeaders(),
     body: JSON.stringify(input),
+    errorMessage: 'Unable to save the CardDAV connection.',
   });
-  return handleResponse(response, 'Unable to save the CardDAV connection.') as Promise<CardDAVConnection>;
 }
 
 export async function deleteCardDAVConnection(): Promise<void> {
-  const response = await apiFetch(`${API_BASE_URL}/carddav/connection`, {
-    method: 'DELETE',
-    headers: getAuthHeaders(),
-  });
-  await handleResponse(response, 'Unable to disconnect the CardDAV server.');
-}
+  await apiJson('/carddav/connection', {
+      method: 'DELETE',
+      errorMessage: 'Unable to disconnect the CardDAV server.',
+    });
+  }
 
-export async function discoverCardDAVAddressBooks(input: {
-  base_url: string;
-  username?: string;
-  password?: string;
-}): Promise<DiscoveredAddressBook[]> {
-  const response = await apiFetch(
-    `${API_BASE_URL}/carddav/discover`,
-    {
+  export async function discoverCardDAVAddressBooks(input: {
+    base_url: string;
+    username?: string;
+    password?: string;
+  }): Promise<DiscoveredAddressBook[]> {
+    const data = await apiJson<{ address_books?: DiscoveredAddressBook[] } | undefined>('/carddav/discover', {
       method: 'POST',
-      headers: getAuthHeaders(),
       body: JSON.stringify(input),
-    },
-    60000
-  );
-  const data = await handleResponse(response, 'Unable to discover address books.');
-  return data?.address_books || [];
-}
+      timeout: 60000,
+      errorMessage: 'Unable to discover address books.',
+    });
+    return data?.address_books || [];
+  }
 
-/**
- * Starts a sync on the server and returns as soon as it has been accepted (202).
- * A first sync can run for minutes, so the outcome is not awaited here — poll
- * getCardDAVConnection and watch `sync_running`, then read `last_sync_status`
- * and `last_sync_stats`.
- */
-export async function startCardDAVSync(): Promise<void> {
-  const response = await apiFetch(`${API_BASE_URL}/carddav/connection/sync`, {
-    method: 'POST',
-    headers: getAuthHeaders(),
-  });
-  await handleResponse(response, 'Unable to start the contact sync.');
-}
+  /**
+   * Starts a sync on the server and returns as soon as it has been accepted (202).
+   * A first sync can run for minutes, so the outcome is not awaited here — poll
+   * getCardDAVConnection and watch `sync_running`, then read `last_sync_status`
+   * and `last_sync_stats`.
+   */
+  export async function startCardDAVSync(): Promise<void> {
+    await apiJson('/carddav/connection/sync', {
+      method: 'POST',
+      errorMessage: 'Unable to start the contact sync.',
+    });
+  }

@@ -138,7 +138,7 @@ export default function ReminderDialog({
   ];
 
   return (
-    <AppDialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <AppDialog open={open} onClose={onClose} busy={loading} maxWidth="sm" fullWidth>
       <DialogTitle>
         {reminder ? t('reminders.editReminder') : t('reminders.addReminder')}
       </DialogTitle>

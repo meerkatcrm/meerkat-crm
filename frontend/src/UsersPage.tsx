@@ -38,7 +38,7 @@ import type { User, UserUpdateInput } from './types';
 
 export default function UsersPage() {
   const { t } = useTranslation();
-  const { formatDate } = useDateFormat();
+  const { formatInstantDate } = useDateFormat();
   const navigate = useNavigate();
   const { showSuccess, showError } = useSnackbar();
   const [users, setUsers] = useState<User[]>([]);
@@ -71,23 +71,31 @@ export default function UsersPage() {
 
   // Fetch users
   useEffect(() => {
+    // Set by the cleanup once the page changes, so a slow response for an
+    // earlier page cannot replace the one now shown.
+    let stale = false;
     const fetchUsers = async () => {
       setLoading(true);
       setError('');
 
       try {
         const response = await getUsers(page + 1, rowsPerPage);
+        if (stale) return;
         setUsers(response.users);
         setTotal(response.total);
       } catch (err) {
+        if (stale) return;
         const errorMessage = err instanceof Error ? err.message : t('users.loadError');
         setError(errorMessage);
       } finally {
-        setLoading(false);
+        if (!stale) setLoading(false);
       }
     };
 
     fetchUsers();
+    return () => {
+      stale = true;
+    };
   }, [page, rowsPerPage, t]);
 
   const handleChangePage = (_: unknown, newPage: number) => {
@@ -255,7 +263,7 @@ export default function UsersPage() {
                     size="small"
                   />
                 </TableCell>
-                <TableCell>{formatDate(user.created_at)}</TableCell>
+                <TableCell>{formatInstantDate(user.created_at)}</TableCell>
                 <TableCell align="right">
                   <IconButton
                     size="small"

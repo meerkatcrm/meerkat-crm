@@ -968,6 +968,9 @@ func (r *contactSyncRun) pullCreate(obj *remoteObject, link *models.CardDAVConta
 
 	var hash string
 	err := r.db.Transaction(func(tx *gorm.DB) error {
+		if err := models.ReleaseDeletedVCardUID(tx, r.conn.UserID, contact.VCardUID); err != nil {
+			return err
+		}
 		if err := tx.Create(contact).Error; err != nil {
 			return err
 		}
@@ -1105,7 +1108,7 @@ func (r *contactSyncRun) reconcileRemoteDeletions() {
 			// Pull is necessarily enabled here: the case above covers every
 			// push-only path. Deleted remotely, so soft-delete locally.
 			if err := r.db.Transaction(func(tx *gorm.DB) error {
-				if err := tx.Delete(&models.Contact{}, contact.ID).Error; err != nil {
+				if err := models.DeleteContactCascade(tx, contact.UserID, contact.ID); err != nil {
 					return err
 				}
 				return tx.Delete(link).Error
@@ -1113,6 +1116,7 @@ func (r *contactSyncRun) reconcileRemoteDeletions() {
 				r.recordItemError(err, "Failed to delete contact removed on server", map[string]string{"path": link.RemotePath})
 				continue
 			}
+			mcarddav.RemoveContactPhotoFile(r.cfg.ProfilePhotoDir, contact.Photo)
 			r.markLinkDropped(link)
 			r.stats.PulledDeleted++
 		}

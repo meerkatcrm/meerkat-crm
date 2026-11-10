@@ -13,6 +13,8 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Relationship, IncomingRelationship } from '../api/relationships';
 import { useDateFormat } from '../DateFormatProvider';
+import { useConfirm } from './ConfirmDialog';
+import { contactDisplayName } from '../utils/contactName';
 
 interface RelationshipListProps {
   relationships: Relationship[];
@@ -30,9 +32,10 @@ export default function RelationshipList({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { formatBirthday, calculateAge } = useDateFormat();
+  const { confirm, confirmDialog } = useConfirm();
 
-  const handleDeleteClick = (relationshipId: number) => {
-    if (window.confirm(t('relationships.deleteMessage'))) {
+  const handleDeleteClick = async (relationshipId: number) => {
+    if (await confirm({ message: t('relationships.deleteMessage'), confirmLabel: t('common.delete'), destructive: true })) {
       onDelete(relationshipId);
     }
   };
@@ -81,7 +84,7 @@ export default function RelationshipList({
         // For linked contacts, use their data; otherwise use the stored relationship data
         const linkedContact = relationship.related_contact;
         const displayName = linkedContact
-          ? `${linkedContact.firstname} ${linkedContact.lastname}`
+          ? contactDisplayName(linkedContact)
           : relationship.name;
         const displayGender = linkedContact?.gender || relationship.gender;
         const displayBirthday = linkedContact?.birthday || relationship.birthday;
@@ -166,7 +169,7 @@ export default function RelationshipList({
           </Typography>
           {incomingRelationships.map((incoming) => {
             const sourceContact = incoming.source_contact;
-            const sourceName = `${sourceContact.firstname} ${sourceContact.lastname}`;
+            const sourceName = contactDisplayName(sourceContact);
 
             return (
               <Paper
@@ -194,6 +197,7 @@ export default function RelationshipList({
           })}
         </>
       )}
+      {confirmDialog}
     </Stack>
   );
 }

@@ -22,13 +22,7 @@ func GetRelationships(c *gin.Context) {
 		return
 	}
 
-	var contact models.Contact
-	if err := db.Where("user_id = ?", userID).First(&contact, "id = ?", contactID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			apperrors.AbortWithError(c, apperrors.ErrNotFound("Contact").WithDetails("id", contactID))
-		} else {
-			apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to retrieve contact").WithError(err))
-		}
+	if _, ok := findOwned[models.Contact](c, db, userID, contactID, "Contact"); !ok {
 		return
 	}
 
@@ -57,13 +51,7 @@ func GetIncomingRelationships(c *gin.Context) {
 		return
 	}
 
-	var contact models.Contact
-	if err := db.Where("user_id = ?", userID).First(&contact, "id = ?", contactID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			apperrors.AbortWithError(c, apperrors.ErrNotFound("Contact").WithDetails("id", contactID))
-		} else {
-			apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to retrieve contact").WithError(err))
-		}
+	if _, ok := findOwned[models.Contact](c, db, userID, contactID, "Contact"); !ok {
 		return
 	}
 
@@ -149,7 +137,6 @@ func CreateRelationship(c *gin.Context) {
 
 func UpdateRelationship(c *gin.Context) {
 	id := c.Param("rid")
-	var relationship models.Relationship
 	db := c.MustGet("db").(*gorm.DB)
 
 	userID, ok := currentUserID(c)
@@ -157,12 +144,8 @@ func UpdateRelationship(c *gin.Context) {
 		return
 	}
 
-	if err := db.Where("user_id = ?", userID).First(&relationship, "id = ?", id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			apperrors.AbortWithError(c, apperrors.ErrNotFound("Relationship").WithDetails("id", id))
-		} else {
-			apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to retrieve relationship").WithError(err))
-		}
+	relationship, ok := findOwned[models.Relationship](c, db, userID, id, "Relationship")
+	if !ok {
 		return
 	}
 
@@ -210,13 +193,8 @@ func DeleteRelationship(c *gin.Context) {
 	}
 
 	// Check if relationship exists first
-	var relationship models.Relationship
-	if err := db.Where("user_id = ?", userID).First(&relationship, "id = ?", id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			apperrors.AbortWithError(c, apperrors.ErrNotFound("Relationship").WithDetails("id", id))
-		} else {
-			apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to retrieve relationship").WithError(err))
-		}
+	relationship, ok := findOwned[models.Relationship](c, db, userID, id, "Relationship")
+	if !ok {
 		return
 	}
 

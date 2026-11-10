@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
-import { createTestContact, deleteTestContact } from './fixtures';
+import { createTestContact, deleteTestContact, acceptConfirm } from './fixtures';
 
 // Employment history lives on its own tab inside the contact information card.
 // Each test uses a throwaway contact and cleans it up afterwards.
@@ -97,9 +97,8 @@ test.describe('Employment history', () => {
       await addJob(page, { organization: org, start: '2019' });
       await expect(page.getByText('Current', { exact: true })).toBeVisible();
 
-      // The list uses window.confirm; Playwright dismisses dialogs by default.
-      page.once('dialog', (d) => d.accept());
       await page.getByRole('button', { name: /end this job/i }).click();
+      await acceptConfirm(page, /mark this job as ended/i, /end this job/i);
 
       await expect(page.getByText('Current', { exact: true })).toBeHidden();
       await expect(page.getByRole('button', { name: /end this job/i })).toBeHidden();
@@ -121,8 +120,8 @@ test.describe('Employment history', () => {
       await addJob(page, { organization: org, start: '2015', end: '2017' });
       await expect(page.getByText(org)).toBeVisible();
 
-      page.once('dialog', (d) => d.accept());
       await page.getByRole('button', { name: /^delete$/i }).click();
+      await acceptConfirm(page, /delete this employment history entry/i, 'Delete');
 
       await expect(page.getByText(org)).toBeHidden();
       await expect(page.getByText(/no employment history yet/i)).toBeVisible();

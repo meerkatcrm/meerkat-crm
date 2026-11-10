@@ -1,5 +1,5 @@
 // Custom hook for fetching and managing notes
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { isAuthenticated } from '../auth';
 import {
   getUnassignedNotes,
@@ -33,8 +33,11 @@ export function useNotes(
   const [limit, setLimit] = useState(paramLimit || 25);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const requestRef = useRef(0);
 
   const fetchNotes = useCallback(async () => {
+    const requestId = requestRef.current + 1;
+    requestRef.current = requestId;
     setLoading(true);
     setError(null);
 
@@ -45,6 +48,9 @@ export function useNotes(
 
       if (contactId) {
         const data = await getContactNotes(contactId);
+        if (requestRef.current !== requestId) {
+          return;
+        }
         const normalized = Array.isArray(data) ? data : data.notes || [];
         setNotes(normalized);
         setTotal(normalized.length);
@@ -53,16 +59,24 @@ export function useNotes(
       } else {
         const fetchParams: GetNotesParams = { page: paramPage, limit: paramLimit, search, fromDate, toDate };
         const data = await getUnassignedNotes(fetchParams);
+        if (requestRef.current !== requestId) {
+          return;
+        }
         setNotes(data.notes || []);
         setTotal(data.total ?? data.notes?.length ?? 0);
         setPageState(data.page || paramPage || 1);
         setLimit(data.limit || paramLimit || 25);
       }
     } catch (err) {
+      if (requestRef.current !== requestId) {
+        return;
+      }
       const message = handleFetchError(err, 'fetching notes');
       setError(message);
     } finally {
-      setLoading(false);
+      if (requestRef.current === requestId) {
+        setLoading(false);
+      }
     }
   }, [contactId, paramPage, paramLimit, search, fromDate, toDate]);
 

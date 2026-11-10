@@ -27,6 +27,7 @@ import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import CallMergeIcon from '@mui/icons-material/CallMerge';
 import { ContactListSkeleton } from './components/LoadingSkeletons';
+import { contactDisplayName } from './utils/contactName';
 
 export default function ContactsPage() {
   const { t } = useTranslation();
@@ -99,15 +100,20 @@ export default function ContactsPage() {
     fetchData();
   }, []);
 
-  // Reset to page 1 when search or filter changes (but not on initial mount)
-  const prevFiltersRef = useRef({ searchQuery, selectedCircle });
+  // Reset to page 1 when search, filter, sort or the archived toggle changes (but not on initial mount)
+  const prevFiltersRef = useRef({ searchQuery, selectedCircle, sortOption, showArchived });
   useEffect(() => {
     const prev = prevFiltersRef.current;
-    if (prev.searchQuery !== searchQuery || prev.selectedCircle !== selectedCircle) {
+    if (
+      prev.searchQuery !== searchQuery ||
+      prev.selectedCircle !== selectedCircle ||
+      prev.sortOption !== sortOption ||
+      prev.showArchived !== showArchived
+    ) {
       setPage(1);
-      prevFiltersRef.current = { searchQuery, selectedCircle };
+      prevFiltersRef.current = { searchQuery, selectedCircle, sortOption, showArchived };
     }
-  }, [searchQuery, selectedCircle, setPage]);
+  }, [searchQuery, selectedCircle, sortOption, showArchived, setPage]);
 
   // Filter contacts by selected circle
   // With backend pagination, contacts are already filtered
@@ -271,7 +277,7 @@ export default function ContactsPage() {
                 <Box sx={{ flex: 1 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                      {[contact.firstname, contact.nickname && `"${contact.nickname}"`, contact.lastname].filter(Boolean).join(' ')}
+                      {contactDisplayName(contact, { nickname: true })}
                     </Typography>
                     {contact.archived && (
                       <Chip

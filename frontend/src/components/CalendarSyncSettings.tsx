@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import ConfirmDialog from './ConfirmDialog';
 import { useDateFormat } from '../DateFormatProvider';
 import {
   Box,
@@ -18,7 +19,6 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogContentText,
   DialogActions,
   Switch,
   FormControlLabel,
@@ -74,6 +74,8 @@ export default function CalendarSyncSettings() {
   const [editingUsername, setEditingUsername] = useState('');
   const [form, setForm] = useState<CalendarFormState>(emptyForm());
   const [saving, setSaving] = useState(false);
+  // Shown inside the add/edit dialog: the page-level alert renders behind it.
+  const [dialogError, setDialogError] = useState('');
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [calendarToDelete, setCalendarToDelete] = useState<CalendarSubscription | null>(null);
@@ -102,6 +104,7 @@ export default function CalendarSyncSettings() {
     setEditingHasPassword(false);
     setEditingUsername('');
     setForm(emptyForm());
+    setDialogError('');
     setDialogOpen(true);
   };
 
@@ -118,6 +121,7 @@ export default function CalendarSyncSettings() {
       past_days: String(cal.past_days),
       future_days: String(cal.future_days),
     });
+    setDialogError('');
     setDialogOpen(true);
   };
 
@@ -129,6 +133,7 @@ export default function CalendarSyncSettings() {
   const handleSave = async () => {
     setSaving(true);
     setError('');
+    setDialogError('');
     setSuccess('');
     const input = {
       name: form.name.trim(),
@@ -161,7 +166,7 @@ export default function CalendarSyncSettings() {
         await handleSync(created);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('settings.calendarSync.saveError'));
+      setDialogError(err instanceof Error ? err.message : t('settings.calendarSync.saveError'));
     } finally {
       setSaving(false);
     }
@@ -336,6 +341,7 @@ export default function CalendarSyncSettings() {
             <Alert severity="info" sx={{ py: 0.5 }}>
               {t('settings.calendarSync.dialogInfo')}
             </Alert>
+            {dialogError && <Alert severity="error" sx={{ py: 0 }}>{dialogError}</Alert>}
             <TextField
               label={t('settings.calendarSync.name')}
               value={form.name}
@@ -430,20 +436,16 @@ export default function CalendarSyncSettings() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
-        <DialogTitle>{t('settings.calendarSync.deleteTitle')}</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            {t('settings.calendarSync.deleteConfirm', { name: calendarToDelete?.name })}
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)}>{t('common.cancel')}</Button>
-          <Button color="error" variant="contained" onClick={handleDeleteConfirm} disabled={deleting}>
-            {t('common.delete')}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        title={t('settings.calendarSync.deleteTitle')}
+        message={t('settings.calendarSync.deleteConfirm', { name: calendarToDelete?.name })}
+        confirmLabel={t('common.delete')}
+        destructive
+        busy={deleting}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteDialogOpen(false)}
+      />
     </>
   );
 }

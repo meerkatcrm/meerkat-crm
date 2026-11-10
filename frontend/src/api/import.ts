@@ -1,4 +1,4 @@
-import { apiFetch, API_BASE_URL, getAuthHeaders, parseErrorResponse } from './client';
+import { apiJson } from './client';
 
 // Column mapping between CSV column and contact field
 export interface ColumnMapping {
@@ -151,16 +151,10 @@ export async function uploadCSVForImport(
   const formData = new FormData();
   formData.append('file', file);
 
-  const response = await apiFetch(`${API_BASE_URL}/contacts/import/upload`, {
+  return apiJson('/contacts/import/upload', {
     method: 'POST',
     body: formData,
   });
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
-
-  return response.json();
 }
 
 // Get import preview with applied mappings
@@ -168,20 +162,13 @@ export async function getImportPreview(
   sessionId: string,
   mappings: ColumnMapping[]
 ): Promise<ImportPreviewResponse> {
-  const response = await apiFetch(`${API_BASE_URL}/contacts/import/preview`, {
+  return apiJson('/contacts/import/preview', {
     method: 'POST',
-    headers: getAuthHeaders(),
     body: JSON.stringify({
       session_id: sessionId,
       mappings,
     }),
   });
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
-
-  return response.json();
 }
 
 // Confirm and execute the import (CSV)
@@ -189,20 +176,13 @@ export async function confirmImport(
   sessionId: string,
   actions: RowImportAction[]
 ): Promise<ImportResult> {
-  const response = await apiFetch(`${API_BASE_URL}/contacts/import/confirm`, {
+  return apiJson('/contacts/import/confirm', {
     method: 'POST',
-    headers: getAuthHeaders(),
     body: JSON.stringify({
       session_id: sessionId,
       actions,
     }),
   });
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
-
-  return response.json();
 }
 
 // Upload a VCF file for import (returns preview directly, no mapping needed)
@@ -212,16 +192,10 @@ export async function uploadVCFForImport(
   const formData = new FormData();
   formData.append('file', file);
 
-  const response = await apiFetch(`${API_BASE_URL}/contacts/import/vcf/upload`, {
+  return apiJson('/contacts/import/vcf/upload', {
     method: 'POST',
     body: formData,
   });
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
-
-  return response.json();
 }
 
 // Confirm and execute VCF import (with photo processing)
@@ -229,18 +203,11 @@ export async function confirmVCFImport(
   sessionId: string,
   actions: RowImportAction[]
 ): Promise<ImportResult> {
-  const response = await apiFetch(`${API_BASE_URL}/contacts/import/vcf/confirm`, {
+  return apiJson('/contacts/import/vcf/confirm', {
     method: 'POST',
-    headers: getAuthHeaders(),
     body: JSON.stringify({
       session_id: sessionId,
       actions,
     }),
   });
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
-
-  return response.json();
 }

@@ -30,9 +30,11 @@ import AddNoteDialog from './components/AddNoteDialog';
 import EditTimelineItemDialog from './components/EditTimelineItemDialog';
 import { handleError } from './utils/errorHandler';
 import { useDateFormat } from './DateFormatProvider';
+import { useSnackbar } from './context/SnackbarContext';
 
 const NotesPage: React.FC = () => {
   const { t } = useTranslation();
+  const { showError } = useSnackbar();
   const { formatDate, parseDateInput, autoFormatDateInput, getDatePlaceholder } = useDateFormat();
   const [searchInput, setSearchInput] = useState('');
   const debouncedSearch = useDebouncedValue(searchInput, 400);
@@ -136,7 +138,7 @@ const NotesPage: React.FC = () => {
       setEditValues({});
       refetch();
     } catch (err) {
-      handleError(err, { operation: 'updating note' });
+      handleError(err, { operation: 'updating note' }, { showError });
     }
   };
 
@@ -155,7 +157,7 @@ const NotesPage: React.FC = () => {
       setEditValues({});
       refetch();
     } catch (err) {
-      handleError(err, { operation: 'deleting note' });
+      handleError(err, { operation: 'deleting note' }, { showError });
     }
   };
 
@@ -348,7 +350,6 @@ const NotesPage: React.FC = () => {
             setEditValues(newValues);
             setEditError('');
           }}
-          allContacts={[]}
           dateError={editError}
         />
       )}

@@ -1,5 +1,5 @@
 // Activities-related API calls
-import { apiFetch, API_BASE_URL, getAuthHeaders, parseErrorResponse } from './client';
+import { apiJson } from './client';
 
 export interface ActivityContact {
   ID: number;
@@ -63,48 +63,21 @@ export async function getActivities(
     queryParams.append('toDate', params.toDate);
   }
 
-  const response = await apiFetch(
-    `${API_BASE_URL}/activities?${queryParams.toString()}`,
-    { headers: getAuthHeaders() }
-  );
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
-
-  return response.json();
+  return apiJson(`/activities?${queryParams.toString()}`);
 }
 
 // Get activities for a contact
 export async function getContactActivities(
   contactId: string | number
 ): Promise<{ activities: Activity[] }> {
-  const response = await apiFetch(
-    `${API_BASE_URL}/contacts/${contactId}/activities`,
-    { headers: getAuthHeaders() }
-  );
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
-
-  return response.json();
+  return apiJson(`/contacts/${contactId}/activities`);
 }
 
 // Get single activity
 export async function getActivity(
   id: string | number
 ): Promise<Activity> {
-  const response = await apiFetch(
-    `${API_BASE_URL}/activities/${id}`,
-    { headers: getAuthHeaders() }
-  );
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
-
-  return response.json();
+  return apiJson(`/activities/${id}`);
 }
 
 // Create activity
@@ -117,20 +90,10 @@ export async function createActivity(
     contact_ids: number[];
   }
 ): Promise<Activity> {
-  const response = await apiFetch(
-    `${API_BASE_URL}/activities`,
-    {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(data),
-    }
-  );
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
-
-  return response.json();
+  return apiJson('/activities', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
 }
 
 // Update activity
@@ -144,35 +107,17 @@ export async function updateActivity(
     contact_ids?: number[];
   }
 ): Promise<Activity> {
-  const response = await apiFetch(
-    `${API_BASE_URL}/activities/${id}`,
-    {
-      method: 'PUT',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(data),
-    }
-  );
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
-
-  return response.json();
+  return apiJson(`/activities/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
 }
 
 // Delete activity
 export async function deleteActivity(
   id: string | number
 ): Promise<void> {
-  const response = await apiFetch(
-    `${API_BASE_URL}/activities/${id}`,
-    {
-      method: 'DELETE',
-      headers: getAuthHeaders(),
-    }
-  );
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
+  await apiJson(`/activities/${id}`, {
+    method: 'DELETE',
+  });
 }

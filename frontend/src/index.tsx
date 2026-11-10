@@ -4,7 +4,6 @@ import './index.css';
 import App from './App';
 import ErrorBoundary from './components/ErrorBoundary';
 import * as serviceWorkerRegistration from './serviceWorkerRegistration';
-import reportWebVitals from './reportWebVitals';
 import './i18n/config';
 import { AppThemeProvider } from './AppThemeProvider';
 import { DateFormatProvider } from './DateFormatProvider';
@@ -51,8 +50,3 @@ root.render(
 );
 
 serviceWorkerRegistration.unregister();
-
-// If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
-// or send to an analytics endpoint.
-reportWebVitals();

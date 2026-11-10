@@ -187,9 +187,15 @@ func TestAdminMiddleware_BlocksApiToken(t *testing.T) {
 
 	assert.Equal(t, http.StatusForbidden, w.Code)
 
-	var body map[string]string
+	var body struct {
+		Error struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
 	json.Unmarshal(w.Body.Bytes(), &body)
-	assert.Equal(t, "API tokens cannot access admin endpoints", body["error"])
+	assert.Equal(t, "FORBIDDEN", body.Error.Code)
+	assert.Equal(t, "API tokens cannot access admin endpoints", body.Error.Message)
 }
 
 func TestAdminMiddleware_AllowsAdminUser(t *testing.T) {

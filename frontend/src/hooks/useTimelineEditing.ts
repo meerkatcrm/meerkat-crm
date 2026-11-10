@@ -1,14 +1,18 @@
 import { useState } from 'react';
-import { getContacts } from '../api/contacts';
+import { useTranslation } from 'react-i18next';
+import { useDateFormat } from '../DateFormatProvider';
 import { updateNote, deleteNote, Note } from '../api/notes';
 import { updateActivity, deleteActivity, Activity } from '../api/activities';
-import { handleError, handleFetchError, ErrorNotifier } from '../utils/errorHandler';
+import { handleError, ErrorNotifier } from '../utils/errorHandler';
 
 export function useTimelineEditing(
   contactId: number | undefined,
   onRefresh: () => Promise<void>,
   notifier?: ErrorNotifier
 ) {
+  const { t } = useTranslation();
+  const { formatDate, parseDateInput } = useDateFormat();
+  const [editTimelineDateError, setEditTimelineDateError] = useState('');
   const [editingTimelineItem, setEditingTimelineItem] = useState<{ type: 'note' | 'activity'; id: number } | null>(null);
   const [editTimelineValues, setEditTimelineValues] = useState<{
     noteContent?: string;
@@ -19,54 +23,58 @@ export function useTimelineEditing(
     activityDate?: string;
     activityContacts?: { ID: number; firstname: string; lastname: string; nickname?: string }[];
   }>({});
-  const [allContacts, setAllContacts] = useState<{ ID: number; firstname: string; lastname: string; nickname?: string }[]>([]);
 
-  const handleStartEditTimelineItem = async (type: 'note' | 'activity', item: Note | Activity) => {
+  const handleStartEditTimelineItem = (type: 'note' | 'activity', item: Note | Activity) => {
     setEditingTimelineItem({ type, id: item.ID });
+    setEditTimelineDateError('');
 
     if (type === 'note') {
       const note = item as Note;
       setEditTimelineValues({
         noteContent: note.content || '',
-        noteDate: note.date ? new Date(note.date).toISOString().split('T')[0] : ''
+        noteDate: note.date ? formatDate(note.date) : ''
       });
     } else {
       const activity = item as Activity;
 
-      // Fetch all contacts for the autocomplete if not already loaded
-      // Before the fetch below: the dialog is already open, so setting these afterwards
-      // would overwrite whatever was typed in the meantime.
       setEditTimelineValues({
         activityTitle: activity.title || '',
         activityDescription: activity.description || '',
         activityLocation: activity.location || '',
-        activityDate: activity.date ? new Date(activity.date).toISOString().split('T')[0] : '',
+        activityDate: activity.date ? formatDate(activity.date) : '',
         activityContacts: activity.contacts || []
       });
-
-      if (allContacts.length === 0) {
-        try {
-          const data = await getContacts({ page: 1, limit: 1000 });
-          setAllContacts(data.contacts || []);
-        } catch (err) {
-          handleFetchError(err, 'fetching contacts for autocomplete');
-        }
-      }
     }
   };
 
   const handleCancelEditTimelineItem = () => {
     setEditingTimelineItem(null);
     setEditTimelineValues({});
+    setEditTimelineDateError('');
+  };
+
+  // The date field is free text in the user's display format. Returns undefined
+  // (and shows the field error) when it cannot be read as a date.
+  const parseEditedDate = (input: string | undefined, errorKey: string): string | undefined => {
+    const parsed = input ? parseDateInput(input) : '';
+    if (parsed === null) {
+      setEditTimelineDateError(t(errorKey));
+      return undefined;
+    }
+    setEditTimelineDateError('');
+    return parsed ? new Date(parsed).toISOString() : new Date().toISOString();
   };
 
   const handleUpdateNote = async (noteId: number) => {
     if (!editTimelineValues.noteContent?.trim()) return;
 
+    const date = parseEditedDate(editTimelineValues.noteDate, 'noteDialog.dateError');
+    if (!date) return;
+
     try {
       await updateNote(noteId, {
         content: editTimelineValues.noteContent,
-        date: editTimelineValues.noteDate ? new Date(editTimelineValues.noteDate).toISOString() : new Date().toISOString(),
+        date,
         contact_id: contactId
       });
       await onRefresh();
@@ -79,12 +87,15 @@ export function useTimelineEditing(
   const handleUpdateActivity = async (activityId: number) => {
     if (!editTimelineValues.activityTitle?.trim()) return;
 
+    const date = parseEditedDate(editTimelineValues.activityDate, 'activityDialog.dateError');
+    if (!date) return;
+
     try {
       await updateActivity(activityId, {
         title: editTimelineValues.activityTitle,
         description: editTimelineValues.activityDescription || '',
         location: editTimelineValues.activityLocation || '',
-        date: editTimelineValues.activityDate ? new Date(editTimelineValues.activityDate).toISOString() : new Date().toISOString(),
+        date,
         contact_ids: editTimelineValues.activityContacts?.map(c => c.ID) || []
       });
       await onRefresh();
@@ -117,7 +128,7 @@ export function useTimelineEditing(
   return {
     editingTimelineItem,
     editTimelineValues,
-    allContacts,
+    editTimelineDateError,
     handleStartEditTimelineItem,
     handleCancelEditTimelineItem,
     handleUpdateNote,

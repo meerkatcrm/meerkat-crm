@@ -12,6 +12,7 @@ import ContactMailIcon from '@mui/icons-material/ContactMail';
 import CallMergeIcon from '@mui/icons-material/CallMerge';
 import { useTranslation } from 'react-i18next';
 import { ContactFieldKey, resolveEnabledFields } from '../contactFields';
+import { contactDisplayName } from '../utils/contactName';
 
 export interface ProfileValues {
   prefix: string;
@@ -89,17 +90,7 @@ export default function ContactHeader({
   const enabled = enabledFields ?? resolveEnabledFields(null);
   const isOn = (key: ContactFieldKey) => enabled.has(key);
 
-  const displayName = [
-    contact.prefix,
-    contact.firstname,
-    contact.nickname ? `"${contact.nickname}"` : '',
-    contact.middle_name,
-    contact.lastname,
-    contact.suffix,
-  ]
-    .map((part) => part?.trim())
-    .filter(Boolean)
-    .join(' ');
+  const displayName = contactDisplayName(contact, { nickname: true, full: true });
 
   return (
     <Card sx={{ mb: 1.5 }}>

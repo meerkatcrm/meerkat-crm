@@ -10,7 +10,6 @@
     "@mui/material": "^9",
     "@mui/system": "^9",
     "@mui/x-date-pickers": "^9",
-    "@types/d3-force": "^3.0.10",
     "d3-force": "^3.0.0",
     "date-fns": "^4",
     "i18next": "^26",
@@ -20,8 +19,7 @@
     "react-easy-crop": "^6",
     "react-force-graph-2d": "^1.29.0",
     "react-i18next": "^17",
-    "react-router-dom": "^7.18.0",
-    "web-vitals": "^6"
+    "react-router-dom": "^7.18.0"
   },
   "scripts": {
     "start": "vite",
@@ -40,6 +38,7 @@
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^7",
     "@testing-library/react": "^16.3.0",
+    "@types/d3-force": "^3.0.10",
     "@types/node": "^26",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",

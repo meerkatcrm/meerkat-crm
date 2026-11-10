@@ -31,6 +31,7 @@ func newContactSyncDB(t *testing.T) *gorm.DB {
 	require.NoError(t, db.AutoMigrate(
 		&models.User{}, &models.Contact{}, &models.JobExecution{},
 		&models.CardDAVConnection{}, &models.CardDAVContactLink{}, &models.EmploymentHistory{},
+		&models.Reminder{}, &models.Note{}, &models.Relationship{}, &models.Activity{},
 	))
 	return db
 }

@@ -3,6 +3,7 @@ package controllers
 import (
 	"crypto/subtle"
 	"errors"
+	apperrors "meerkat/errors"
 	"net/http"
 
 	"meerkat/config"
@@ -29,12 +30,12 @@ func OIDCLoginHandler(provider *services.OIDCProvider, cfg *config.Config) gin.H
 	return func(c *gin.Context) {
 		state, err := services.GenerateStateToken()
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate state"})
+			apperrors.AbortWithError(c, apperrors.ErrInternal("failed to generate state"))
 			return
 		}
 		nonce, err := services.GenerateStateToken()
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate nonce"})
+			apperrors.AbortWithError(c, apperrors.ErrInternal("failed to generate nonce"))
 			return
 		}
 

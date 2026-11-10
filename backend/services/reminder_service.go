@@ -150,9 +150,24 @@ func releaseJobLock(db *gorm.DB, jobName string, success bool) error {
 	})
 }
 
+// reminderJobRanToday reports whether the daily job last succeeded on today's
+// date in the reminder timezone. Unknown (no record, or a read error) counts as
+// not run, so events are sent rather than lost.
+func reminderJobRanToday(db *gorm.DB, cfg config.Config) bool {
+	var job models.JobExecution
+	if err := db.Where("job_name = ?", models.JobNameDailyReminders).First(&job).Error; err != nil {
+		return false
+	}
+	loc := cfg.GetReminderLocation()
+	return job.LastRunAt.In(loc).Format(time.DateOnly) == time.Now().In(loc).Format(time.DateOnly)
+}
+
 // SendRemindersWithRateLimit wraps SendReminders with distributed locking
 // to prevent duplicate sends during rapid restarts
 func SendRemindersWithRateLimit(db *gorm.DB, cfg config.Config) error {
+	// Read before the lock is taken: acquiring it for the first time stamps LastRunAt.
+	dailyEvents := !reminderJobRanToday(db, cfg)
+
 	acquired, err := acquireJobLock(db, models.JobNameDailyReminders, ReminderMinInterval)
 	if err != nil {
 		logger.Error().Err(err).Msg("Error checking job lock")
@@ -165,7 +180,7 @@ func SendRemindersWithRateLimit(db *gorm.DB, cfg config.Config) error {
 	}
 
 	// Run the actual reminder logic
-	err = SendReminders(db, cfg)
+	err = sendReminders(db, cfg, dailyEvents)
 
 	// Release the lock, marking success if no error
 	if releaseErr := releaseJobLock(db, models.JobNameDailyReminders, err == nil); releaseErr != nil {
@@ -175,8 +190,19 @@ func SendRemindersWithRateLimit(db *gorm.DB, cfg config.Config) error {
 	return err
 }
 
+// SendReminders runs the daily reminder job unconditionally, including its
+// once-a-day events. The scheduled path goes through SendRemindersWithRateLimit.
 func SendReminders(db *gorm.DB, config config.Config) error {
-	logger.Info().Msg("Sending reminders...")
+	return sendReminders(db, config, true)
+}
+
+// sendReminders emails due reminders. dailyEvents is false on a second run within
+// the same local day (a restart, or the scheduled run after a startup run): the
+// things that have no "already done" marker of their own are then skipped, namely
+// the reminder.triggered and birthday.occurred webhooks and the email to users who
+// only have a birthday today. Reminder emails are safe to retry: email_sent guards them.
+func sendReminders(db *gorm.DB, config config.Config, dailyEvents bool) error {
+	logger.Info().Bool("daily_events", dailyEvents).Msg("Sending reminders...")
 	var reminders []models.Reminder
 	// Get the current time in the configured reminder timezone
 	loc := config.GetReminderLocation()
@@ -212,7 +238,9 @@ func SendReminders(db *gorm.DB, config config.Config) error {
 	// Also include users who have birthdays today (even without reminders)
 	// Check all users and use GetUpcomingBirthdays - if first result is today, include them
 	var allUsers []models.User
-	if err := db.Find(&allUsers).Error; err != nil {
+	if !dailyEvents {
+		// Birthday-only users were already mailed by today's first run.
+	} else if err := db.Find(&allUsers).Error; err != nil {
 		logger.Warn().Err(err).Msg("Failed to fetch all users for birthday check, continuing with reminders only")
 	} else {
 		for _, user := range allUsers {
@@ -266,11 +294,13 @@ func SendReminders(db *gorm.DB, config config.Config) error {
 
 		// Send email only when enabled; preserve reminders (email_sent=false) when disabled
 		// so they are picked up again once email is configured.
+		emailedNow := false
 		if config.EmailEnabled() {
 			if err := sendReminderEmailFn(user, userReminders, config, db); err != nil {
 				logger.Error().Err(err).Uint("user_id", user.ID).Msg("Error sending daily email, skipping reminder mutations for this user")
 				sendErrors++
 			} else {
+				emailedNow = true
 				// Mark reminders as email_sent so they won't be re-emailed
 				for _, reminder := range userReminders {
 					// Only these two columns: the row was loaded before the emails went
@@ -287,9 +317,18 @@ func SendReminders(db *gorm.DB, config config.Config) error {
 			logger.Info().Int("reminder_count", len(userReminders)).Uint("user_id", userID).Msg("Email sending disabled (no channel configured), skipping reminder mutations to preserve them")
 		}
 
-		// Fire reminder.triggered webhooks regardless of email config
-		for _, reminder := range userReminders {
-			go TriggerWebhooks(db, config, reminder.UserID, "reminder.triggered", reminder)
+		// reminder.triggered fires once per occurrence. With email on, that is when
+		// the email goes out (email_sent then keeps the reminder out of later runs,
+		// including one that became due after today's first run). With email off
+		// nothing marks the reminder, so it fires on the first run of the day only.
+		if emailedNow || (!config.EmailEnabled() && dailyEvents) {
+			for _, reminder := range userReminders {
+				go TriggerWebhooks(db, config, reminder.UserID, "reminder.triggered", reminder)
+			}
+		}
+
+		if !dailyEvents {
+			continue
 		}
 
 		// Fire birthday.occurred for each birthday that falls today regardless of email config
@@ -496,13 +535,21 @@ func addYears(t time.Time, years int) time.Time {
 	return result
 }
 
+// TodayIn returns today's calendar date in loc as midnight UTC, the same form
+// remind_at is stored in.
+func TodayIn(loc *time.Location) time.Time {
+	now := time.Now().In(loc)
+	return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+}
+
 // NextOccurrenceAfterToday steps a reminder forward until it is no longer due, so completing
-// one that is several periods overdue does not mail it again straight away.
-func NextOccurrenceAfterToday(reminder models.Reminder) time.Time {
-	now := time.Now().UTC()
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+// one that is several periods overdue does not mail it again straight away. "Today" is
+// the date in loc, the timezone the daily job uses to decide what is due: with UTC
+// here, a reminder completed east of UTC could land on a date that is already due.
+func NextOccurrenceAfterToday(reminder models.Reminder, loc *time.Location) time.Time {
+	today := TodayIn(loc)
 	for {
-		next := CalculateNextReminderTime(reminder)
+		next := nextReminderTime(reminder, today)
 		if next.After(today) || next.Equal(reminder.RemindAt) {
 			return next
 		}
@@ -510,23 +557,27 @@ func NextOccurrenceAfterToday(reminder models.Reminder) time.Time {
 	}
 }
 
-// CalculateNextReminderTime determines the next reminder date based on recurrence settings.
-// All calculations are done in UTC to ensure consistency.
+// CalculateNextReminderTime determines the next reminder date based on recurrence
+// settings, taking today's date in UTC.
 func CalculateNextReminderTime(reminder models.Reminder) time.Time {
-	// Normalize to UTC for consistent calculations
-	now := time.Now().UTC()
+	return nextReminderTime(reminder, TodayIn(time.UTC))
+}
+
+// nextReminderTime is CalculateNextReminderTime for a given "today" (midnight UTC
+// of the calendar date).
+func nextReminderTime(reminder models.Reminder, today time.Time) time.Time {
 	remindAtUTC := reminder.RemindAt.UTC()
 
 	var baseTime time.Time
 	// Default to true if not specified (nil)
 	reoccurFromCompletion := reminder.ReoccurFromCompletion == nil || *reminder.ReoccurFromCompletion
 	if reoccurFromCompletion {
-		if remindAtUTC.After(now) {
+		if remindAtUTC.After(today) {
 			// For reminders in the future, use the original remind at time (e.g. if I already complete a monthly reminder set for next week I am reminded again next week in one month)
 			baseTime = remindAtUTC
 		} else {
-			// For reminders in the past use now as reference (if I complete a weekly reminder that was due last week, the next reminder is in one week from today)
-			baseTime = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+			// For reminders in the past use today as reference (if I complete a weekly reminder that was due last week, the next reminder is in one week from today)
+			baseTime = today
 		}
 	} else {
 		baseTime = remindAtUTC

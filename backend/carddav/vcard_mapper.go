@@ -11,6 +11,7 @@ import (
 	"image/png"
 	"io"
 	"meerkat/httputil"
+	"meerkat/logger"
 	"meerkat/models"
 	"net/http"
 	"os"
@@ -156,6 +157,12 @@ func ContactToVCard(contact *models.Contact, photoDir string) vcard.Card {
 		card.SetValue(vcard.FieldAnniversary, contact.Anniversary)
 	}
 
+	// GENDER is vCard 4.0, like ANNIVERSARY above; 3.0 clients ignore it. Without
+	// it a two-way sync would strip the value from the remote on the next push.
+	if code := mapGenderToVCard(contact.Gender); code != "" {
+		card.SetValue(vcard.FieldGender, code)
+	}
+
 	// CATEGORIES (circles)
 	if len(contact.Circles) > 0 {
 		card.SetValue(vcard.FieldCategories, strings.Join(contact.Circles, ","))
@@ -265,6 +272,8 @@ func VCardToContact(card vcard.Card, existing *models.Contact) (*models.Contact,
 	contact := existing
 	if contact == nil {
 		contact = &models.Contact{}
+	} else {
+		clearVCardOwnedFields(contact)
 	}
 
 	// UID
@@ -442,6 +451,42 @@ func VCardToContact(card vcard.Card, existing *models.Contact) (*models.Contact,
 	return contact, photoData, photoMediaType, photoURL
 }
 
+// clearVCardOwnedFields blanks the fields a card fully describes before an
+// existing contact is updated from it. A PUT replaces the card: a phone number
+// or birthday the client removed is simply absent, and keeping the stored value
+// would serve it straight back (and, with two-way sync, push it to the server).
+//
+// Left alone on purpose: circles, gender and anniversary. Common clients (iOS,
+// Android) have no field for CATEGORIES, GENDER or ANNIVERSARY and may drop them
+// on save, which must not empty what is core Meerkat data. Names are always
+// present (N or FN) and are overwritten below.
+func clearVCardOwnedFields(contact *models.Contact) {
+	contact.Nickname = ""
+	contact.Emails, contact.Email = nil, ""
+	contact.Phones, contact.Phone = nil, ""
+	contact.Addresses, contact.Address = nil, ""
+	contact.URLs = nil
+	contact.IMPPs = nil
+	contact.Birthday = ""
+	// Blanking all four never ends a job: Contact.AfterSave re-derives them from
+	// the employment history when the card carries no ORG, TITLE or ROLE.
+	contact.Organization, contact.Department = "", ""
+	contact.JobTitle, contact.Role = "", ""
+	contact.VCardExtra = ""
+}
+
+// RemoveContactPhotoFile deletes a contact's photo from disk, after the contact
+// itself was deleted. The thumbnail lives in the database row. A missing file is
+// not an error.
+func RemoveContactPhotoFile(photoDir, photo string) {
+	if photoDir == "" || photo == "" || strings.Contains(photo, "..") || filepath.IsAbs(photo) {
+		return
+	}
+	if err := os.Remove(filepath.Join(photoDir, photo)); err != nil && !os.IsNotExist(err) {
+		logger.Warn().Err(err).Str("photo", photo).Msg("Failed to delete photo of a deleted contact")
+	}
+}
+
 // SaveContactPhoto saves photo data to disk and generates thumbnail
 // Returns the photo filename and base64 thumbnail data URL
 func SaveContactPhoto(photoData []byte, mediaType string, photoDir string) (string, string, error) {
@@ -452,6 +497,12 @@ func SaveContactPhoto(photoData []byte, mediaType string, photoDir string) (stri
 	// Detect content type if not provided
 	if mediaType == "" {
 		mediaType = http.DetectContentType(photoData)
+	}
+
+	// Photos arrive from clients and remote servers: check the declared size
+	// before decoding allocates memory for it.
+	if err := httputil.CheckImageDimensions(bytes.NewReader(photoData)); err != nil {
+		return "", "", err
 	}
 
 	// Decode the image
@@ -862,6 +913,21 @@ func mapGenderFromVCard(gender string) string {
 		return "other"
 	case "N", "U":
 		return "prefer_not_to_say"
+	default:
+		return ""
+	}
+}
+
+func mapGenderToVCard(gender string) string {
+	switch gender {
+	case "male":
+		return "M"
+	case "female":
+		return "F"
+	case "other":
+		return "O"
+	case "prefer_not_to_say":
+		return "N"
 	default:
 		return ""
 	}

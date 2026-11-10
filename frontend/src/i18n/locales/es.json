@@ -956,6 +956,7 @@
       "warning": "Este token no se mostrará de nuevo. Cópialo ahora y guárdalo de forma segura.",
       "copy": "Copiar",
       "copied": "¡Copiado!",
+      "copyFailed": "No se pudo copiar automáticamente. Selecciona el texto y cópialo manualmente.",
       "done": "Listo, lo guardé"
     },
     "revokeDialog": {
@@ -998,5 +999,15 @@
     "triggerReminders": "Enviar Emails de Recordatorio",
     "triggerRemindersSuccess": "Emails de recordatorio enviados exitosamente",
     "triggerRemindersError": "Error al enviar los emails de recordatorio"
+  },
+  "errorBoundary": {
+    "title": "¡Vaya! Algo salió mal",
+    "message": "Se produjo un error inesperado. Intenta actualizar la página o vuelve a la página de inicio.",
+    "tryAgain": "Reintentar",
+    "reloadPage": "Recargar la página",
+    "goHome": "Ir al inicio",
+    "detailsTitle": "Detalles del error (solo en desarrollo)",
+    "error": "Error:",
+    "componentStack": "Pila de componentes:"
   }
 }

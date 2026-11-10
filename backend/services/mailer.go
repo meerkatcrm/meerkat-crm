@@ -8,6 +8,7 @@ import (
 	"net/smtp"
 	"strconv"
 	"strings"
+	"time"
 
 	"meerkat/config"
 	"meerkat/logger"
@@ -104,26 +105,42 @@ func sendViaSMTP(cfg config.Config, msg EmailMessage) error {
 		auth = smtp.PlainAuth("", cfg.SMTPUsername, cfg.SMTPPassword, cfg.SMTPHost)
 	}
 
-	if cfg.SMTPUseTLS {
-		if err := sendSMTPImplicitTLS(cfg, addr, auth, msg.To, body); err != nil {
-			return err
-		}
-	} else {
-		// smtp.SendMail upgrades to STARTTLS automatically when the server advertises it.
-		if err := smtp.SendMail(addr, auth, cfg.SMTPFromEmail, []string{msg.To}, body); err != nil {
-			return err
-		}
+	if err := sendSMTP(cfg, addr, auth, msg.To, body); err != nil {
+		return err
 	}
 
 	logger.Info().Str("to", msg.To).Msg("Email sent via SMTP")
 	return nil
 }
 
-// sendSMTPImplicitTLS sends a message over a connection that is wrapped in TLS (implicit TLS, typically port 465).
-func sendSMTPImplicitTLS(cfg config.Config, addr string, auth smtp.Auth, to string, body []byte) error {
-	conn, err := tls.Dial("tcp", addr, &tls.Config{ServerName: cfg.SMTPHost, MinVersion: tls.VersionTLS12})
+// smtpTimeout bounds one whole delivery. Without it a mail host that accepts the
+// connection and then goes silent would hang the reminder job for good.
+const smtpTimeout = 30 * time.Second
+
+// sendSMTP delivers one message. With SMTP_USE_TLS the connection is wrapped in
+// TLS from the start (implicit TLS, typically port 465); otherwise it upgrades
+// with STARTTLS when the server offers it.
+func sendSMTP(cfg config.Config, addr string, auth smtp.Auth, to string, body []byte) error {
+	dialer := &net.Dialer{Timeout: smtpTimeout}
+	tlsConfig := &tls.Config{ServerName: cfg.SMTPHost, MinVersion: tls.VersionTLS12}
+
+	var conn net.Conn
+	var err error
+	if cfg.SMTPUseTLS {
+		conn, err = tls.DialWithDialer(dialer, "tcp", addr, tlsConfig)
+	} else {
+		conn, err = dialer.Dial("tcp", addr)
+	}
 	if err != nil {
-		return fmt.Errorf("tls dial: %w", err)
+		if cfg.SMTPUseTLS {
+			return fmt.Errorf("tls dial: %w", err)
+		}
+		return fmt.Errorf("smtp dial: %w", err)
+	}
+	// Closing the connection also covers the paths where no client exists yet.
+	defer func() { _ = conn.Close() }()
+	if err := conn.SetDeadline(time.Now().Add(smtpTimeout)); err != nil {
+		return fmt.Errorf("smtp deadline: %w", err)
 	}
 
 	client, err := smtp.NewClient(conn, cfg.SMTPHost)
@@ -131,6 +148,14 @@ func sendSMTPImplicitTLS(cfg config.Config, addr string, auth smtp.Auth, to stri
 		return fmt.Errorf("smtp client: %w", err)
 	}
 	defer client.Close()
+
+	if !cfg.SMTPUseTLS {
+		if ok, _ := client.Extension("STARTTLS"); ok {
+			if err := client.StartTLS(tlsConfig); err != nil {
+				return fmt.Errorf("smtp starttls: %w", err)
+			}
+		}
+	}
 
 	if auth != nil {
 		if err := client.Auth(auth); err != nil {

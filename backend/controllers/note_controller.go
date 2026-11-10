@@ -28,13 +28,8 @@ func CreateNote(c *gin.Context) {
 	contactID := c.Param("id")
 
 	// Find the contact by the ID
-	var contact models.Contact
-	if err := db.Where("user_id = ?", userID).First(&contact, "id = ?", contactID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			apperrors.AbortWithError(c, apperrors.ErrNotFound("Contact").WithDetails("id", contactID))
-		} else {
-			apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to retrieve contact").WithError(err))
-		}
+	contact, ok := findOwned[models.Contact](c, db, userID, contactID, "Contact")
+	if !ok {
 		return
 	}
 
@@ -109,7 +104,6 @@ func CreateUnassignedNote(c *gin.Context) {
 
 func GetNote(c *gin.Context) {
 	id := c.Param("id")
-	var note models.Note
 	db := c.MustGet("db").(*gorm.DB)
 
 	userID, ok := currentUserID(c)
@@ -117,12 +111,8 @@ func GetNote(c *gin.Context) {
 		return
 	}
 
-	if err := db.Where("user_id = ?", userID).First(&note, "id = ?", id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			apperrors.AbortWithError(c, apperrors.ErrNotFound("Note").WithDetails("id", id))
-		} else {
-			apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to retrieve note").WithError(err))
-		}
+	note, ok := findOwned[models.Note](c, db, userID, id, "Note")
+	if !ok {
 		return
 	}
 
@@ -197,15 +187,10 @@ func UpdateNote(c *gin.Context) {
 	}
 
 	id := c.Param("id")
-	var note models.Note
 
 	// Retrieve the existing note from the database
-	if err := db.Where("user_id = ?", userID).First(&note, "id = ?", id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			apperrors.AbortWithError(c, apperrors.ErrNotFound("Note").WithDetails("id", id))
-		} else {
-			apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to retrieve note").WithError(err))
-		}
+	note, ok := findOwned[models.Note](c, db, userID, id, "Note")
+	if !ok {
 		return
 	}
 
@@ -254,13 +239,8 @@ func DeleteNote(c *gin.Context) {
 	}
 
 	// Check if note exists first
-	var note models.Note
-	if err := db.Where("user_id = ?", userID).First(&note, "id = ?", id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			apperrors.AbortWithError(c, apperrors.ErrNotFound("Note").WithDetails("id", id))
-		} else {
-			apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to retrieve note").WithError(err))
-		}
+	note, ok := findOwned[models.Note](c, db, userID, id, "Note")
+	if !ok {
 		return
 	}
 

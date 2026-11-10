@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import ConfirmDialog from './ConfirmDialog';
 import { useDateFormat } from '../DateFormatProvider';
+import { useSnackbar } from '../context/SnackbarContext';
+import { copyToClipboard } from '../utils/clipboard';
 import {
   Box,
   Card,
@@ -18,7 +21,6 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogContentText,
   DialogActions,
   Switch,
   FormControlLabel,
@@ -88,6 +90,7 @@ const DELIVERY_ERROR_KEYS: Record<string, string> = {
 
 export default function WebhooksSettings() {
   const { t } = useTranslation();
+  const { showError } = useSnackbar();
   const { formatDateTime } = useDateFormat();
   const deliveryErrorText = (error: string) => {
     const key = DELIVERY_ERROR_KEYS[error];
@@ -96,6 +99,8 @@ export default function WebhooksSettings() {
   const [webhooks, setWebhooks] = useState<Webhook[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // Shown inside the add/edit dialog: the page-level alert renders behind it.
+  const [dialogError, setDialogError] = useState('');
   const [success, setSuccess] = useState('');
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -135,18 +140,21 @@ export default function WebhooksSettings() {
   const openCreate = () => {
     setEditingId(null);
     setForm(emptyForm());
+    setDialogError('');
     setDialogOpen(true);
   };
 
   const openEdit = (wh: Webhook) => {
     setEditingId(wh.id);
     setForm({ name: wh.name, url: wh.url, events: wh.events, is_active: wh.is_active });
+    setDialogError('');
     setDialogOpen(true);
   };
 
   const handleSave = async () => {
     setSaving(true);
     setError('');
+    setDialogError('');
     try {
       if (editingId !== null) {
         const updated = await updateWebhook(editingId, form);
@@ -160,7 +168,7 @@ export default function WebhooksSettings() {
         setSecretCopied(false);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('settings.webhooks.saveError'));
+      setDialogError(err instanceof Error ? err.message : t('settings.webhooks.saveError'));
     } finally {
       setSaving(false);
     }
@@ -414,6 +422,7 @@ export default function WebhooksSettings() {
         </DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
+            {dialogError && <Alert severity="error" sx={{ py: 0 }}>{dialogError}</Alert>}
             <TextField
               label={t('settings.webhooks.name')}
               value={form.name}
@@ -497,11 +506,13 @@ export default function WebhooksSettings() {
               }} />
             <Tooltip title={secretCopied ? t('apiTokens.createdDialog.copied') : t('apiTokens.createdDialog.copy')}>
               <IconButton
-                onClick={() => {
-                  if (createdWebhook) {
-                    navigator.clipboard.writeText(createdWebhook.secret);
+                onClick={async () => {
+                  if (!createdWebhook) return;
+                  if (await copyToClipboard(createdWebhook.secret)) {
                     setSecretCopied(true);
                     setTimeout(() => setSecretCopied(false), 2000);
+                  } else {
+                    showError(t('apiTokens.createdDialog.copyFailed'));
                   }
                 }}
                 color={secretCopied ? 'success' : 'default'}
@@ -519,22 +530,17 @@ export default function WebhooksSettings() {
       </Dialog>
 
       {/* Delete confirmation dialog */}
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
-        <DialogTitle>{t('settings.webhooks.deleteDialog.title')}</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            {t('settings.webhooks.deleteDialog.message', { name: webhookToDelete?.name ?? '' })}
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)}>
-            {t('settings.webhooks.deleteDialog.cancel')}
-          </Button>
-          <Button onClick={handleDeleteConfirm} color="error" disabled={deleting} autoFocus>
-            {t('settings.webhooks.deleteDialog.confirm')}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        title={t('settings.webhooks.deleteDialog.title')}
+        message={t('settings.webhooks.deleteDialog.message', { name: webhookToDelete?.name ?? '' })}
+        cancelLabel={t('settings.webhooks.deleteDialog.cancel')}
+        confirmLabel={t('settings.webhooks.deleteDialog.confirm')}
+        destructive
+        busy={deleting}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteDialogOpen(false)}
+      />
     </>
   );
 }

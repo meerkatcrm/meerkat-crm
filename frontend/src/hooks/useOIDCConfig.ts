@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { API_BASE_URL } from '../auth';
+import { API_BASE_URL, apiFetch } from '../api/client';
 
 interface OIDCConfig {
   enabled: boolean;
@@ -10,7 +10,8 @@ export function useOIDCConfig(): OIDCConfig {
   const [config, setConfig] = useState<OIDCConfig>({ enabled: false, provider_name: 'SSO' });
 
   useEffect(() => {
-    fetch(`${API_BASE_URL}/auth/oidc/config`)
+    // Asked on the login page, before there is a session
+    apiFetch(`${API_BASE_URL}/auth/oidc/config`, { skipAuthRedirect: true })
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data) {

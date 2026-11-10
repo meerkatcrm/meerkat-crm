@@ -65,6 +65,12 @@ describe('fetchAndCacheUserInfo', () => {
     expect(JSON.parse(localStorage.getItem('user_info')!)).toEqual(cached);
   });
 
+  test('returns the stored preferences for the caller to apply, without caching them', async () => {
+    fetchMock.mockResolvedValueOnce(ok({ ...me, language: 'de', date_format: 'iso' }));
+    await expect(fetchAndCacheUserInfo()).resolves.toEqual({ ...cached, language: 'de', date_format: 'iso' });
+    expect(JSON.parse(localStorage.getItem('user_info')!)).toEqual(cached);
+  });
+
   test('a user without is_admin is cached as a non-admin', async () => {
     fetchMock.mockResolvedValueOnce(ok({ id: 7, username: 'anna' }));
     await expect(fetchAndCacheUserInfo()).resolves.toMatchObject({ is_admin: false });

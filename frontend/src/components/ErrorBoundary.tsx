@@ -11,21 +11,18 @@ import {
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutlined';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import HomeIcon from '@mui/icons-material/Home';
+import { withTranslation, WithTranslation } from 'react-i18next';
 
 /**
  * Props for ErrorBoundary component
  */
 interface ErrorBoundaryProps {
   children: ReactNode;
-  /** Optional fallback component to render on error */
-  fallback?: ReactNode;
   /** Optional callback when an error occurs */
   onError?: (error: Error, errorInfo: ErrorInfo) => void;
   /** Whether to show detailed error info (dev mode) */
   showDetails?: boolean;
-  /** Custom error message */
-  errorMessage?: string;
-  /** Component name for better error context */
+  /** Component name, for the console log */
   name?: string;
 }
 
@@ -52,8 +49,8 @@ interface ErrorBoundaryState {
  * </ErrorBoundary>
  * ```
  */
-class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  constructor(props: ErrorBoundaryProps) {
+class ErrorBoundary extends Component<ErrorBoundaryProps & WithTranslation, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps & WithTranslation) {
     super(props);
     this.state = {
       hasError: false,
@@ -77,7 +74,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
    */
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     // Log to console
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    console.error(`ErrorBoundary${this.props.name ? ` (${this.props.name})` : ''} caught an error:`, error, errorInfo);
 
     // Update state with error info
     this.setState({
@@ -117,15 +114,9 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 
   render(): ReactNode {
     const { hasError, error, errorInfo } = this.state;
-    const { children, fallback, showDetails, errorMessage, name } = this.props;
+    const { children, showDetails, t } = this.props;
 
     if (hasError) {
-      // If custom fallback is provided, use it
-      if (fallback) {
-        return fallback;
-      }
-
-      // Default error UI
       return (
         <Container maxWidth="md">
           <Box
@@ -154,7 +145,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
               />
               
               <Typography variant="h4" gutterBottom>
-                Oops! Something went wrong
+                {t('errorBoundary.title')}
               </Typography>
               
               <Typography
@@ -163,9 +154,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
                   color: "text.secondary",
                   marginBottom: "16px"
                 }}>
-                {errorMessage || 
-                  `We encountered an unexpected error${name ? ` in ${name}` : ''}. ` +
-                  'Please try refreshing the page or return to the home page.'}
+                {t('errorBoundary.message')}
               </Typography>
 
               <Box sx={{ mt: 3, display: 'flex', gap: 2, justifyContent: 'center' }}>
@@ -174,32 +163,32 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
                   startIcon={<RefreshIcon />}
                   onClick={this.handleReset}
                 >
-                  Try Again
+                  {t('errorBoundary.tryAgain')}
                 </Button>
                 <Button
                   variant="outlined"
                   startIcon={<RefreshIcon />}
                   onClick={this.handleReload}
                 >
-                  Reload Page
+                  {t('errorBoundary.reloadPage')}
                 </Button>
                 <Button
                   variant="outlined"
                   startIcon={<HomeIcon />}
                   onClick={this.handleGoHome}
                 >
-                  Go Home
+                  {t('errorBoundary.goHome')}
                 </Button>
               </Box>
 
               {/* Show error details in development */}
               {showDetails && error && (
                 <Alert severity="error" sx={{ mt: 3, textAlign: 'left' }}>
-                  <AlertTitle>Error Details (Development Only)</AlertTitle>
+                  <AlertTitle>{t('errorBoundary.detailsTitle')}</AlertTitle>
                   <Typography variant="body2" component="pre" sx={{ whiteSpace: 'pre-wrap', fontSize: '0.75rem' }}>
-                    <strong>Error:</strong> {error.toString()}
+                    <strong>{t('errorBoundary.error')}</strong> {error.toString()}
                     {'\n\n'}
-                    <strong>Component Stack:</strong>
+                    <strong>{t('errorBoundary.componentStack')}</strong>
                     {errorInfo?.componentStack}
                   </Typography>
                 </Alert>
@@ -214,4 +203,4 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 }
 
-export default ErrorBoundary;
+export default withTranslation()(ErrorBoundary);

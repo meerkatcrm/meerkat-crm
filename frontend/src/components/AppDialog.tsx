@@ -13,9 +13,11 @@ const shake = keyframes`
 
 type AppDialogProps = Omit<DialogProps, 'onClose'> & {
   onClose?: () => void;
+  // While true (e.g. a save is in flight) every close request, Esc included, is ignored.
+  busy?: boolean;
 };
 
-export default function AppDialog({ onClose, slotProps, ...props }: AppDialogProps) {
+export default function AppDialog({ onClose, busy = false, slotProps, ...props }: AppDialogProps) {
   const [shaking, setShaking] = useState(false);
 
   const handleClose = useCallback(
@@ -27,9 +29,10 @@ export default function AppDialog({ onClose, slotProps, ...props }: AppDialogPro
         }
         return;
       }
+      if (busy) return;
       onClose?.();
     },
-    [onClose, shaking]
+    [onClose, shaking, busy]
   );
 
   return (

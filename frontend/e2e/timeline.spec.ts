@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures';
-import { createTestContact, deleteTestContact } from './fixtures';
+import { createTestContact, deleteTestContact, acceptConfirm } from './fixtures';
 import { API_BASE_URL } from './global-setup';
 
 // Notes and activities both render in the contact's Timeline tab. Each test
@@ -74,8 +74,8 @@ test.describe('Timeline', () => {
       await expect(page.getByText(`${content} edited`)).toBeVisible();
 
       await page.getByRole('listitem').filter({ hasText: content }).getByRole('button', { name: 'Edit' }).click({ force: true });
-      page.once('dialog', (confirm) => confirm.accept());
       await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
+      await acceptConfirm(page, /delete this item/i, 'Delete');
       await expect(page.getByText(content)).toHaveCount(0);
 
       await page.reload();
@@ -106,8 +106,8 @@ test.describe('Timeline', () => {
       await expect(page.getByText(`${title} edited`)).toBeVisible();
 
       await page.getByRole('listitem').filter({ hasText: title }).getByRole('button', { name: 'Edit' }).click({ force: true });
-      page.once('dialog', (confirm) => confirm.accept());
       await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
+      await acceptConfirm(page, /delete this item/i, 'Delete');
       await expect(page.getByText(title)).toHaveCount(0);
 
       await page.reload();

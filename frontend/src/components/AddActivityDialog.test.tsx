@@ -14,10 +14,11 @@ beforeEach(() => vi.resetAllMocks());
 afterEach(cleanup);
 
 test('saving waits for the preselected contact, so the activity is not stored without it', async () => {
-  let resolve!: (r: contactsApi.ContactsResponse) => void;
-  // The first call loads the preselected contact; the debounced search makes its own later.
-  mocked.getContacts.mockImplementationOnce(() => new Promise((r) => { resolve = r; }));
-  mocked.getContacts.mockResolvedValue({ contacts: [anna], total: 1, page: 1, limit: 100 });
+  let resolve!: (r: contactsApi.Contact) => void;
+  // The preselected contact is fetched by id, so it is found however many contacts exist;
+  // the picker's own list (which does not contain it here) is a separate request.
+  mocked.getContact.mockImplementationOnce(() => new Promise((r) => { resolve = r; }));
+  mocked.getContacts.mockResolvedValue({ contacts: [], total: 0, page: 1, limit: 100 });
   const onSave = vi.fn().mockResolvedValue(undefined);
   render(
     <I18nextProvider i18n={i18n}>
@@ -30,7 +31,8 @@ test('saving waits for the preselected contact, so the activity is not stored wi
   const save = await screen.findByRole('button', { name: 'Save' });
   await waitFor(() => expect(save).toBeDisabled());
 
-  await act(async () => resolve({ contacts: [anna], total: 1, page: 1, limit: 100 }));
+  expect(mocked.getContact).toHaveBeenCalledWith(7, expect.any(Array));
+  await act(async () => resolve(anna));
   await waitFor(() => expect(save).toBeEnabled());
   fireEvent.click(save);
 

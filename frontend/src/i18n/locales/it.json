@@ -956,6 +956,7 @@
       "warning": "Questo token non verrà mostrato di nuovo. Copialo ora e conservalo in modo sicuro.",
       "copy": "Copia",
       "copied": "Copiato!",
+      "copyFailed": "Impossibile copiare automaticamente. Seleziona il testo e copialo manualmente.",
       "done": "Fatto, l'ho salvato"
     },
     "revokeDialog": {
@@ -998,5 +999,15 @@
     "triggerReminders": "Invia Email Promemoria",
     "triggerRemindersSuccess": "Email di promemoria inviate con successo",
     "triggerRemindersError": "Invio email di promemoria fallito"
+  },
+  "errorBoundary": {
+    "title": "Ops! Qualcosa è andato storto",
+    "message": "Si è verificato un errore imprevisto. Prova ad aggiornare la pagina o torna alla pagina iniziale.",
+    "tryAgain": "Riprova",
+    "reloadPage": "Ricarica la pagina",
+    "goHome": "Vai alla home",
+    "detailsTitle": "Dettagli dell'errore (solo in sviluppo)",
+    "error": "Errore:",
+    "componentStack": "Stack dei componenti:"
   }
 }

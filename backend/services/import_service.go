@@ -986,10 +986,19 @@ func MergeImportedContact(existing *models.Contact, incoming *models.Contact) {
 	if incoming.Anniversary != "" {
 		existing.Anniversary = incoming.Anniversary
 	}
+	// Like every field here, an import only adds: it never brings a contact back to life.
+	if incoming.IsDeceased {
+		existing.IsDeceased = true
+		if incoming.DeceasedDate != "" {
+			existing.DeceasedDate = incoming.DeceasedDate
+		}
+	}
 	if incoming.VCardExtra != "" {
 		existing.VCardExtra = incoming.VCardExtra
 	}
-	if incoming.VCardUID != "" {
+	// The UID is the contact's identity for every synced device: replacing it
+	// makes the contact vanish there and come back as a new one.
+	if existing.VCardUID == "" && incoming.VCardUID != "" {
 		existing.VCardUID = incoming.VCardUID
 	}
 }

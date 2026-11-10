@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import ConfirmDialog from './ConfirmDialog';
 import {
   Box,
   Card,
@@ -14,11 +15,6 @@ import {
   List,
   ListItem,
   ListItemText,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
 } from '@mui/material';
 import TuneIcon from '@mui/icons-material/Tune';
 import AddIcon from '@mui/icons-material/Add';
@@ -53,12 +49,15 @@ export default function CustomFieldsSettings() {
   }, [t]);
 
   const saveFields = async (newNames: string[]) => {
+    // Callers show newNames right away; this render's list is what to go back to if the save fails.
+    const previousNames = fieldNames;
     try {
       setSaving(true);
       setError('');
       const savedNames = await updateCustomFieldNames(newNames);
       setFieldNames(savedNames);
     } catch (err) {
+      setFieldNames(previousNames);
       setError(err instanceof Error ? err.message : t('settings.customFields.saveError'));
     } finally {
       setSaving(false);
@@ -156,7 +155,7 @@ export default function CustomFieldsSettings() {
                   <List dense sx={{ py: 0 }}>
                     {fieldNames.map((name, index) => (
                       <ListItem
-                        key={index}
+                        key={name}
                         // Keep the text clear of the absolutely positioned action buttons.
                         sx={{ pl: 0, pr: 15, overflowWrap: 'anywhere' }}
                         secondaryAction={
@@ -232,24 +231,18 @@ export default function CustomFieldsSettings() {
         </CardContent>
       </Card>
 
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
-        <DialogTitle>{t('settings.customFields.deleteDialog.title')}</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            {t('settings.customFields.deleteDialog.message', { 
-              fieldName: fieldToDelete !== null ? fieldNames[fieldToDelete] : '' 
-            })}
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)}>
-            {t('settings.customFields.deleteDialog.cancel')}
-          </Button>
-          <Button onClick={handleDeleteConfirm} color="error" autoFocus>
-            {t('settings.customFields.deleteDialog.confirm')}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        title={t('settings.customFields.deleteDialog.title')}
+        message={t('settings.customFields.deleteDialog.message', {
+          fieldName: fieldToDelete !== null ? fieldNames[fieldToDelete] : ''
+        })}
+        cancelLabel={t('settings.customFields.deleteDialog.cancel')}
+        confirmLabel={t('settings.customFields.deleteDialog.confirm')}
+        destructive
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteDialogOpen(false)}
+      />
     </>
   );
 }

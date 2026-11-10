@@ -11,8 +11,13 @@ import {
   IconButton
 } from '@mui/material';
 import AppDialog from './AppDialog';
+import { useConfirm } from './ConfirmDialog';
+import { useContactSearch } from '../hooks/useContactSearch';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useDateFormat } from '../DateFormatProvider';
+import { contactDisplayName } from '../utils/contactName';
+
+type TimelineContact = { ID: number; firstname: string; lastname: string; nickname?: string };
 
 export interface TimelineItemValues {
   noteContent?: string;
@@ -21,7 +26,7 @@ export interface TimelineItemValues {
   activityDescription?: string;
   activityLocation?: string;
   activityDate?: string;
-  activityContacts?: { ID: number; firstname: string; lastname: string; nickname?: string }[];
+  activityContacts?: TimelineContact[];
 }
 
 interface EditTimelineItemDialogProps {
@@ -32,7 +37,6 @@ interface EditTimelineItemDialogProps {
   type: 'note' | 'activity';
   values: TimelineItemValues;
   onChange: (values: TimelineItemValues) => void;
-  allContacts: { ID: number; firstname: string; lastname: string; nickname?: string }[];
   dateError?: string;
 }
 
@@ -44,18 +48,25 @@ export default function EditTimelineItemDialog({
   type,
   values,
   onChange,
-  allContacts,
   dateError
 }: EditTimelineItemDialogProps) {
   const { t } = useTranslation();
   const { autoFormatDateInput, getDatePlaceholder } = useDateFormat();
+  const { confirm, confirmDialog } = useConfirm();
+  const participantSearch = useContactSearch(open && type === 'activity');
+  // Selected participants stay in the list even when the current search does not match them.
+  const selectedContacts = values.activityContacts || [];
+  const participantOptions: TimelineContact[] = [
+    ...selectedContacts,
+    ...participantSearch.options.filter((option) => !selectedContacts.some((c) => c.ID === option.ID)),
+  ];
 
   const handleSave = () => {
     onSave();
   };
 
-  const handleDelete = () => {
-    if (window.confirm(t('contactDetail.confirmDelete'))) {
+  const handleDelete = async () => {
+    if (await confirm({ message: t('contactDetail.confirmDelete'), confirmLabel: t('common.delete'), destructive: true })) {
       onDelete();
     }
   };
@@ -124,10 +135,14 @@ export default function EditTimelineItemDialog({
             />
             <Autocomplete
               multiple
-              options={allContacts}
+              options={participantOptions}
+              filterOptions={(x) => x}
+              loading={participantSearch.loading}
+              inputValue={participantSearch.search}
+              onInputChange={(_, value) => participantSearch.setSearch(value)}
               isOptionEqualToValue={(option, value) => option.ID === value.ID}
-              getOptionLabel={(contact) => `${contact.firstname}${contact.nickname ? ` "${contact.nickname}"` : ''} ${contact.lastname}`}
-              value={values.activityContacts || []}
+              getOptionLabel={(contact) => contactDisplayName(contact, { nickname: true })}
+              value={selectedContacts}
               onChange={(_, newValue) => onChange({ ...values, activityContacts: newValue })}
               renderInput={(params) => (
                 <TextField
@@ -139,7 +154,7 @@ export default function EditTimelineItemDialog({
               renderValue={(value, getItemProps) =>
                 value.map((contact, index) => (
                   <Chip
-                    label={`${contact.firstname}${contact.nickname ? ` "${contact.nickname}"` : ''} ${contact.lastname}`}
+                    label={contactDisplayName(contact, { nickname: true })}
                     {...getItemProps({ index })}
                     size="small"
                     key={contact.ID}
@@ -167,6 +182,7 @@ export default function EditTimelineItemDialog({
           </Button>
         </Box>
       </DialogActions>
+      {confirmDialog}
     </AppDialog>
   );
 }

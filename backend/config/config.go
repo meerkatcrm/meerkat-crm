@@ -52,6 +52,7 @@ type Config struct {
 	CookieSecure             bool   // Set Secure flag on auth cookie (requires HTTPS)
 	CookieDomain             string // Domain for auth cookie (empty = current domain only)
 	RegistrationDisabled     bool   // Disable new user registration
+	DemoMode                 bool   // Public demo instance: password changes and photo uploads are refused
 	WebhookBlockPrivateURLs  bool   // Block webhook deliveries to private/loopback addresses (useful for cloud deployments)
 	CalDAVSyncIntervalHours  int    // Interval in hours for the scheduled calendar sync job
 	CalDAVBlockPrivateURLs   bool   // Block calendar sync requests to private/loopback addresses (useful for cloud deployments)
@@ -109,6 +110,7 @@ func LoadConfig() *Config {
 		CookieSecure:            getBoolEnv("COOKIE_SECURE", false),
 		CookieDomain:            getEnv("COOKIE_DOMAIN", ""),
 		RegistrationDisabled:    getBoolEnv("DISABLE_REGISTRATION", false),
+		DemoMode:                getBoolEnv("DEMO_MODE", false),
 		WebhookBlockPrivateURLs: getBoolEnv("WEBHOOK_BLOCK_PRIVATE_URLS", false),
 		CalDAVSyncIntervalHours: getIntEnv("CALDAV_SYNC_INTERVAL_HOURS", 6),
 		CalDAVBlockPrivateURLs:  getBoolEnv("CALDAV_BLOCK_PRIVATE_URLS", false),
@@ -346,41 +348,33 @@ func (c *Config) Validate() []ValidationError {
 		log.Println("WARN: OIDC is partially configured. Set OIDC_PROVIDER_URL, OIDC_CLIENT_ID, and OIDC_CLIENT_SECRET to enable SSO.")
 	}
 
-	// Validate Resend configuration if emails are enabled
-	if c.UseResend {
-		if c.ResendAPIKey == "" {
-			errors = append(errors, ValidationError{
-				Field:   "RESEND_API_KEY",
-				Message: "Resend API key is required when email is enabled.",
-			})
-		}
-		if c.ResendFromEmail == "" {
-			errors = append(errors, ValidationError{
-				Field:   "RESEND_FROM_EMAIL",
-				Message: "Resend sender email is required when email is enabled.",
-			})
-		}
+	// UseResend and UseSMTP are derived from these fields being set, so a
+	// half-configured channel is silently off. Say so instead.
+	if (c.ResendAPIKey != "") != (c.ResendFromEmail != "") {
+		log.Println("WARN: Resend is partially configured. Set both RESEND_API_KEY and RESEND_FROM_EMAIL to send email through Resend.")
+	}
+	if (c.SMTPHost != "") != (c.SMTPFromEmail != "") {
+		log.Println("WARN: SMTP is partially configured. Set both SMTP_HOST and SMTP_FROM_EMAIL to send email through SMTP.")
+	}
+	if c.UseSMTP && (c.SMTPPort < 1 || c.SMTPPort > 65535) {
+		errors = append(errors, ValidationError{
+			Field:   "SMTP_PORT",
+			Message: fmt.Sprintf("Invalid SMTP port '%d'. Must be between 1 and 65535.", c.SMTPPort),
+		})
 	}
 
-	// Validate SMTP configuration if SMTP delivery is enabled
-	if c.UseSMTP {
-		if c.SMTPHost == "" {
+	// A wildcard origin is for development. With cookies it lets any site call the
+	// API as the logged-in user wherever the browser sends them, and OIDC cannot
+	// work at all: the redirect URL is built from FRONTEND_URL.
+	if c.FrontendURL == "*" {
+		if c.OIDC.Enabled {
 			errors = append(errors, ValidationError{
-				Field:   "SMTP_HOST",
-				Message: "SMTP host is required when SMTP email is enabled.",
+				Field:   "FRONTEND_URL",
+				Message: "FRONTEND_URL must be the real origin (not '*') when OIDC is enabled: the OIDC redirect URL is derived from it.",
 			})
 		}
-		if c.SMTPFromEmail == "" {
-			errors = append(errors, ValidationError{
-				Field:   "SMTP_FROM_EMAIL",
-				Message: "SMTP sender email is required when SMTP email is enabled.",
-			})
-		}
-		if c.SMTPPort < 1 || c.SMTPPort > 65535 {
-			errors = append(errors, ValidationError{
-				Field:   "SMTP_PORT",
-				Message: fmt.Sprintf("Invalid SMTP port '%d'. Must be between 1 and 65535.", c.SMTPPort),
-			})
+		if os.Getenv("GIN_MODE") == "release" {
+			log.Println("WARN: FRONTEND_URL is '*', so any website may call the API with the user's session. Set it to your frontend's origin.")
 		}
 	}
 

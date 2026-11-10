@@ -956,6 +956,7 @@
       "warning": "此令牌不会再次显示。请立即复制并妥善保存。",
       "copy": "复制",
       "copied": "已复制！",
+      "copyFailed": "无法自动复制。请选中文本后手动复制。",
       "done": "好的，我已保存"
     },
     "revokeDialog": {
@@ -998,5 +999,15 @@
     "triggerReminders": "发送提醒邮件",
     "triggerRemindersSuccess": "提醒邮件发送成功",
     "triggerRemindersError": "发送提醒邮件失败"
+  },
+  "errorBoundary": {
+    "title": "哎呀！出了点问题",
+    "message": "发生了意外错误。请尝试刷新页面或返回首页。",
+    "tryAgain": "重试",
+    "reloadPage": "重新加载页面",
+    "goHome": "返回首页",
+    "detailsTitle": "错误详情（仅限开发环境）",
+    "error": "错误：",
+    "componentStack": "组件堆栈："
   }
 }

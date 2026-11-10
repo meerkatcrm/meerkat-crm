@@ -337,6 +337,11 @@ func (b *Backend) PutAddressObject(ctx context.Context, urlPath string, card vca
 
 	// Save contact
 	updatedContact.RevertStaleEmployment = true
+	if isNew {
+		if err := models.ReleaseDeletedVCardUID(db, userID, updatedContact.VCardUID); err != nil {
+			return nil, err
+		}
+	}
 	if err := db.Save(updatedContact).Error; err != nil {
 		return nil, err
 	}
@@ -358,16 +363,12 @@ func (b *Backend) DeleteAddressObject(ctx context.Context, urlPath string) error
 
 	db := b.getDB(ctx)
 
-	// Find contact by vcard_uid or ID
+	// Only by vCard UID. Reads still accept the legacy numeric-ID path, but a
+	// delete must never guess: a client whose UID happens to be the number 42
+	// would otherwise delete contact 42. A device holding a legacy path gets a
+	// 404 and picks up the UID-based path on its next sync.
 	var contact models.Contact
 	err = db.Where("user_id = ? AND vcard_uid = ?", userID, uid).First(&contact).Error
-	if err == gorm.ErrRecordNotFound {
-		// Paths from before contacts had a vCard UID used the numeric ID. The whole
-		// name must be a number: "42f1e0c2-…" is a UID, not contact 42.
-		if id, parseErr := strconv.ParseUint(uid, 10, 64); parseErr == nil {
-			err = db.Where("user_id = ? AND id = ?", userID, id).First(&contact).Error
-		}
-	}
 	if err != nil {
 		return fmt.Errorf("contact not found")
 	}
@@ -382,8 +383,14 @@ func (b *Backend) DeleteAddressObject(ctx context.Context, urlPath string) error
 		return webdav.NewHTTPError(http.StatusNotFound, fmt.Errorf("contact not found"))
 	}
 
-	// Soft delete
-	return db.Delete(&contact).Error
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		return models.DeleteContactCascade(tx, userID, contact.ID)
+	}); err != nil {
+		return err
+	}
+	// File deletion cannot be rolled back, so it waits for the commit.
+	RemoveContactPhotoFile(b.getPhotoDir(ctx), contact.Photo)
+	return nil
 }
 
 // circleFilter is the user's choice of which contacts CardDAV clients see

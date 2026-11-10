@@ -956,6 +956,7 @@
       "warning": "Ce jeton ne sera plus affiché. Copiez-le maintenant et conservez-le en lieu sûr.",
       "copy": "Copier",
       "copied": "Copié !",
+      "copyFailed": "Copie automatique impossible. Sélectionnez le texte et copiez-le manuellement.",
       "done": "Terminé, je l'ai sauvegardé"
     },
     "revokeDialog": {
@@ -998,5 +999,15 @@
     "triggerReminders": "Envoyer les e-mails de rappel",
     "triggerRemindersSuccess": "E-mails de rappel envoyés avec succès",
     "triggerRemindersError": "Échec de l'envoi des e-mails de rappel"
+  },
+  "errorBoundary": {
+    "title": "Oups ! Une erreur s'est produite",
+    "message": "Une erreur inattendue s'est produite. Veuillez actualiser la page ou revenir à la page d'accueil.",
+    "tryAgain": "Réessayer",
+    "reloadPage": "Recharger la page",
+    "goHome": "Retour à l'accueil",
+    "detailsTitle": "Détails de l'erreur (développement uniquement)",
+    "error": "Erreur :",
+    "componentStack": "Pile des composants :"
   }
 }

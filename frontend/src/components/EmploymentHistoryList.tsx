@@ -14,6 +14,7 @@ import EventBusyIcon from '@mui/icons-material/EventBusy';
 import { useTranslation } from 'react-i18next';
 import { EmploymentHistoryEntry } from '../api/employmentHistory';
 import { useDateFormat } from '../DateFormatProvider';
+import { useConfirm } from './ConfirmDialog';
 
 interface EmploymentHistoryListProps {
   entries: EmploymentHistoryEntry[];
@@ -30,16 +31,16 @@ export default function EmploymentHistoryList({
 }: EmploymentHistoryListProps) {
   const { t } = useTranslation();
   const { formatDate } = useDateFormat();
+  const { confirm, confirmDialog } = useConfirm();
 
-
-  const handleDeleteClick = (entryId: number) => {
-    if (window.confirm(t('employmentHistory.deleteMessage'))) {
+  const handleDeleteClick = async (entryId: number) => {
+    if (await confirm({ message: t('employmentHistory.deleteMessage'), confirmLabel: t('common.delete'), destructive: true })) {
       onDelete(entryId);
     }
   };
 
-  const handleEndClick = (entryId: number) => {
-    if (window.confirm(t('employmentHistory.endMessage'))) {
+  const handleEndClick = async (entryId: number) => {
+    if (await confirm({ message: t('employmentHistory.endMessage'), confirmLabel: t('employmentHistory.endJob') })) {
       onEnd(entryId);
     }
   };
@@ -112,6 +113,7 @@ export default function EmploymentHistoryList({
           </Paper>
         );
       })}
+      {confirmDialog}
     </Stack>
   );
 }

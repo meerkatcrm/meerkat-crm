@@ -28,10 +28,15 @@ import { Reminder, getUpcomingReminders, completeReminder, skipReminder } from '
 import { ContactListSkeleton } from './components/LoadingSkeletons';
 import { handleFetchError, handleError } from './utils/errorHandler';
 import { useDateFormat } from './DateFormatProvider';
+import { isReminderOverdue } from './utils/reminderDue';
+import { useSnackbar } from './context/SnackbarContext';
+import { useConfirm } from './components/ConfirmDialog';
 
 function DashboardPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { showError } = useSnackbar();
+  const { confirm, confirmDialog } = useConfirm();
   const { formatBirthday: formatBirthdayDate, formatDate } = useDateFormat();
   const [birthdays, setBirthdays] = useState<Birthday[]>([]);
   const [randomContacts, setRandomContacts] = useState<Contact[]>([]);
@@ -98,12 +103,12 @@ function DashboardPage() {
       const reminders = await getUpcomingReminders();
       setUpcomingReminders(reminders);
     } catch (err) {
-      handleError(err, { operation: 'completing reminder' });
+      handleError(err, { operation: 'completing reminder' }, { showError });
     }
   };
 
   const handleSkipReminder = async (reminderId: number) => {
-    if (!window.confirm(t('reminders.skipConfirm'))) {
+    if (!(await confirm({ message: t('reminders.skipConfirm'), confirmLabel: t('reminders.skip') }))) {
       return;
     }
     try {
@@ -112,13 +117,11 @@ function DashboardPage() {
       const reminders = await getUpcomingReminders();
       setUpcomingReminders(reminders);
     } catch (err) {
-      handleError(err, { operation: 'skipping reminder' });
+      handleError(err, { operation: 'skipping reminder' }, { showError });
     }
   };
 
-  const isOverdue = (remindAt: string) => {
-    return new Date(remindAt) < new Date();
-  };
+  const isOverdue = isReminderOverdue;
 
   const isBirthdayToday = (birthday: string | undefined) => {
     if (!birthday) return false;
@@ -549,6 +552,7 @@ function DashboardPage() {
           )}
         </Box>
       </Box>
+      {confirmDialog}
     </Box>
   );
 }

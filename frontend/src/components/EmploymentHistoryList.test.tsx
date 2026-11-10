@@ -1,5 +1,5 @@
 import { test, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react';
 import { I18nextProvider } from 'react-i18next';
 import i18n from '../i18n/config';
 import EmploymentHistoryList from './EmploymentHistoryList';
@@ -57,16 +57,23 @@ test('missing start date shows Unknown', () => {
   expect(screen.getByText('Unknown – Present')).toBeInTheDocument();
 });
 
-test('delete and end only fire after confirmation', () => {
-  const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValue(true);
+test('delete and end only fire after confirmation', async () => {
   const h = renderList([entry({ ID: 7 })]);
   fireEvent.click(screen.getByLabelText('Delete'));
+  expect(screen.getByText('Delete this employment history entry?')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   expect(h.onDelete).not.toHaveBeenCalled();
+
   fireEvent.click(screen.getByLabelText('Delete'));
-  expect(h.onDelete).toHaveBeenCalledWith(7);
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
+  await waitFor(() => expect(h.onDelete).toHaveBeenCalledWith(7));
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
   fireEvent.click(screen.getByLabelText('End this job'));
-  expect(h.onEnd).toHaveBeenCalledWith(7);
-  expect(confirm).toHaveBeenCalledTimes(3);
+  expect(h.onEnd).not.toHaveBeenCalled();
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'End this job' }));
+  await waitFor(() => expect(h.onEnd).toHaveBeenCalledWith(7));
 });
 
 test('edit passes the entry', () => {

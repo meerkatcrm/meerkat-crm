@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import {
   DialogTitle,
   DialogContent,
@@ -12,9 +12,11 @@ import {
 } from '@mui/material';
 import AppDialog from './AppDialog';
 import { useTranslation } from 'react-i18next';
-import { Contact, getContacts } from '../api/contacts';
+import { Contact, getContact } from '../api/contacts';
+import { useContactSearch } from '../hooks/useContactSearch';
 import { useDateFormat } from '../DateFormatProvider';
 import { todayISO } from '../utils/today';
+import { contactDisplayName } from '../utils/contactName';
 
 interface AddActivityDialogProps {
   open: boolean;
@@ -42,60 +44,46 @@ export default function AddActivityDialog({
   const [location, setLocation] = useState('');
   const [date, setDate] = useState(formatDate(todayISO()));
   const [selectedContacts, setSelectedContacts] = useState<Contact[]>([]);
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [searchInput, setSearchInput] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   // Saving before the preselected contact arrives would store the activity without it.
   const [loadingPreselected, setLoadingPreselected] = useState(false);
-  const [loading, setLoading] = useState(false);
-
-  const loadContacts = useCallback(async (search: string = '') => {
-    setLoading(true);
-    try {
-      const response = await getContacts({ limit: 100, search });
-      setContacts(response.contacts || []);
-    } catch (err) {
-      console.error('Failed to fetch contacts:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const {
+    options: contacts,
+    loading,
+    search: searchInput,
+    setSearch: setSearchInput,
+  } = useContactSearch(open);
 
   // Load preselected contact on open
   useEffect(() => {
-    if (open && preselectedContactId) {
-      const loadPreselected = async () => {
-        setLoadingPreselected(true);
-        try {
-          const response = await getContacts({ limit: 100 });
-          const preselected = response.contacts.find((c: Contact) => c.ID === preselectedContactId);
-          if (preselected) {
-            setSelectedContacts([preselected]);
-          }
-          setContacts(response.contacts || []);
-        } catch (err) {
-          console.error('Failed to load preselected contact:', err);
-        } finally {
+    // The picker's options come from useContactSearch either way.
+    if (!open || !preselectedContactId) return;
+
+    // Fetched by id: looking for it in a page of the contact list misses
+    // everyone beyond that page.
+    let cancelled = false;
+    const loadPreselected = async () => {
+      setLoadingPreselected(true);
+      try {
+        const preselected = await getContact(preselectedContactId, ['ID', 'firstname', 'lastname', 'nickname']);
+        if (!cancelled) {
+          setSelectedContacts([preselected]);
+        }
+      } catch (err) {
+        console.error('Failed to load preselected contact:', err);
+      } finally {
+        if (!cancelled) {
           setLoadingPreselected(false);
         }
-      };
-      loadPreselected();
-    } else if (open) {
-      loadContacts('');
-    }
-  }, [open, preselectedContactId, loadContacts]);
-
-  // Debounced search effect
-  useEffect(() => {
-    if (!open) return;
-    
-    const timeoutId = setTimeout(() => {
-      loadContacts(searchInput);
-    }, 300);
-
-    return () => clearTimeout(timeoutId);
-  }, [searchInput, open, loadContacts]);
+      }
+    };
+    loadPreselected();
+    return () => {
+      cancelled = true;
+      setLoadingPreselected(false);
+    };
+  }, [open, preselectedContactId]);
 
   const handleSave = async () => {
     if (!title.trim() || !date) {
@@ -133,14 +121,11 @@ export default function AddActivityDialog({
     setDate(formatDate(todayISO()));
     setSelectedContacts([]);
     setSearchInput('');
-    setContacts([]);
     setError('');
     onClose();
   };
 
-  const getContactLabel = (contact: Contact) => {
-    return `${contact.firstname}${contact.nickname ? ` "${contact.nickname}"` : ''} ${contact.lastname}`;
-  };
+  const getContactLabel = (contact: Contact) => contactDisplayName(contact, { nickname: true });
 
   return (
     <AppDialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>

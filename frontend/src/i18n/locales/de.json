@@ -956,6 +956,7 @@
       "warning": "Dieser Token wird nicht erneut angezeigt. Kopieren Sie ihn jetzt und bewahren Sie ihn sicher auf.",
       "copy": "Kopieren",
       "copied": "Kopiert!",
+      "copyFailed": "Automatisches Kopieren nicht möglich. Markieren Sie den Text und kopieren Sie ihn manuell.",
       "done": "Fertig, ich habe ihn gespeichert"
     },
     "revokeDialog": {
@@ -998,5 +999,15 @@
     "triggerReminders": "Erinnerungs-E-Mails senden",
     "triggerRemindersSuccess": "Erinnerungs-E-Mails erfolgreich gesendet",
     "triggerRemindersError": "Fehler beim Senden der Erinnerungs-E-Mails"
+  },
+  "errorBoundary": {
+    "title": "Hoppla! Etwas ist schiefgelaufen",
+    "message": "Ein unerwarteter Fehler ist aufgetreten. Bitte laden Sie die Seite neu oder kehren Sie zur Startseite zurück.",
+    "tryAgain": "Erneut versuchen",
+    "reloadPage": "Seite neu laden",
+    "goHome": "Zur Startseite",
+    "detailsTitle": "Fehlerdetails (nur in der Entwicklung)",
+    "error": "Fehler:",
+    "componentStack": "Komponenten-Stack:"
   }
 }

@@ -24,6 +24,7 @@ import { handleError, getErrorMessage } from '../utils/errorHandler';
 import { useDateFormat } from '../DateFormatProvider';
 import { buildBirthdayReminderPayload } from '../utils/birthdayReminder';
 import { ContactFieldKey, resolveEnabledFields } from '../contactFields';
+import { contactDisplayName } from '../utils/contactName';
 
 interface AddContactDialogProps {
   open: boolean;
@@ -193,7 +194,7 @@ export default function AddContactDialog({
         const payload = buildBirthdayReminderPayload(
           newContact.ID,
           birthdayISO,
-          t('reminders.birthdayMessage', { name: `${newContact.firstname} ${newContact.lastname}` })
+          t('reminders.birthdayMessage', { name: contactDisplayName(newContact) })
         );
         if (payload) {
           try {
@@ -237,7 +238,7 @@ export default function AddContactDialog({
   };
 
   return (
-    <AppDialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
+    <AppDialog open={open} onClose={handleClose} busy={loading} maxWidth="md" fullWidth>
       <DialogTitle>{t('contacts.add.title')}</DialogTitle>
       <DialogContent>
         {error && (

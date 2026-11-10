@@ -28,6 +28,7 @@ import {
   Tooltip,
 } from '@mui/material';
 import AppDialog from './components/AppDialog';
+import { copyToClipboard } from './utils/clipboard';
 import AddIcon from '@mui/icons-material/Add';
 import KeyIcon from '@mui/icons-material/Key';
 import BlockIcon from '@mui/icons-material/Block';
@@ -93,11 +94,13 @@ export default function ApiTokensPage() {
     }
   };
 
-  const handleCopy = () => {
-    if (createdToken) {
-      navigator.clipboard.writeText(createdToken.token);
+  const handleCopy = async () => {
+    if (!createdToken) return;
+    if (await copyToClipboard(createdToken.token)) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    } else {
+      showError(t('apiTokens.createdDialog.copyFailed'));
     }
   };
 

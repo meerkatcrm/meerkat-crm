@@ -2,12 +2,14 @@ package controllers
 
 import (
 	"database/sql"
+	"errors"
 	"meerkat/config"
 	apperrors "meerkat/errors"
 	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 const (
@@ -88,4 +90,21 @@ func parsePositiveOrDefault(raw string, fallback int) int {
 		return fallback
 	}
 	return value
+}
+
+// findOwned loads the row of type T with the given id that belongs to userID, or
+// answers 404 (500 on a database error) and returns false. Pass a db that already
+// carries any Preload. The id is always bound as a value: GORM runs a non-numeric
+// string given as an inline condition as raw SQL.
+func findOwned[T any](c *gin.Context, db *gorm.DB, userID uint, id any, resource string) (T, bool) {
+	var row T
+	if err := db.Where("user_id = ?", userID).First(&row, "id = ?", id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			apperrors.AbortWithError(c, apperrors.ErrNotFound(resource).WithDetails("id", id))
+		} else {
+			apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to retrieve "+strings.ToLower(resource)).WithError(err))
+		}
+		return row, false
+	}
+	return row, true
 }

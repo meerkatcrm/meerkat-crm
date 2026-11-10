@@ -1,7 +1,8 @@
-import { lazy, useState, useEffect, Suspense, useMemo, MouseEvent as ReactMouseEvent } from 'react';
+import { lazy, useState, useEffect, Suspense, useMemo, MouseEvent as ReactMouseEvent, ReactNode } from 'react';
 import LoginPage from './LoginPage';
 import RegisterPage from './RegisterPage';
 import { getToken, logoutAndRedirect, isAdmin, fetchAndCacheUserInfo } from './auth';
+import { applyUserPreferences } from './utils/userPreferences';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -31,6 +32,7 @@ import {
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
 import { getContacts, Contact } from './api/contacts';
+import { contactDisplayName } from './utils/contactName';
 import MenuIcon from '@mui/icons-material/Menu';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import ContactsIcon from '@mui/icons-material/Contacts';
@@ -58,6 +60,21 @@ const NetworkPage = lazy(() => import('./NetworkPage'));
 const UsersPage = lazy(() => import('./UsersPage'));
 const ApiTokensPage = lazy(() => import('./ApiTokensPage'));
 const DataSettingsPage = lazy(() => import('./DataSettingsPage'));
+
+// Each lazily loaded page gets its own boundary, so the shell stays up while the page's chunk loads.
+function LazyPage({ children }: { children: ReactNode }) {
+  return (
+    <Suspense
+      fallback={
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+          <CircularProgress />
+        </Box>
+      }
+    >
+      {children}
+    </Suspense>
+  );
+}
 
 const EXPANDED_DRAWER_WIDTH = 240;
 const COLLAPSED_DRAWER_WIDTH = 64;
@@ -110,23 +127,32 @@ function AppContent({ token, setToken }: { token: string | null; setToken: (toke
   useEffect(() => {
     if (!token || searchQuery.length < 2) {
       setSearchResults([]);
+      setSearchLoading(false);
       return;
     }
 
+    // Set by the cleanup once the query has changed, so a slow response for an
+    // older query cannot replace the results of a newer one.
+    let stale = false;
     const timer = setTimeout(async () => {
       setSearchLoading(true);
       try {
         const result = await getContacts({ search: searchQuery, limit: 10 });
+        if (stale) return;
         setSearchResults(result.contacts || []);
       } catch (err) {
+        if (stale) return;
         console.error('Search error:', err);
         setSearchResults([]);
       } finally {
-        setSearchLoading(false);
+        if (!stale) setSearchLoading(false);
       }
     }, 300);
 
-    return () => clearTimeout(timer);
+    return () => {
+      stale = true;
+      clearTimeout(timer);
+    };
   }, [searchQuery, token]);
 
   const handleLogout = async () => {
@@ -355,7 +381,7 @@ function AppContent({ token, setToken }: { token: string | null; setToken: (toke
             getOptionLabel={(option) => 
               typeof option === 'string' 
                 ? option 
-                : `${option.firstname} ${option.lastname}`
+                : contactDisplayName(option)
             }
             loading={searchLoading}
             onInputChange={(_, value) => setSearchQuery(value)}
@@ -444,7 +470,7 @@ function AppContent({ token, setToken }: { token: string | null; setToken: (toke
               <li {...props} key={option.ID}>
                 <Box>
                   <Typography variant="body1">
-                    {option.firstname} {option.lastname}
+                    {contactDisplayName(option)}
                   </Typography>
                   {option.email && (
                     <Typography variant="caption" sx={{
@@ -536,73 +562,17 @@ function AppContent({ token, setToken }: { token: string | null; setToken: (toke
         }}
       >
         <Routes>
-          <Route path="/contacts" element={<Suspense fallback={<Box
-            sx={{
-              display: "flex",
-              justifyContent: "center",
-              mt: 4
-            }}><CircularProgress /></Box>}><ContactsPage /></Suspense>} />
-          <Route path="/contacts/duplicates" element={<Suspense fallback={<Box
-            sx={{
-              display: "flex",
-              justifyContent: "center",
-              mt: 4
-            }}><CircularProgress /></Box>}><DuplicatesPage /></Suspense>} />
-          <Route path="/contacts/:id" element={<Suspense fallback={<Box
-            sx={{
-              display: "flex",
-              justifyContent: "center",
-              mt: 4
-            }}><CircularProgress /></Box>}><ContactDetailPage /></Suspense>} />
-          <Route path="/notes" element={<Suspense fallback={<Box
-            sx={{
-              display: "flex",
-              justifyContent: "center",
-              mt: 4
-            }}><CircularProgress /></Box>}><NotesPage /></Suspense>} />
-          <Route path="/activities" element={<Suspense fallback={<Box
-            sx={{
-              display: "flex",
-              justifyContent: "center",
-              mt: 4
-            }}><CircularProgress /></Box>}><ActivitiesPage /></Suspense>} />
-          <Route path="/settings" element={<Suspense fallback={<Box
-            sx={{
-              display: "flex",
-              justifyContent: "center",
-              mt: 4
-            }}><CircularProgress /></Box>}><SettingsPage /></Suspense>} />
-          <Route path="/settings/data" element={<Suspense fallback={<Box
-            sx={{
-              display: "flex",
-              justifyContent: "center",
-              mt: 4
-            }}><CircularProgress /></Box>}><DataSettingsPage /></Suspense>} />
-          <Route path="/network" element={<Suspense fallback={<Box
-            sx={{
-              display: "flex",
-              justifyContent: "center",
-              mt: 4
-            }}><CircularProgress /></Box>}><NetworkPage /></Suspense>} />
-          <Route path="/users" element={<Suspense fallback={<Box
-            sx={{
-              display: "flex",
-              justifyContent: "center",
-              mt: 4
-            }}><CircularProgress /></Box>}><UsersPage /></Suspense>} />
-          <Route path="/api-tokens" element={<Suspense fallback={<Box
-            sx={{
-              display: "flex",
-              justifyContent: "center",
-              mt: 4
-            }}><CircularProgress /></Box>}><ApiTokensPage /></Suspense>} />
-          <Route path="/reminders" element={<div>{t('pages.reminders')}</div>} />
-          <Route path="/" element={<Suspense fallback={<Box
-            sx={{
-              display: "flex",
-              justifyContent: "center",
-              mt: 4
-            }}><CircularProgress /></Box>}><DashboardPage /></Suspense>} />
+          <Route path="/contacts" element={<LazyPage><ContactsPage /></LazyPage>} />
+          <Route path="/contacts/duplicates" element={<LazyPage><DuplicatesPage /></LazyPage>} />
+          <Route path="/contacts/:id" element={<LazyPage><ContactDetailPage /></LazyPage>} />
+          <Route path="/notes" element={<LazyPage><NotesPage /></LazyPage>} />
+          <Route path="/activities" element={<LazyPage><ActivitiesPage /></LazyPage>} />
+          <Route path="/settings" element={<LazyPage><SettingsPage /></LazyPage>} />
+          <Route path="/settings/data" element={<LazyPage><DataSettingsPage /></LazyPage>} />
+          <Route path="/network" element={<LazyPage><NetworkPage /></LazyPage>} />
+          <Route path="/users" element={<LazyPage><UsersPage /></LazyPage>} />
+          <Route path="/api-tokens" element={<LazyPage><ApiTokensPage /></LazyPage>} />
+          <Route path="/" element={<LazyPage><DashboardPage /></LazyPage>} />
           <Route path="/login" element={<Navigate to="/" replace />} />
           <Route path="/register" element={<Navigate to="/" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
@@ -620,7 +590,10 @@ function App() {
     // localStorage is empty, so we fetch user info once to populate it.
     if (!getToken()) {
       fetchAndCacheUserInfo().then(info => {
-        if (info) setToken(getToken());
+        if (info) {
+          applyUserPreferences(info);
+          setToken(getToken());
+        }
       });
     }
   }, []);
