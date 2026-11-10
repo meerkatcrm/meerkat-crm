@@ -10,7 +10,6 @@ import (
 
 	"meerkat/config"
 	apperrors "meerkat/errors"
-	"meerkat/i18n"
 	"meerkat/logger"
 	"meerkat/middleware"
 	"meerkat/models"
@@ -383,16 +382,6 @@ func ConfirmPasswordReset(context *gin.Context) {
 	context.JSON(http.StatusOK, gin.H{"message": "Password reset successful"})
 }
 
-// UpdateLanguageInput represents the request body for updating user language
-type UpdateLanguageInput struct {
-	Language string `json:"language" validate:"required,oneof=en de it es fr zh"`
-}
-
-// UpdateDateFormatInput represents the request body for updating user date format
-type UpdateDateFormatInput struct {
-	DateFormat string `json:"date_format" validate:"required,oneof=eu us iso"`
-}
-
 // updateOwnPreference writes one column of the caller's user row. The caller is
 // identified by id: the username in a session token goes stale when an admin
 // renames the account, and API tokens carry none. A single-column write also
@@ -418,15 +407,9 @@ func updateOwnPreference(c *gin.Context, column, value string) bool {
 
 // UpdateLanguage updates the authenticated user's language preference
 func UpdateLanguage(context *gin.Context) {
-	var input UpdateLanguageInput
-	if err := context.ShouldBindJSON(&input); err != nil {
-		apperrors.AbortWithError(context, apperrors.ErrInvalidInput("language", "Invalid language value"))
-		return
-	}
-
-	// Validate language is supported
-	if !i18n.IsValidLanguage(input.Language) {
-		apperrors.AbortWithError(context, apperrors.ErrInvalidInput("language", "Unsupported language. Supported: "+strings.Join(i18n.SupportedLanguages, ", ")))
+	input, appErr := middleware.GetValidated[models.UpdateLanguageInput](context)
+	if appErr != nil {
+		apperrors.AbortWithError(context, appErr)
 		return
 	}
 
@@ -439,15 +422,9 @@ func UpdateLanguage(context *gin.Context) {
 
 // UpdateDateFormat updates the authenticated user's date format preference
 func UpdateDateFormat(context *gin.Context) {
-	var input UpdateDateFormatInput
-	if err := context.ShouldBindJSON(&input); err != nil {
-		apperrors.AbortWithError(context, apperrors.ErrInvalidInput("date_format", "Invalid date format value"))
-		return
-	}
-
-	// Validate date format is supported
-	if input.DateFormat != "eu" && input.DateFormat != "us" && input.DateFormat != "iso" {
-		apperrors.AbortWithError(context, apperrors.ErrInvalidInput("date_format", "Unsupported date format. Supported: eu, us, iso"))
+	input, appErr := middleware.GetValidated[models.UpdateDateFormatInput](context)
+	if appErr != nil {
+		apperrors.AbortWithError(context, appErr)
 		return
 	}
 
