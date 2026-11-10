@@ -337,6 +337,7 @@ func (m *ImportSessionManager) Confirm(db *gorm.DB, userID uint, req models.Impo
 // photoTask queues photo processing for a contact, deferred until after the import
 // transaction commits since it involves file I/O and network requests.
 type photoTask struct {
+	rowIndex       int
 	contactID      uint
 	photoData      []byte
 	photoMediaType string
@@ -394,6 +395,7 @@ func (m *ImportSessionManager) ConfirmVCF(db *gorm.DB, userID uint, req models.I
 					// Queue photo processing (either embedded data or URL)
 					if len(vcfData.PhotoData) > 0 || vcfData.PhotoURL != "" {
 						photoTasks = append(photoTasks, photoTask{
+							rowIndex:       preview.RowIndex,
 							contactID:      contact.ID,
 							photoData:      vcfData.PhotoData,
 							photoMediaType: vcfData.PhotoMediaType,
@@ -443,6 +445,7 @@ func (m *ImportSessionManager) ConfirmVCF(db *gorm.DB, userID uint, req models.I
 					// Queue photo processing only if contact doesn't already have a photo
 					if existing.Photo == "" && (len(vcfData.PhotoData) > 0 || vcfData.PhotoURL != "") {
 						photoTasks = append(photoTasks, photoTask{
+							rowIndex:       preview.RowIndex,
 							contactID:      existing.ID,
 							photoData:      vcfData.PhotoData,
 							photoMediaType: vcfData.PhotoMediaType,
@@ -479,6 +482,7 @@ func (m *ImportSessionManager) ConfirmVCF(db *gorm.DB, userID uint, req models.I
 			photoData, mediaType, err = carddav.FetchPhotoFromURL(task.photoURL)
 			if err != nil {
 				log.Warn().Err(err).Uint("contact_id", task.contactID).Str("photo_url", task.photoURL).Msg("Failed to fetch photo from URL")
+				result.Errors = append(result.Errors, fmt.Sprintf("Row %d: The contact was imported, but its photo could not be downloaded", task.rowIndex+1))
 				continue
 			}
 		}
@@ -490,6 +494,7 @@ func (m *ImportSessionManager) ConfirmVCF(db *gorm.DB, userID uint, req models.I
 		photoPath, thumbnailData, err := carddav.SaveContactPhoto(photoData, mediaType, cfg.ProfilePhotoDir)
 		if err != nil {
 			log.Warn().Err(err).Uint("contact_id", task.contactID).Msg("Failed to save imported photo")
+			result.Errors = append(result.Errors, fmt.Sprintf("Row %d: The contact was imported, but its photo could not be saved", task.rowIndex+1))
 			continue
 		}
 

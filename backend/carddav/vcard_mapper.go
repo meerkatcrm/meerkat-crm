@@ -11,6 +11,7 @@ import (
 	"image/png"
 	"io"
 	"meerkat/httputil"
+	"meerkat/logger"
 	"meerkat/models"
 	"net/http"
 	"os"
@@ -472,6 +473,18 @@ func clearVCardOwnedFields(contact *models.Contact) {
 	contact.Organization, contact.Department = "", ""
 	contact.JobTitle, contact.Role = "", ""
 	contact.VCardExtra = ""
+}
+
+// RemoveContactPhotoFile deletes a contact's photo from disk, after the contact
+// itself was deleted. The thumbnail lives in the database row. A missing file is
+// not an error.
+func RemoveContactPhotoFile(photoDir, photo string) {
+	if photoDir == "" || photo == "" || strings.Contains(photo, "..") || filepath.IsAbs(photo) {
+		return
+	}
+	if err := os.Remove(filepath.Join(photoDir, photo)); err != nil && !os.IsNotExist(err) {
+		logger.Warn().Err(err).Str("photo", photo).Msg("Failed to delete photo of a deleted contact")
+	}
 }
 
 // SaveContactPhoto saves photo data to disk and generates thumbnail

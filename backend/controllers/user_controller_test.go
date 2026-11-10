@@ -691,6 +691,13 @@ func TestUpdateLanguageAndDateFormat_RejectUnsupportedValues(t *testing.T) {
 	router.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusOK, w.Code)
 
+	// Saving the value that is already stored is a success, not "user not found".
+	req, _ = http.NewRequest("PATCH", "/users/date-format", bytes.NewBufferString(`{"date_format":"iso"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+
 	var updated models.User
 	require.NoError(t, db.First(&updated, user.ID).Error)
 	assert.Equal(t, "en", updated.Language)

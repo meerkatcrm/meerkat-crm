@@ -294,11 +294,13 @@ func sendReminders(db *gorm.DB, config config.Config, dailyEvents bool) error {
 
 		// Send email only when enabled; preserve reminders (email_sent=false) when disabled
 		// so they are picked up again once email is configured.
+		emailedNow := false
 		if config.EmailEnabled() {
 			if err := sendReminderEmailFn(user, userReminders, config, db); err != nil {
 				logger.Error().Err(err).Uint("user_id", user.ID).Msg("Error sending daily email, skipping reminder mutations for this user")
 				sendErrors++
 			} else {
+				emailedNow = true
 				// Mark reminders as email_sent so they won't be re-emailed
 				for _, reminder := range userReminders {
 					// Only these two columns: the row was loaded before the emails went
@@ -315,13 +317,18 @@ func sendReminders(db *gorm.DB, config config.Config, dailyEvents bool) error {
 			logger.Info().Int("reminder_count", len(userReminders)).Uint("user_id", userID).Msg("Email sending disabled (no channel configured), skipping reminder mutations to preserve them")
 		}
 
-		if !dailyEvents {
-			continue
+		// reminder.triggered fires once per occurrence. With email on, that is when
+		// the email goes out (email_sent then keeps the reminder out of later runs,
+		// including one that became due after today's first run). With email off
+		// nothing marks the reminder, so it fires on the first run of the day only.
+		if emailedNow || (!config.EmailEnabled() && dailyEvents) {
+			for _, reminder := range userReminders {
+				go TriggerWebhooks(db, config, reminder.UserID, "reminder.triggered", reminder)
+			}
 		}
 
-		// Fire reminder.triggered webhooks regardless of email config
-		for _, reminder := range userReminders {
-			go TriggerWebhooks(db, config, reminder.UserID, "reminder.triggered", reminder)
+		if !dailyEvents {
+			continue
 		}
 
 		// Fire birthday.occurred for each birthday that falls today regardless of email config

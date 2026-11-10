@@ -1116,6 +1116,7 @@ func (r *contactSyncRun) reconcileRemoteDeletions() {
 				r.recordItemError(err, "Failed to delete contact removed on server", map[string]string{"path": link.RemotePath})
 				continue
 			}
+			mcarddav.RemoveContactPhotoFile(r.cfg.ProfilePhotoDir, contact.Photo)
 			r.markLinkDropped(link)
 			r.stats.PulledDeleted++
 		}
