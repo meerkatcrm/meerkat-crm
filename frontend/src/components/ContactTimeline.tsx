@@ -27,6 +27,7 @@ import { Activity } from '../api/activities';
 import { ReminderCompletion } from '../api/reminders';
 import { useDateFormat } from '../DateFormatProvider';
 import { contactDisplayName } from '../utils/contactName';
+import { responsiveTimelineSx } from './timelineLayout';
 
 interface ContactTimelineProps {
   // instant: date is a real timestamp (shown by local day) rather than a date-only value.
@@ -51,7 +52,7 @@ export default function ContactTimeline({ timelineItems, onEditItem, onDeleteCom
   }
 
   return (
-    <Timeline position="right">
+    <Timeline position="right" sx={responsiveTimelineSx}>
       {timelineItems.map((item, index) => {
         const itemDate = new Date(item.date);
         const isValidDate = !isNaN(itemDate.getTime());
@@ -75,7 +76,7 @@ export default function ContactTimeline({ timelineItems, onEditItem, onDeleteCom
               </TimelineDot>
               {index < timelineItems.length - 1 && <TimelineConnector />}
             </TimelineSeparator>
-            <TimelineContent>
+            <TimelineContent sx={{ minWidth: 0, overflowWrap: 'anywhere' }}>
               <Paper
                 elevation={1}
                 sx={{

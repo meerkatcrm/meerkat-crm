@@ -34,6 +34,7 @@ import WarningIcon from '@mui/icons-material/Warning';
 import ErrorIcon from '@mui/icons-material/Error';
 import RestoreFromTrashIcon from '@mui/icons-material/RestoreFromTrash';
 import CloseIcon from '@mui/icons-material/Close';
+import { importStepperSx } from './importStepperSx';
 import { useSnackbar } from '../context/SnackbarContext';
 import { getErrorMessage } from '../utils/errorHandler';
 import {
@@ -704,7 +705,7 @@ export default function ImportContactsDialog({
 
       <DialogContent dividers>
         {/* Stepper - different steps for CSV vs VCF */}
-        <Stepper activeStep={activeStep} sx={{ mb: 3 }}>
+        <Stepper activeStep={activeStep} sx={importStepperSx}>
           {(importType === 'vcf' ? VCF_STEP_KEYS : CSV_STEP_KEYS).map((key) => (
             <Step key={key}>
               <StepLabel>{t(`contacts.import.steps.${key}`)}</StepLabel>

@@ -35,6 +35,7 @@ import { useDateFormat } from './DateFormatProvider';
 import { useSnackbar } from './context/SnackbarContext';
 import { handleError } from './utils/errorHandler';
 import { contactDisplayName } from './utils/contactName';
+import { responsiveTimelineSx } from './components/timelineLayout';
 
 const ActivitiesPage: React.FC = () => {
   const { t } = useTranslation();
@@ -206,6 +207,8 @@ const ActivitiesPage: React.FC = () => {
       <Box
         sx={{
           display: "flex",
+          flexWrap: "wrap",
+          gap: 1,
           justifyContent: "space-between",
           alignItems: "center",
           mb: 2
@@ -289,7 +292,7 @@ const ActivitiesPage: React.FC = () => {
           </Typography>
         </Paper>
       ) : (
-        <Timeline position="right">
+        <Timeline position="right" sx={responsiveTimelineSx}>
           {activities.map((activity, index) => (
             <TimelineItem key={activity.ID}>
               <TimelineOppositeContent
@@ -307,7 +310,7 @@ const ActivitiesPage: React.FC = () => {
                 </TimelineDot>
                 {index < activities.length - 1 && <TimelineConnector />}
               </TimelineSeparator>
-              <TimelineContent sx={{ flex: 0.8 }}>
+              <TimelineContent sx={{ flex: 0.8, minWidth: 0, overflowWrap: 'anywhere' }}>
                 <Paper
                   elevation={2}
                   sx={{
@@ -324,7 +327,7 @@ const ActivitiesPage: React.FC = () => {
                         justifyContent: "space-between",
                         alignItems: "flex-start"
                       }}>
-                      <Box sx={{ flex: 1, pr: 2 }}>
+                      <Box sx={{ flex: 1, minWidth: 0, pr: 2 }}>
                         {activity.title && (
                           <Typography
                             variant="body2"

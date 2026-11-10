@@ -106,7 +106,7 @@ export default function ReminderList({
           >
             <CardContent>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <Box sx={{ flexGrow: 1 }}>
+                <Box sx={{ flexGrow: 1, minWidth: 0, overflowWrap: 'anywhere' }}>
                   <Typography variant="body1" gutterBottom>
                     {reminder.message}
                   </Typography>

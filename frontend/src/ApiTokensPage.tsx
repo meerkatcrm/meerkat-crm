@@ -135,7 +135,7 @@ export default function ApiTokensPage() {
 
       <Card sx={{ mb: 2 }}>
         <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
               <KeyIcon sx={{ mr: 1, color: 'text.secondary', fontSize: 20 }} />
               <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>

@@ -242,7 +242,7 @@ export default function WebhooksSettings() {
     <>
       <Card sx={{ mb: 2 }}>
         <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
               <WebhookIcon sx={{ mr: 1, color: 'text.secondary', fontSize: 20 }} />
               <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
@@ -290,7 +290,8 @@ export default function WebhooksSettings() {
                 {webhooks.map(wh => (
                   <Box key={wh.id}>
                     <ListItem
-                      sx={{ px: 0 }}
+                      // Keep the text clear of the absolutely positioned action buttons.
+                      sx={{ pl: 0, pr: 15, overflowWrap: 'anywhere' }}
                       secondaryAction={
                         <Box sx={{ display: 'flex', gap: 0.5 }}>
                           <IconButton
@@ -321,7 +322,7 @@ export default function WebhooksSettings() {
                     >
                       <ListItemText
                         primary={
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
                             <Typography variant="body2" sx={{ fontWeight: 500 }}>{wh.name}</Typography>
                             <Chip
                               size="small"
@@ -375,7 +376,7 @@ export default function WebhooksSettings() {
                             }}>{t('settings.webhooks.noDeliveries')}</Typography>
                           ) : (
                             (deliveries[wh.id] || []).slice(0, 5).map(d => (
-                              <Box key={d.id} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                              <Box key={d.id} sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1, mb: 0.5 }}>
                                 <Chip
                                   size="small"
                                   label={d.status_code ?? 'err'}

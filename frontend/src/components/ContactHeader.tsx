@@ -95,7 +95,7 @@ export default function ContactHeader({
   return (
     <Card sx={{ mb: 1.5 }}>
       <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-        <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: 'flex-start', gap: 1.5 }}>
           <Box
             sx={{
               position: 'relative',
@@ -140,7 +140,7 @@ export default function ContactHeader({
               <CameraAltIcon sx={{ fontSize: 14 }} />
             </IconButton>
           </Box>
-          <Box sx={{ flex: 1, ml: 1.5 }}>
+          <Box sx={{ flex: 1, minWidth: 0, width: { xs: '100%', sm: 'auto' } }}>
             {editingProfile ? (
               // Edit Mode
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -245,8 +245,8 @@ export default function ContactHeader({
                     }
                   }}
                 >
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <Typography variant="h5" sx={{ fontWeight: 500, lineHeight: 1.2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
+                    <Typography variant="h5" sx={{ fontWeight: 500, lineHeight: 1.2, overflowWrap: 'anywhere' }}>
                       {displayName}
                     </Typography>
                     <IconButton
@@ -262,7 +262,7 @@ export default function ContactHeader({
                       <EditIcon fontSize="small" />
                     </IconButton>
                   </Box>
-                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
                     {onExportVcard && (
                       <Tooltip title={t('contactDetail.exportVcard')}>
                         <IconButton size="small" onClick={() => onExportVcard()}>
@@ -387,7 +387,7 @@ export default function ContactHeader({
                       </Typography>
                     )}
                   </Stack>
-                  <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                  <Stack direction="row" useFlexGap spacing={1} sx={{ flexWrap: 'wrap', mt: 1 }}>
                     <Autocomplete
                       key={contact.circles?.length ?? 0}
                       size="small"
@@ -399,7 +399,7 @@ export default function ContactHeader({
                         }
                       }}
                       blurOnSelect
-                      sx={{ minWidth: 200 }}
+                      sx={{ flex: '1 1 200px', minWidth: 0 }}
                       renderInput={(params) => (
                         <TextField
                           {...params}
@@ -418,7 +418,7 @@ export default function ContactHeader({
                           onAddCircle();
                         }
                       }}
-                      sx={{ flexGrow: 1 }}
+                      sx={{ flex: '1 1 120px', minWidth: 0 }}
                     />
                     <IconButton
                       size="small"

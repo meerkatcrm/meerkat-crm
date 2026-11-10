@@ -429,11 +429,12 @@ export default function AddContactDialog({
                 />
               ))}
             </Box>
-            <Stack direction="row" spacing={1}>
+            <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
               <TextField
                 select
                 label={t('contacts.selectCircle')}
                 fullWidth
+                sx={{ flex: '1 1 200px' }}
                 value=""
                 onChange={(e) => {
                   const value = e.target.value;
@@ -461,9 +462,9 @@ export default function AddContactDialog({
                     handleAddCircle();
                   }
                 }}
-                sx={{ minWidth: 150 }}
+                sx={{ flex: '1 1 130px' }}
               />
-              <Button onClick={handleAddCircle} variant="outlined">
+              <Button onClick={handleAddCircle} variant="outlined" sx={{ flexShrink: 0 }}>
                 {t('contacts.add.addCircle')}
               </Button>
             </Stack>

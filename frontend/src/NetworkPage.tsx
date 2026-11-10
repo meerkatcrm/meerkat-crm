@@ -228,7 +228,7 @@ export default function NetworkPage() {
           display: 'flex',
           gap: 2,
           flexWrap: 'wrap',
-          alignItems: 'center',
+          alignItems: isMobile ? 'stretch' : 'center',
           flexDirection: isMobile ? 'column' : 'row',
           flexShrink: 0,
           overflow: 'visible',
@@ -302,7 +302,7 @@ export default function NetworkPage() {
       </Card>
 
       {isMobile && (
-        <Card sx={{ p: 1.5, mb: 2 }}>
+        <Card sx={{ p: 1.5, mb: 2, flexShrink: 0 }}>
           <NetworkLegend showCircles={showCircles} showActivities={showActivities} showRelationships={showRelationships} />
         </Card>
       )}

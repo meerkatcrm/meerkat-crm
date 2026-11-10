@@ -225,7 +225,7 @@ export default function CalendarSyncSettings() {
     <>
       <Card sx={{ mb: 2 }}>
         <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
               <CalendarMonthIcon sx={{ mr: 1, color: 'text.secondary', fontSize: 20 }} />
               <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
@@ -266,6 +266,8 @@ export default function CalendarSyncSettings() {
                   <ListItem
                     key={cal.id}
                     divider
+                    // Keep the text clear of the absolutely positioned action buttons.
+                    sx={{ pr: 15, overflowWrap: 'anywhere' }}
                     secondaryAction={
                       <Stack direction="row" spacing={0.5}>
                         <Tooltip title={t('settings.calendarSync.syncNow')}>
@@ -295,7 +297,8 @@ export default function CalendarSyncSettings() {
                   >
                     <ListItemText
                       primary={
-                        <Stack direction="row" spacing={1} sx={{
+                        <Stack direction="row" useFlexGap spacing={1} sx={{
+                          flexWrap: "wrap",
                           alignItems: "center"
                         }}>
                           <Typography variant="body2" sx={{ fontWeight: 500 }}>
