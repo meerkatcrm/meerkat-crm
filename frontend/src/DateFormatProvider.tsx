@@ -16,7 +16,6 @@ interface DateFormatContextValue {
   parsePartialDateInput: (input: string) => string | null;
   autoFormatDateInput: (newValue: string, prevValue: string) => string;
   getBirthdayPlaceholder: () => string;
-  getBirthdayFormatHint: () => string;
   getDatePlaceholder: () => string;
   getDateFnsFormat: () => string;
   calculateAge: (birthday: string) => number | null;
@@ -624,17 +623,6 @@ export function DateFormatProvider({ children }: { children: ReactNode }) {
     }
   }, [dateFormat]);
 
-  const getBirthdayFormatHint = useCallback(() => {
-    switch (dateFormat) {
-      case "eu":
-        return "DD.MM.YYYY (year optional, e.g., 30.04.1990 or 30.04.)";
-      case "iso":
-        return "YYYY-MM-DD (year optional, e.g., 1990-04-30 or --04-30 or 04-30)";
-      default: // us
-        return "MM/DD/YYYY (year optional, e.g., 04/30/1990 or 04/30)";
-    }
-  }, [dateFormat]);
-
   const getDatePlaceholder = useCallback(() => {
     switch (dateFormat) {
       case "eu":
@@ -668,12 +656,11 @@ export function DateFormatProvider({ children }: { children: ReactNode }) {
       parsePartialDateInput,
       autoFormatDateInput,
       getBirthdayPlaceholder,
-      getBirthdayFormatHint,
       getDatePlaceholder,
       getDateFnsFormat,
       calculateAge,
     }),
-    [dateFormat, formatDate, formatInstantDate, formatDateTime, formatBirthday, formatBirthdayForInput, parseBirthdayInput, autoFormatBirthdayInput, parseDateInput, parsePartialDateInput, autoFormatDateInput, getBirthdayPlaceholder, getBirthdayFormatHint, getDatePlaceholder, getDateFnsFormat, calculateAge]
+    [dateFormat, formatDate, formatInstantDate, formatDateTime, formatBirthday, formatBirthdayForInput, parseBirthdayInput, autoFormatBirthdayInput, parseDateInput, parsePartialDateInput, autoFormatDateInput, getBirthdayPlaceholder, getDatePlaceholder, getDateFnsFormat, calculateAge]
   );
 
   return (

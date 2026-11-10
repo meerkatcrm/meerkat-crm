@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures';
-import { waitForLoading, searchContact, createTestContact, deleteTestContact } from './fixtures';
+import { waitForLoading, searchContact, createTestContact, deleteTestContact, acceptConfirm } from './fixtures';
 import { API_BASE_URL } from './global-setup';
 
 // Authenticated via the shared storageState (see playwright.config.ts) — no
@@ -142,13 +142,11 @@ test.describe('Contacts', () => {
     await page.goto(`/contacts/${contact.ID}`);
     await expect(page.getByRole('heading', { name: `${contact.firstname} ToDelete` })).toBeVisible();
 
-    // Deletion is confirmed via a native confirm() dialog.
-    page.once('dialog', (dialog) => dialog.accept());
-
     // The delete button only appears inside profile edit mode (entered via the
     // name pencil). The delete button itself has a title, so it's role-addressable.
     await page.locator('.edit-icon').first().click();
     await page.getByRole('button', { name: /delete contact/i }).click();
+    await acceptConfirm(page, /are you sure you want to delete/i, 'Delete');
 
     // Redirects back to the list, and the contact is gone.
     await expect(page).toHaveURL(/\/contacts$/);

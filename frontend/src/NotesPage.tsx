@@ -350,7 +350,6 @@ const NotesPage: React.FC = () => {
             setEditValues(newValues);
             setEditError('');
           }}
-          allContacts={[]}
           dateError={editError}
         />
       )}

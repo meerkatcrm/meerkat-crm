@@ -16,6 +16,67 @@ Nothing here was tried in the running app. Backend `go vet`, `go test` and
 
 ---
 
+## Status (2026-11-10, branch `fix/audit-followups`)
+
+Part 1 is in PR 306. The follow-up branch works through part 2. The text of part 2
+below is unchanged, so it still describes each problem; this table says where it stands.
+
+### Done on `fix/audit-followups`
+
+| Finding | What changed |
+|---|---|
+| 2.1 A deletion cascade | `models.DeleteContactCascade` is used by the API, the CardDAV server and remote sync. The birthday query skips deleted contacts. Merge was left alone: it moves the source's data before deleting it. |
+| 2.1 B CardDAV never clears a field | An update from a vCard clears nickname, emails, phones, addresses, URLs, IMPPs, birthday and the employment scalars first. Circles, gender and anniversary are deliberately kept, because phone clients may not send them back. `GENDER` is exported. **Check with a real iOS and Android device before release.** |
+| 2.1 E image size | 64 megapixel limit before decoding, in uploads and vCard photos (`httputil.CheckImageDimensions`). The two photo pipelines are still separate. |
+| 2.1 F wildcard origin | `FRONTEND_URL=*` is a startup error with OIDC and a warning in release mode. |
+| 2.1 H soft-deleted UID | `models.ReleaseDeletedVCardUID` frees the UID before CardDAV or sync creates a contact. |
+| 2.1 H VCardUID overwrite | An import merge keeps the existing UID. |
+| 2.1 H double VCF confirm | The session is dropped as soon as the rows are committed. Two truly concurrent confirms are still possible. |
+| 2.1 H SMTP timeout | 30s dial and I/O deadline for both TLS modes. |
+| 2.1 H dirty migration | The failed migration is retried instead of being marked as applied. |
+| 2.2 repeated webhooks and birthday mails | A second run of the daily job on the same local day skips them. A manual trigger still sends. |
+| 2.2 mixed timezones | `NextOccurrenceAfterToday` takes the reminder timezone. |
+| 2.3 `findOwned[T]` | 24 lookups converted. About 25 variants remain (different error text, extra conditions). |
+| 2.3 one error envelope | Auth, admin, rate limit and login lockout use `AppError`. `registration_disabled` keeps its shape because the e2e setup reads it. |
+| 2.3 configuration | `Config.DemoMode`; dead Resend/SMTP validation replaced by warnings for a half-configured channel. `PROFILE_PHOTO_DIR` in `deleteContactPhotos` and the rate-limit bursts still read the environment. |
+| 2.3 checklist drift | The CSV export has the newer contact fields; an import merge carries `is_deceased`. |
+| 2.3 housekeeping | Webhook deliveries are pruned after 30 days; import sessions are swept every 10 minutes; activity create is one transaction. |
+| 2.2 timeline date editing | Edit dialogs prefill and parse in the user's format. |
+| 2.2 "overdue" | One `isReminderOverdue` helper for dashboard and reminder list. |
+| 2.2 instants | `formatInstantDate` shows `completed_at` and `created_at` on the local day. |
+| 2.2 preferences after login | Language and date format apply at once after password and OIDC login. |
+| 2.4 one API helper | `apiJson<T>` in `api/client.ts`; every API module throws `ApiError`; no direct `fetch` left; a caller's `AbortSignal` is honoured. A few calls in `contacts.ts`, `relationships.ts` and all of `export.ts` keep their own handling. |
+| 2.4 stale responses | Guards in `useNotes`, header search and `UsersPage`. |
+| 2.4 contact pickers | `useContactSearch` in the merge, relationship, activity and timeline-edit dialogs; the three 100-capped bulk fetches are gone. |
+| 2.4 silent failures | Errors are shown on the notes, activities, network and dashboard pages and inside the webhook and calendar dialogs; custom fields roll back. |
+| 2.4 translations | `ErrorBoundary` is translated in six locales. |
+| 2.4 shared components | `ConfirmDialog` / `useConfirm` replaces every `window.confirm` and five hand-built dialogs; `contactDisplayName` replaces eight name formatters. |
+| 2.4 dead code | `types/api.ts`, `forms.ts`, `utils.ts`, 13 skeletons, 8 unused functions, `reportWebVitals` and `web-vitals`, the `/reminders` placeholder route. |
+| 2.4 other reported bugs | Drag and drop, clipboard on plain HTTP, Monica session leak, contacts page reset, Esc during save. |
+
+### Still open
+
+- **2.1 C** whole-contact PUT. Needs an API decision: `PATCH` or an `updated_at` precondition.
+- **2.1 D** OIDC re-linking. A policy choice: refusing a re-link also blocks a legitimate
+  subject change after an identity-provider migration.
+- **2.1 G** soft-delete retention policy.
+- **2.1 H** CardDAV connection changed during a running sync.
+- **2.2** monthly reminders drifting from the 31st (needs a stored anchor day and a
+  migration); calendar sync reading all-day and floating events as UTC.
+- **2.3** `Reminder` as its own DTO; transactions for `UpdateActivity` and
+  `CompleteReminder`; shared real-date validation for birthdays; the large-file splits;
+  one safe-dial implementation; CardDAV context plumbing and `ListAddressObjects`
+  cost; health version; preview duplicate index; query strings in the request log.
+- **2.4** `CONTACT_FIELD_LABELS` in the CSV mapping step and the
+  `err instanceof Error ? err.message : t(...)` pattern (error codes are not mapped to
+  translations yet); backend validation messages in English; `prefer_not_to_say`;
+  the settings-card frame; the two import dialogs and the notes/activities pages as
+  shared components; splitting `ContactDetailPage`, `DateFormatProvider` and the rest
+  of `App.tsx`; the hook return contract; hover-only action buttons; the
+  `NetworkGraph` mouse listener; the unused `pages.*` locale section.
+
+---
+
 ## Part 1: Fixed on this branch
 
 ### Security

@@ -111,46 +111,6 @@ export function handleError(
 }
 
 /**
- * Create an error handler bound to a specific notifier.
- * Useful in React components/hooks where the snackbar is available.
- * 
- * @example
- * ```ts
- * const { showError } = useSnackbar();
- * const errorHandler = createErrorHandler({ showError });
- * 
- * try {
- *   await saveNote(data);
- * } catch (err) {
- *   errorHandler.handle(err, 'saving note');
- *   throw err;
- * }
- * ```
- */
-export function createErrorHandler(notifier: ErrorNotifier) {
-  return {
-    /**
-     * Handle an error with the bound notifier
-     */
-    handle(error: unknown, operation: string, options?: { silent?: boolean }): string {
-      return handleError(error, { operation, ...options }, notifier);
-    },
-    
-    /**
-     * Log an error without user notification
-     */
-    log(error: unknown, operation: string, options?: { silent?: boolean }): void {
-      logError(error, { operation, ...options });
-    },
-    
-    /**
-     * Get a user-friendly message from an error
-     */
-    getMessage: getErrorMessage,
-  };
-}
-
-/**
  * Hook-friendly error handler that returns a consistent error message.
  * Use this in hooks that need to set error state.
  * 

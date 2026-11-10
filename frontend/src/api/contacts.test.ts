@@ -1,16 +1,17 @@
-import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { apiFetch } from './client';
+import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { updateContact, type Contact } from './contacts';
 
-vi.mock('./client', async importOriginal => ({
-  ...(await importOriginal<typeof import('./client')>()),
-  apiFetch: vi.fn(),
-}));
+const fetchMock = vi.fn();
 
 describe('updateContact', () => {
   beforeEach(() => {
-    vi.mocked(apiFetch).mockReset();
-    vi.mocked(apiFetch).mockResolvedValue(new Response(JSON.stringify({ ID: 1 }), { status: 200 }));
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ ID: 1 }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   test('does not send the employment fields, so a stale copy cannot overwrite a newer job', async () => {
@@ -25,7 +26,7 @@ describe('updateContact', () => {
 
     await updateContact(1, stale);
 
-    const [url, init] = vi.mocked(apiFetch).mock.calls[0];
+    const [url, init] = fetchMock.mock.calls[0];
     expect(String(url)).toMatch(/\/contacts\/1$/);
     expect(init?.method).toBe('PUT');
     expect(JSON.parse(String(init?.body))).toEqual({ firstname: 'Erin', nickname: 'E' });

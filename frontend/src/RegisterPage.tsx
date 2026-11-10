@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { API_BASE_URL } from './auth';
+import { API_BASE_URL, apiFetch } from './api/client';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -28,12 +28,13 @@ export default function RegisterPage() {
     setError('');
     setSuccess('');
     try {
-      const response = await fetch(`${API_BASE_URL}/register`, {
+      const response = await apiFetch(`${API_BASE_URL}/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ email, password, username }),
+        skipAuthRedirect: true,
       });
       if (!response.ok) {
         const data = await response.json();

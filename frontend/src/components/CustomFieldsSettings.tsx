@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import ConfirmDialog from './ConfirmDialog';
 import {
   Box,
   Card,
@@ -14,11 +15,6 @@ import {
   List,
   ListItem,
   ListItemText,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
 } from '@mui/material';
 import TuneIcon from '@mui/icons-material/Tune';
 import AddIcon from '@mui/icons-material/Add';
@@ -233,24 +229,18 @@ export default function CustomFieldsSettings() {
         </CardContent>
       </Card>
 
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
-        <DialogTitle>{t('settings.customFields.deleteDialog.title')}</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            {t('settings.customFields.deleteDialog.message', { 
-              fieldName: fieldToDelete !== null ? fieldNames[fieldToDelete] : '' 
-            })}
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)}>
-            {t('settings.customFields.deleteDialog.cancel')}
-          </Button>
-          <Button onClick={handleDeleteConfirm} color="error" autoFocus>
-            {t('settings.customFields.deleteDialog.confirm')}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        title={t('settings.customFields.deleteDialog.title')}
+        message={t('settings.customFields.deleteDialog.message', {
+          fieldName: fieldToDelete !== null ? fieldNames[fieldToDelete] : ''
+        })}
+        cancelLabel={t('settings.customFields.deleteDialog.cancel')}
+        confirmLabel={t('settings.customFields.deleteDialog.confirm')}
+        destructive
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteDialogOpen(false)}
+      />
     </>
   );
 }

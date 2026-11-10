@@ -29,7 +29,6 @@ const activity: Activity = {
   UpdatedAt: '',
   contacts: [person],
 };
-const directory = { contacts: [person], total: 1, page: 1, limit: 1000 } as contactsApi.ContactsResponse;
 
 const quietLogs = () => vi.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -44,7 +43,6 @@ function setup() {
 beforeEach(() => {
   localStorage.clear();
   vi.resetAllMocks();
-  contacts.getContacts.mockResolvedValue(directory);
 });
 
 afterEach(() => {
@@ -66,7 +64,7 @@ test('editing a note without a date leaves the date field empty', async () => {
   expect(result.current.editTimelineValues.noteDate).toBe('');
 });
 
-test('editing an activity fills the form and loads the contact picker only once', async () => {
+test('editing an activity fills the form; the participant picker searches on its own', async () => {
   const { result } = setup();
   await act(() => result.current.handleStartEditTimelineItem('activity', activity));
   expect(result.current.editingTimelineItem).toEqual({ type: 'activity', id: 2 });
@@ -77,32 +75,8 @@ test('editing an activity fills the form and loads the contact picker only once'
     activityDate: '01.04.2026',
     activityContacts: [person],
   });
-  expect(result.current.allContacts).toEqual([person]);
-  await act(() => result.current.handleStartEditTimelineItem('activity', activity));
-  expect(contacts.getContacts).toHaveBeenCalledTimes(1);
-});
-
-test('the activity form still opens when the contact picker fails to load', async () => {
-  quietLogs();
-  contacts.getContacts.mockRejectedValue(new Error('offline'));
-  const { result } = setup();
-  await act(() => result.current.handleStartEditTimelineItem('activity', activity));
-  expect(result.current.editTimelineValues.activityTitle).toBe('Lunch');
-  expect(result.current.allContacts).toEqual([]);
-});
-
-test('text typed while the contact picker loads is not overwritten', async () => {
-  let resolve!: (r: contactsApi.ContactsResponse) => void;
-  contacts.getContacts.mockImplementation(() => new Promise((r) => { resolve = r; }));
-  const { result } = setup();
-
-  await act(async () => { void result.current.handleStartEditTimelineItem('activity', activity); });
-  expect(result.current.editTimelineValues.activityTitle).toBe('Lunch');
-
-  act(() => result.current.setEditTimelineValues({ ...result.current.editTimelineValues, activityTitle: 'Typed' }));
-  await act(async () => resolve(directory));
-
-  expect(result.current.editTimelineValues.activityTitle).toBe('Typed');
+  // No bulk contact fetch: the backend caps a page at 100, so it could never be complete.
+  expect(contacts.getContacts).not.toHaveBeenCalled();
 });
 
 test('cancel leaves edit mode and clears the form', async () => {

@@ -1,4 +1,4 @@
-import { test, expect, LOGGED_OUT, signInAsNewUser, uniqueUser, createTestContact, waitForLoading } from './fixtures';
+import { test, expect, LOGGED_OUT, signInAsNewUser, uniqueUser, createTestContact, waitForLoading, acceptConfirm } from './fixtures';
 import { API_BASE_URL } from './global-setup';
 import type { Page } from '@playwright/test';
 
@@ -88,8 +88,8 @@ test.describe('Dashboard content', () => {
 
     await page.goto('/');
     await expect(page.getByText('E2E dashboard monthly')).toBeVisible();
-    page.once('dialog', (confirm) => confirm.accept());
     await page.getByRole('button', { name: 'Skip', exact: true }).click();
+    await acceptConfirm(page, /skip this reminder/i, 'Skip');
 
     await expect
       .poll(async () => {

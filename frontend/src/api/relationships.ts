@@ -1,5 +1,5 @@
 // Relationship-related API calls
-import { apiFetch, API_BASE_URL, getAuthHeaders, parseErrorResponse } from './client';
+import { apiFetch, apiJson, API_BASE_URL, getAuthHeaders, parseErrorResponse } from './client';
 import { Contact } from './contacts';
 
 export interface Relationship {
@@ -47,32 +47,14 @@ export interface IncomingRelationshipsResponse {
 export async function getRelationships(
   contactId: number | string
 ): Promise<RelationshipsResponse> {
-  const response = await apiFetch(
-    `${API_BASE_URL}/contacts/${contactId}/relationships`,
-    { headers: getAuthHeaders() }
-  );
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
-
-  return response.json();
+  return apiJson(`/contacts/${contactId}/relationships`);
 }
 
 // Get all incoming relationships for a contact (relationships pointing to this contact)
 export async function getIncomingRelationships(
   contactId: number | string
 ): Promise<IncomingRelationshipsResponse> {
-  const response = await apiFetch(
-    `${API_BASE_URL}/contacts/${contactId}/incoming-relationships`,
-    { headers: getAuthHeaders() }
-  );
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
-
-  return response.json();
+  return apiJson(`/contacts/${contactId}/incoming-relationships`);
 }
 
 // Create a new relationship
@@ -125,17 +107,9 @@ export async function deleteRelationship(
   contactId: number | string,
   relationshipId: number
 ): Promise<void> {
-  const response = await apiFetch(
-    `${API_BASE_URL}/contacts/${contactId}/relationships/${relationshipId}`,
-    {
-      method: 'DELETE',
-      headers: getAuthHeaders(),
-    }
-  );
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
+  await apiJson(`/contacts/${contactId}/relationships/${relationshipId}`, {
+    method: 'DELETE',
+  });
 }
 
 // Preset relationship types

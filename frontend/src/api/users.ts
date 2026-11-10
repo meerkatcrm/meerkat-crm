@@ -1,47 +1,37 @@
 // User settings and preferences API calls
-import { apiFetch, API_BASE_URL, getAuthHeaders } from './client';
-import { handleResponse } from './errorHandling';
+import { apiJson } from './client';
 
 export async function updateLanguage(language: string): Promise<string> {
-  const response = await apiFetch(`${API_BASE_URL}/users/language`, {
+  const data = await apiJson<{ message?: string } | undefined>('/users/language', {
     method: 'PATCH',
-    headers: getAuthHeaders(),
     body: JSON.stringify({ language }),
+    errorMessage: 'Unable to update language.',
   });
-
-  const data = await handleResponse(response, 'Unable to update language.');
   return data?.message || 'Language updated successfully.';
 }
 
 export async function updateDateFormat(dateFormat: string): Promise<string> {
-  const response = await apiFetch(`${API_BASE_URL}/users/date-format`, {
+  const data = await apiJson<{ message?: string } | undefined>('/users/date-format', {
     method: 'PATCH',
-    headers: getAuthHeaders(),
     body: JSON.stringify({ date_format: dateFormat }),
+    errorMessage: 'Unable to update date format.',
   });
-
-  const data = await handleResponse(response, 'Unable to update date format.');
   return data?.message || 'Date format updated successfully.';
 }
 
 export async function getCustomFieldNames(): Promise<string[]> {
-  const response = await apiFetch(`${API_BASE_URL}/users/custom-fields`, {
-    method: 'GET',
-    headers: getAuthHeaders(),
+  const data = await apiJson<{ custom_field_names?: string[] } | undefined>('/users/custom-fields', {
+    errorMessage: 'Unable to get custom field names.',
   });
-
-  const data = await handleResponse(response, 'Unable to get custom field names.');
   return data?.custom_field_names || [];
 }
 
 export async function updateCustomFieldNames(names: string[]): Promise<string[]> {
-  const response = await apiFetch(`${API_BASE_URL}/users/custom-fields`, {
+  const data = await apiJson<{ custom_field_names?: string[] } | undefined>('/users/custom-fields', {
     method: 'PATCH',
-    headers: getAuthHeaders(),
     body: JSON.stringify({ names }),
+    errorMessage: 'Unable to update custom field names.',
   });
-
-  const data = await handleResponse(response, 'Unable to update custom field names.');
   return data?.custom_field_names || names;
 }
 
@@ -54,44 +44,35 @@ export interface CardDAVCircleFilter {
 
 // Which circles Meerkat's built-in CardDAV server shows the user's devices.
 export async function getCardDAVCircleFilter(): Promise<CardDAVCircleFilter> {
-  const response = await apiFetch(`${API_BASE_URL}/users/carddav-circle-filter`, {
-    method: 'GET',
-    headers: getAuthHeaders(),
+  const data = await apiJson<Partial<CardDAVCircleFilter> | undefined>('/users/carddav-circle-filter', {
+    errorMessage: 'Unable to get the CardDAV circle filter.',
   });
-
-  const data = await handleResponse(response, 'Unable to get the CardDAV circle filter.');
   return { mode: data?.mode ?? 'all', circles: data?.circles ?? [] };
 }
 
 export async function updateCardDAVCircleFilter(filter: CardDAVCircleFilter): Promise<CardDAVCircleFilter> {
-  const response = await apiFetch(`${API_BASE_URL}/users/carddav-circle-filter`, {
+  const data = await apiJson<Partial<CardDAVCircleFilter> | undefined>('/users/carddav-circle-filter', {
     method: 'PATCH',
-    headers: getAuthHeaders(),
     body: JSON.stringify(filter),
+    errorMessage: 'Unable to update the CardDAV circle filter.',
   });
-
-  const data = await handleResponse(response, 'Unable to update the CardDAV circle filter.');
   return { mode: data?.mode ?? filter.mode, circles: data?.circles ?? filter.circles };
 }
 
 export async function updateEnabledContactFields(fields: string[]): Promise<string[]> {
-  const response = await apiFetch(`${API_BASE_URL}/users/enabled-contact-fields`, {
+  const data = await apiJson<{ enabled_contact_fields?: string[] } | undefined>('/users/enabled-contact-fields', {
     method: 'PATCH',
-    headers: getAuthHeaders(),
     body: JSON.stringify({ fields }),
+    errorMessage: 'Unable to update enabled contact fields.',
   });
-
-  const data = await handleResponse(response, 'Unable to update enabled contact fields.');
   return data?.enabled_contact_fields || fields;
 }
 
 export async function updateContactFieldDisplay(hideEmpty: boolean): Promise<boolean> {
-  const response = await apiFetch(`${API_BASE_URL}/users/contact-field-display`, {
+  const data = await apiJson<{ hide_empty_contact_fields?: boolean } | undefined>('/users/contact-field-display', {
     method: 'PATCH',
-    headers: getAuthHeaders(),
     body: JSON.stringify({ hide_empty_contact_fields: hideEmpty }),
+    errorMessage: 'Unable to update contact field display.',
   });
-
-  const data = await handleResponse(response, 'Unable to update contact field display.');
   return data?.hide_empty_contact_fields ?? hideEmpty;
 }

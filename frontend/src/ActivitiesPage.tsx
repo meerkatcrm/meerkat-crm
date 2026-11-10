@@ -27,13 +27,14 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { useActivities } from './hooks/useActivities';
 import { useDebouncedValue } from './hooks/useDebounce';
 import { createActivity, updateActivity, deleteActivity, Activity } from './api/activities';
-import { Contact, getContacts } from './api/contacts';
+import { Contact } from './api/contacts';
 import AddActivityDialog from './components/AddActivityDialog';
 import EditTimelineItemDialog from './components/EditTimelineItemDialog';
 import { ListSkeleton } from './components/LoadingSkeletons';
 import { useDateFormat } from './DateFormatProvider';
 import { useSnackbar } from './context/SnackbarContext';
 import { handleError } from './utils/errorHandler';
+import { contactDisplayName } from './utils/contactName';
 
 const ActivitiesPage: React.FC = () => {
   const { t } = useTranslation();
@@ -80,7 +81,6 @@ const ActivitiesPage: React.FC = () => {
     activityDate?: string;
     activityContacts?: Contact[];
   }>({});
-  const [allContacts, setAllContacts] = useState<Contact[]>([]);
   const [infoAnchorEl, setInfoAnchorEl] = useState<HTMLElement | null>(null);
   const infoOpen = Boolean(infoAnchorEl);
   const infoPopoverId = infoOpen ? 'activities-info-popover' : undefined;
@@ -132,11 +132,9 @@ const ActivitiesPage: React.FC = () => {
     }
   };
 
-  const handleEditClick = async (activity: Activity) => {
+  const handleEditClick = (activity: Activity) => {
     setEditingActivity(activity);
     setEditError('');
-    // Before the fetch below: the dialog is already open, so setting these afterwards
-    // would overwrite whatever was typed in the meantime.
     setEditValues({
       activityTitle: activity.title || '',
       activityDescription: activity.description || '',
@@ -144,16 +142,6 @@ const ActivitiesPage: React.FC = () => {
       activityDate: activity.date ? formatDate(activity.date) : '',
       activityContacts: activity.contacts || [],
     });
-
-    // Fetch all contacts if not already loaded
-    if (allContacts.length === 0) {
-      try {
-        const data = await getContacts({ page: 1, limit: 1000 });
-        setAllContacts(data.contacts || []);
-      } catch (err) {
-        console.error('Failed to fetch contacts:', err);
-      }
-    }
   };
 
   const handleSaveEdit = async () => {
@@ -383,7 +371,7 @@ const ActivitiesPage: React.FC = () => {
                         {activity.contacts.map((contact: Contact) => (
                           <Chip
                             key={contact.ID}
-                            label={`${contact.firstname} ${contact.lastname}`}
+                            label={contactDisplayName(contact)}
                             size="small"
                             variant="outlined"
                             component={RouterLink}
@@ -437,7 +425,6 @@ const ActivitiesPage: React.FC = () => {
             setEditValues(newValues);
             setEditError('');
           }}
-          allContacts={allContacts}
           dateError={editError}
         />
       )}

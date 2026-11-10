@@ -23,7 +23,6 @@ import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import AppDialog from './AppDialog';
 import {
   Contact,
-  getContacts,
   getMergePreview,
   mergeContacts,
   MergeConflict,
@@ -32,8 +31,9 @@ import {
 } from '../api/contacts';
 import { CONTACT_FIELDS } from '../contactFields';
 import { useDateFormat } from '../DateFormatProvider';
-import { useDebouncedValue } from '../hooks/useDebounce';
-import { getErrorMessage, handleFetchError } from '../utils/errorHandler';
+import { useContactSearch } from '../hooks/useContactSearch';
+import { getErrorMessage } from '../utils/errorHandler';
+import { contactDisplayName } from '../utils/contactName';
 
 interface MergeContactsDialogProps {
   open: boolean;
@@ -64,10 +64,6 @@ const BOOLEAN_FIELD_VALUES: Record<string, { true: string; false: string }> = {
   archived: { true: 'contacts.merge.archivedRemovesReminders', false: 'contacts.merge.active' },
 };
 
-export function contactDisplayName(contact: { firstname?: string; lastname?: string }): string {
-  return [contact.firstname, contact.lastname].filter(Boolean).join(' ');
-}
-
 export default function MergeContactsDialog({
   open,
   onClose,
@@ -86,10 +82,12 @@ export default function MergeContactsDialog({
   const [merging, setMerging] = useState(false);
   const [error, setError] = useState('');
 
-  const [searchInput, setSearchInput] = useState('');
-  const debouncedSearch = useDebouncedValue(searchInput, 300);
-  const [candidates, setCandidates] = useState<Contact[]>([]);
-  const [candidatesLoading, setCandidatesLoading] = useState(false);
+  // Contact picker for when no second contact was given
+  const {
+    options: candidates,
+    loading: candidatesLoading,
+    setSearch: setSearchInput,
+  } = useContactSearch(open && sourceId === null, { excludeId: contactId, includeArchived: true });
 
   // Start over whenever the dialog is (re)opened
   useEffect(() => {
@@ -98,27 +96,8 @@ export default function MergeContactsDialog({
       setSourceId(otherContactId ?? null);
       setPreview(null);
       setError('');
-      setSearchInput('');
     }
   }, [open, contactId, otherContactId]);
-
-  // Contact picker for when no second contact was given
-  useEffect(() => {
-    if (!open || sourceId !== null) return;
-    let cancelled = false;
-    setCandidatesLoading(true);
-    getContacts({ limit: 50, search: debouncedSearch, includeArchived: true })
-      .then((response) => {
-        if (!cancelled) setCandidates(response.contacts.filter((c) => c.ID !== contactId));
-      })
-      .catch((err) => handleFetchError(err, 'loading contacts'))
-      .finally(() => {
-        if (!cancelled) setCandidatesLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, sourceId, debouncedSearch, contactId]);
 
   useEffect(() => {
     if (!open || sourceId === null) return;

@@ -1,4 +1,4 @@
-import { apiFetch, API_BASE_URL, getAuthHeaders, parseErrorResponse } from './client';
+import { apiJson } from './client';
 import type { ImportRowPreview, ImportResult, RowImportAction } from './import';
 
 // Per-entity totals of the connected Monica account
@@ -109,21 +109,11 @@ export async function monicaConnect(
   baseUrl: string,
   apiToken: string
 ): Promise<MonicaConnectResponse> {
-  const response = await apiFetch(
-    `${API_BASE_URL}/contacts/import/monica/connect`,
-    {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ base_url: baseUrl, api_token: apiToken }),
-    },
-    CONNECT_TIMEOUT_MS
-  );
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
-
-  return response.json();
+  return apiJson('/contacts/import/monica/connect', {
+    method: 'POST',
+    body: JSON.stringify({ base_url: baseUrl, api_token: apiToken }),
+    timeout: CONNECT_TIMEOUT_MS,
+  });
 }
 
 // Start the background snapshot fetch
@@ -137,48 +127,24 @@ export async function monicaStartFetch(
     collapse_reciprocal_relationships: boolean;
   }
 ): Promise<void> {
-  const response = await apiFetch(
-    `${API_BASE_URL}/contacts/import/monica/fetch`,
-    {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ session_id: sessionId, ...options }),
-    }
-  );
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
+  await apiJson('/contacts/import/monica/fetch', {
+    method: 'POST',
+    body: JSON.stringify({ session_id: sessionId, ...options }),
+  });
 }
 
 // Poll fetch/import progress
 export async function monicaGetStatus(
   sessionId: string
 ): Promise<MonicaImportStatus> {
-  const response = await apiFetch(
-    `${API_BASE_URL}/contacts/import/monica/status?session_id=${encodeURIComponent(sessionId)}`
-  );
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
-
-  return response.json();
+  return apiJson(`/contacts/import/monica/status?session_id=${encodeURIComponent(sessionId)}`);
 }
 
 // Load the contact preview once the snapshot is ready
 export async function monicaGetPreview(
   sessionId: string
 ): Promise<MonicaPreviewResponse> {
-  const response = await apiFetch(
-    `${API_BASE_URL}/contacts/import/monica/preview?session_id=${encodeURIComponent(sessionId)}`
-  );
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
-
-  return response.json();
+  return apiJson(`/contacts/import/monica/preview?session_id=${encodeURIComponent(sessionId)}`);
 }
 
 // Execute the import with per-contact actions
@@ -186,30 +152,15 @@ export async function monicaConfirm(
   sessionId: string,
   actions: RowImportAction[]
 ): Promise<MonicaImportResult> {
-  const response = await apiFetch(
-    `${API_BASE_URL}/contacts/import/monica/confirm`,
-    {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ session_id: sessionId, actions }),
-    }
-  );
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
-
-  return response.json();
+  return apiJson('/contacts/import/monica/confirm', {
+    method: 'POST',
+    body: JSON.stringify({ session_id: sessionId, actions }),
+  });
 }
 
 // Cancel a session, dropping the API token server-side
 export async function monicaCancel(sessionId: string): Promise<void> {
-  const response = await apiFetch(
-    `${API_BASE_URL}/contacts/import/monica/session?session_id=${encodeURIComponent(sessionId)}`,
-    { method: 'DELETE' }
-  );
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
+  await apiJson(`/contacts/import/monica/session?session_id=${encodeURIComponent(sessionId)}`, {
+    method: 'DELETE',
+  });
 }

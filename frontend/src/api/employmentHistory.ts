@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import { apiFetch, API_BASE_URL, getAuthHeaders, parseErrorResponse } from './client';
+import { apiJson } from './client';
 
 export interface EmploymentHistoryEntry {
   ID: number;
@@ -32,24 +32,14 @@ export interface EmploymentHistoryResponse {
 export async function getEmploymentHistory(
   contactId: number | string
 ): Promise<EmploymentHistoryResponse> {
-  const response = await apiFetch(
-    `${API_BASE_URL}/contacts/${contactId}/employment-history`,
-    { headers: getAuthHeaders() }
-  );
-  if (!response.ok) throw await parseErrorResponse(response);
-  return response.json();
+  return apiJson(`/contacts/${contactId}/employment-history`);
 }
 
 export async function createEmploymentHistory(
   contactId: number | string,
   data: EmploymentHistoryFormData
 ): Promise<{ employment_history: EmploymentHistoryEntry }> {
-  const response = await apiFetch(
-    `${API_BASE_URL}/contacts/${contactId}/employment-history`,
-    { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data) }
-  );
-  if (!response.ok) throw await parseErrorResponse(response);
-  return response.json();
+  return apiJson(`/contacts/${contactId}/employment-history`, { method: 'POST', body: JSON.stringify(data) });
 }
 
 export async function updateEmploymentHistory(
@@ -57,23 +47,14 @@ export async function updateEmploymentHistory(
   entryId: number,
   data: EmploymentHistoryFormData
 ): Promise<{ employment_history: EmploymentHistoryEntry }> {
-  const response = await apiFetch(
-    `${API_BASE_URL}/contacts/${contactId}/employment-history/${entryId}`,
-    { method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify(data) }
-  );
-  if (!response.ok) throw await parseErrorResponse(response);
-  return response.json();
+  return apiJson(`/contacts/${contactId}/employment-history/${entryId}`, { method: 'PUT', body: JSON.stringify(data) });
 }
 
 export async function deleteEmploymentHistory(
   contactId: number | string,
   entryId: number
 ): Promise<void> {
-  const response = await apiFetch(
-    `${API_BASE_URL}/contacts/${contactId}/employment-history/${entryId}`,
-    { method: 'DELETE', headers: getAuthHeaders() }
-  );
-  if (!response.ok) throw await parseErrorResponse(response);
+  await apiJson(`/contacts/${contactId}/employment-history/${entryId}`, { method: 'DELETE' });
 }
 
 export async function endEmploymentHistory(
@@ -82,10 +63,5 @@ export async function endEmploymentHistory(
 ): Promise<{ employment_history: EmploymentHistoryEntry }> {
   // The user's local today, which can differ from the server's UTC date.
   const today = format(new Date(), 'yyyy-MM-dd');
-  const response = await apiFetch(
-    `${API_BASE_URL}/contacts/${contactId}/employment-history/${entryId}/end?date=${today}`,
-    { method: 'POST', headers: getAuthHeaders() }
-  );
-  if (!response.ok) throw await parseErrorResponse(response);
-  return response.json();
+  return apiJson(`/contacts/${contactId}/employment-history/${entryId}/end?date=${today}`, { method: 'POST' });
 }

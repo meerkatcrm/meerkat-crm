@@ -91,7 +91,6 @@ export function useReminderManagement(
     handleDeleteReminder,
     handleAddReminder,
     setReminderDialogOpen,
-    setEditingReminder,
-    setReminders
+    setEditingReminder
   };
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import ConfirmDialog from './ConfirmDialog';
 import { useDateFormat } from '../DateFormatProvider';
 import {
   Box,
@@ -18,7 +19,6 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogContentText,
   DialogActions,
   Switch,
   FormControlLabel,
@@ -433,20 +433,16 @@ export default function CalendarSyncSettings() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
-        <DialogTitle>{t('settings.calendarSync.deleteTitle')}</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            {t('settings.calendarSync.deleteConfirm', { name: calendarToDelete?.name })}
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)}>{t('common.cancel')}</Button>
-          <Button color="error" variant="contained" onClick={handleDeleteConfirm} disabled={deleting}>
-            {t('common.delete')}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        title={t('settings.calendarSync.deleteTitle')}
+        message={t('settings.calendarSync.deleteConfirm', { name: calendarToDelete?.name })}
+        confirmLabel={t('common.delete')}
+        destructive
+        busy={deleting}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteDialogOpen(false)}
+      />
     </>
   );
 }

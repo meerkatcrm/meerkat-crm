@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import {
   DialogTitle,
   DialogContent,
@@ -21,10 +21,12 @@ import {
 import AppDialog from './AppDialog';
 import { useTranslation } from 'react-i18next';
 import { Relationship, RelationshipFormData, RELATIONSHIP_TYPES } from '../api/relationships';
-import { Contact, getContacts, createContact } from '../api/contacts';
+import { Contact, createContact } from '../api/contacts';
+import { useContactSearch } from '../hooks/useContactSearch';
 import { useSnackbar } from '../context/SnackbarContext';
-import { handleError, handleFetchError, getErrorMessage } from '../utils/errorHandler';
+import { handleError, getErrorMessage } from '../utils/errorHandler';
 import { useDateFormat } from '../DateFormatProvider';
+import { contactDisplayName } from '../utils/contactName';
 
 interface AddRelationshipDialogProps {
   open: boolean;
@@ -62,35 +64,19 @@ export default function AddRelationshipDialog({
   const [gender, setGender] = useState('');
   const [birthday, setBirthday] = useState('');
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [contactsLoading, setContactsLoading] = useState(false);
-  const [searchInput, setSearchInput] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   // Contact created by "create new contact" mode. Kept so a failed link step can
   // be retried without creating the contact twice.
   const [createdContact, setCreatedContact] = useState<Contact | null>(null);
 
-  const loadContacts = useCallback(async (search: string = '') => {
-    setContactsLoading(true);
-    try {
-      const response = await getContacts({ limit: 100, search });
-      // Filter out the current contact
-      const filteredContacts = response.contacts.filter(c => c.ID !== currentContactId);
-      setContacts(filteredContacts);
-    } catch (err) {
-      handleFetchError(err, 'loading contacts');
-    } finally {
-      setContactsLoading(false);
-    }
-  }, [currentContactId]);
-
-  // Load contacts for linking
-  useEffect(() => {
-    if (open && entryMode === 'linked') {
-      loadContacts();
-    }
-  }, [open, entryMode, loadContacts]);
+  // Contacts for linking
+  const {
+    options: contacts,
+    loading: contactsLoading,
+    search: searchInput,
+    setSearch: setSearchInput,
+  } = useContactSearch(open && entryMode === 'linked', { excludeId: currentContactId });
 
   // Populate form when editing
   useEffect(() => {
@@ -130,17 +116,6 @@ export default function AddRelationshipDialog({
     }
   }, [relationship, open, formatBirthdayForInput]);
 
-  // Debounced search effect
-  useEffect(() => {
-    if (entryMode !== 'linked') return;
-    
-    const timeoutId = setTimeout(() => {
-      loadContacts(searchInput);
-    }, 300);
-
-    return () => clearTimeout(timeoutId);
-  }, [searchInput, entryMode, loadContacts]);
-
   const resetForm = () => {
     setEntryMode('manual');
     setName('');
@@ -151,8 +126,7 @@ export default function AddRelationshipDialog({
     setGender('');
     setBirthday('');
     setSelectedContact(null);
-    setSearchInput('');
-    setContacts([]);
+    // Leaving linked mode clears the contact search (useContactSearch).
     setError('');
     setCreatedContact(null);
   };
@@ -174,10 +148,6 @@ export default function AddRelationshipDialog({
     }
     setEntryMode(mode);
     setError('');
-    if (mode === 'linked') {
-      // Load initial contacts when switching to linked mode
-      loadContacts('');
-    }
   };
 
   const handleContactSelect = (contact: Contact | null) => {
@@ -237,7 +207,7 @@ export default function AddRelationshipDialog({
         });
         setCreatedContact(newContact);
         showSuccess(t('relationships.contactCreated', {
-          name: `${newContact.firstname} ${newContact.lastname}`.trim(),
+          name: contactDisplayName(newContact),
         }));
       }
 
@@ -246,7 +216,7 @@ export default function AddRelationshipDialog({
       const linkedContact = entryMode === 'new' ? newContact : (entryMode === 'linked' ? selectedContact : null);
       const data: RelationshipFormData = {
         name: linkedContact
-          ? `${linkedContact.firstname} ${linkedContact.lastname}`.trim()
+          ? contactDisplayName(linkedContact)
           : name.trim(),
         type: effectiveType,
         // Only include gender/birthday for manual mode
@@ -317,7 +287,7 @@ export default function AddRelationshipDialog({
           {entryMode === 'linked' && (
             <Autocomplete
               options={contacts}
-              getOptionLabel={(option) => `${option.firstname} ${option.lastname}`}
+              getOptionLabel={(option) => contactDisplayName(option)}
               value={selectedContact}
               onChange={(_, value) => handleContactSelect(value)}
               onInputChange={(_, value, reason) => {

@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDateFormat } from '../DateFormatProvider';
-import { getContacts } from '../api/contacts';
 import { updateNote, deleteNote, Note } from '../api/notes';
 import { updateActivity, deleteActivity, Activity } from '../api/activities';
-import { handleError, handleFetchError, ErrorNotifier } from '../utils/errorHandler';
+import { handleError, ErrorNotifier } from '../utils/errorHandler';
 
 export function useTimelineEditing(
   contactId: number | undefined,
@@ -24,9 +23,8 @@ export function useTimelineEditing(
     activityDate?: string;
     activityContacts?: { ID: number; firstname: string; lastname: string; nickname?: string }[];
   }>({});
-  const [allContacts, setAllContacts] = useState<{ ID: number; firstname: string; lastname: string; nickname?: string }[]>([]);
 
-  const handleStartEditTimelineItem = async (type: 'note' | 'activity', item: Note | Activity) => {
+  const handleStartEditTimelineItem = (type: 'note' | 'activity', item: Note | Activity) => {
     setEditingTimelineItem({ type, id: item.ID });
     setEditTimelineDateError('');
 
@@ -39,9 +37,6 @@ export function useTimelineEditing(
     } else {
       const activity = item as Activity;
 
-      // Fetch all contacts for the autocomplete if not already loaded
-      // Before the fetch below: the dialog is already open, so setting these afterwards
-      // would overwrite whatever was typed in the meantime.
       setEditTimelineValues({
         activityTitle: activity.title || '',
         activityDescription: activity.description || '',
@@ -49,15 +44,6 @@ export function useTimelineEditing(
         activityDate: activity.date ? formatDate(activity.date) : '',
         activityContacts: activity.contacts || []
       });
-
-      if (allContacts.length === 0) {
-        try {
-          const data = await getContacts({ page: 1, limit: 1000 });
-          setAllContacts(data.contacts || []);
-        } catch (err) {
-          handleFetchError(err, 'fetching contacts for autocomplete');
-        }
-      }
     }
   };
 
@@ -143,7 +129,6 @@ export function useTimelineEditing(
     editingTimelineItem,
     editTimelineValues,
     editTimelineDateError,
-    allContacts,
     handleStartEditTimelineItem,
     handleCancelEditTimelineItem,
     handleUpdateNote,

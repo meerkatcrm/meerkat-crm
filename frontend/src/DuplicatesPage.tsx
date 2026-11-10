@@ -18,10 +18,11 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CallMergeIcon from '@mui/icons-material/CallMerge';
 import { dismissDuplicate, DuplicateContactSummary, DuplicatePair } from './api/contacts';
-import MergeContactsDialog, { contactDisplayName } from './components/MergeContactsDialog';
+import MergeContactsDialog from './components/MergeContactsDialog';
 import { useDuplicateContacts } from './hooks/useDuplicateContacts';
 import { useSnackbar } from './context/SnackbarContext';
 import { getErrorMessage } from './utils/errorHandler';
+import { contactDisplayName } from './utils/contactName';
 
 function ContactSummary({ contact }: { contact: DuplicateContactSummary }) {
   const { t } = useTranslation();

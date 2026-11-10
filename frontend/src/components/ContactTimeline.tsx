@@ -26,6 +26,7 @@ import { Note } from '../api/notes';
 import { Activity } from '../api/activities';
 import { ReminderCompletion } from '../api/reminders';
 import { useDateFormat } from '../DateFormatProvider';
+import { contactDisplayName } from '../utils/contactName';
 
 interface ContactTimelineProps {
   // instant: date is a real timestamp (shown by local day) rather than a date-only value.
@@ -133,9 +134,7 @@ export default function ContactTimeline({ timelineItems, onEditItem, onDeleteCom
                             '&:hover': { textDecoration: 'underline' }
                           }}
                         >
-                          {activityContact.firstname}{' '}
-                          {activityContact.nickname ? `"${activityContact.nickname}" ` : ''}
-                          {activityContact.lastname}
+                          {contactDisplayName(activityContact, { nickname: true })}
                         </Link>
                         {idx < (item.data as Activity).contacts!.length - 1 && (
                           <Typography variant="caption" sx={{

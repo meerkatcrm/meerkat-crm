@@ -3,8 +3,9 @@
 // Token is stored in httpOnly cookie (not accessible from JS for security)
 // User info is cached in localStorage for UI purposes
 
-const API_SERVER_URL = import.meta.env.REACT_APP_API_URL || '';
-export const API_BASE_URL = `${API_SERVER_URL}/api/v1`;
+import { API_BASE_URL, apiFetch } from './api/client';
+
+export { API_BASE_URL };
 
 const USER_INFO_KEY = 'user_info';
 
@@ -20,13 +21,14 @@ export interface UserInfo {
 }
 
 export async function loginUser(identifier: string, password: string): Promise<LoginResponse> {
-  const response = await fetch(`${API_BASE_URL}/login`, {
+  const response = await apiFetch(`${API_BASE_URL}/login`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    credentials: 'include', // Send and receive cookies
     body: JSON.stringify({ identifier, password }),
+    // Wrong credentials are a 401: an answer for the login form, not an expired session.
+    skipAuthRedirect: true,
   });
   if (!response.ok) {
     throw new Error('Login failed');
@@ -48,9 +50,8 @@ export async function loginUser(identifier: string, password: string): Promise<L
 // Fetch current user info from the server and cache it
 export async function fetchAndCacheUserInfo(): Promise<(UserInfo & LoginResponse) | null> {
   try {
-    const response = await fetch(`${API_BASE_URL}/users/me`, {
-      credentials: 'include',
-    });
+    // This is the "am I signed in?" probe, so a 401 just means no.
+    const response = await apiFetch(`${API_BASE_URL}/users/me`, { skipAuthRedirect: true });
     if (!response.ok) {
       return null;
     }
@@ -66,11 +67,6 @@ export async function fetchAndCacheUserInfo(): Promise<(UserInfo & LoginResponse
   } catch {
     return null;
   }
-}
-
-// No-op: token is now in httpOnly cookie, not stored in localStorage
-export function saveToken(_token: string) {
-  // Kept for backward compatibility - token is now set via httpOnly cookie by server
 }
 
 // Returns null - token is in httpOnly cookie (not accessible from JS)
@@ -89,10 +85,7 @@ export function isAuthenticated(): boolean {
 
 export async function logoutUser() {
   try {
-    await fetch(`${API_BASE_URL}/logout`, {
-      method: 'POST',
-      credentials: 'include',
-    });
+    await apiFetch(`${API_BASE_URL}/logout`, { method: 'POST', skipAuthRedirect: true });
   } catch {
     // Ignore errors - clear local state anyway
   }

@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures';
-import { createTestContact, deleteTestContact } from './fixtures';
+import { createTestContact, deleteTestContact, acceptConfirm } from './fixtures';
 import { API_BASE_URL } from './global-setup';
 
 // Relationships live on a tab inside the contact information card. Each test
@@ -61,8 +61,8 @@ test.describe('Relationships', () => {
       await page.getByRole('tab', { name: /relationships/i }).click();
       await expect(page.getByText(`${name} edited`)).toBeVisible();
 
-      page.once('dialog', (confirm) => confirm.accept());
       await page.getByRole('button', { name: 'Delete', exact: true }).click();
+      await acceptConfirm(page, /delete this relationship/i, 'Delete');
       await expect(page.getByText(name)).toHaveCount(0);
 
       await page.reload();

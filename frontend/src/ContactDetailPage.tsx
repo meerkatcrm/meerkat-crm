@@ -64,9 +64,11 @@ import MergeContactsDialog from './components/MergeContactsDialog';
 import { useEmploymentHistory } from './hooks/useEmploymentHistory';
 import AddEmploymentHistoryDialog from './components/AddEmploymentHistoryDialog';
 import { useSnackbar } from './context/SnackbarContext';
+import { useConfirm } from './components/ConfirmDialog';
 import { ApiError } from './api/client';
 import { handleFetchError } from './utils/errorHandler';
 import { useDateFormat } from './DateFormatProvider';
+import { contactDisplayName } from './utils/contactName';
 
 // Extended Contact type with optional relations for local state
 interface ContactWithRelations extends Contact {
@@ -97,6 +99,7 @@ function ContactDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { showError, showSnackbar } = useSnackbar();
+  const { confirm, confirmDialog } = useConfirm();
   const { formatBirthdayForInput, parseBirthdayInput, autoFormatBirthdayInput } = useDateFormat();
   const [contact, setContact] = useState<ContactWithRelations | null>(null);
   const [profilePic, setProfilePic] = useState<string>('');
@@ -173,7 +176,6 @@ function ContactDetail() {
     editingTimelineItem,
     editTimelineValues,
     editTimelineDateError,
-    allContacts,
     handleStartEditTimelineItem,
     handleCancelEditTimelineItem,
     handleUpdateNote,
@@ -344,7 +346,7 @@ function ContactDetail() {
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const handleDeleteCompletion = async (completionId: number) => {
-    if (!window.confirm(t('timeline.deleteCompletionConfirm'))) {
+    if (!(await confirm({ message: t('timeline.deleteCompletionConfirm'), confirmLabel: t('common.delete'), destructive: true }))) {
       return;
     }
     try {
@@ -473,7 +475,7 @@ function ContactDetail() {
         const payload = buildBirthdayReminderPayload(
           contact.ID,
           contact.birthday,
-          t('reminders.birthdayMessage', { name: `${contact.firstname} ${contact.lastname}` })
+          t('reminders.birthdayMessage', { name: contactDisplayName(contact) })
         );
         if (payload) {
           await createReminder(contact.ID, payload);
@@ -582,7 +584,7 @@ function ContactDetail() {
 
   const handleSaveProfile = async () => {
     if (!contact || !profileValues.firstname.trim()) {
-      alert(t('contactDetail.firstNameRequired'));
+      showError(t('contactDetail.firstNameRequired'));
       return;
     }
 
@@ -613,10 +615,10 @@ function ContactDetail() {
     if (!contact || !id) return;
 
     const confirmMessage = t('contactDetail.confirmDeleteContact', {
-      name: `${contact.firstname} ${contact.lastname}`
+      name: contactDisplayName(contact)
     });
 
-    if (!window.confirm(confirmMessage)) {
+    if (!(await confirm({ message: confirmMessage, confirmLabel: t('common.delete'), destructive: true }))) {
       return;
     }
 
@@ -625,7 +627,7 @@ function ContactDetail() {
       navigate('/contacts');
     } catch (err) {
       console.error('Error deleting contact:', err);
-      alert(t('contactDetail.deleteContactError'));
+      showError(t('contactDetail.deleteContactError'));
     }
   };
 
@@ -633,7 +635,7 @@ function ContactDetail() {
     if (!contact || !id) return;
 
     const confirmMessage = t('contactDetail.archiveConfirmation');
-    if (!window.confirm(confirmMessage)) {
+    if (!(await confirm({ message: confirmMessage, confirmLabel: t('contactDetail.archive'), destructive: true }))) {
       return;
     }
 
@@ -693,7 +695,7 @@ function ContactDetail() {
 
   const handleStayInTouch = () => {
     if (!contact) return;
-    const contactName = `${contact.firstname}${contact.lastname ? ' ' + contact.lastname : ''}`;
+    const contactName = contactDisplayName(contact);
     setReminderInitialValues({
       message: t('contactDetail.catchUpWith', { name: contactName }),
       recurrence: 'quarterly'
@@ -930,7 +932,6 @@ function ContactDetail() {
           type={editingTimelineItem.type}
           values={editTimelineValues}
           onChange={setEditTimelineValues}
-          allContacts={allContacts}
           dateError={editTimelineDateError}
         />
       )}
@@ -970,6 +971,7 @@ function ContactDetail() {
         onSave={handleSaveEmploymentHistory}
         entry={editingEmploymentHistoryEntry}
       />
+      {confirmDialog}
     </Box>
   );
 }

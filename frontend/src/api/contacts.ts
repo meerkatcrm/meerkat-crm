@@ -1,5 +1,5 @@
 // Contact-related API calls
-import { apiFetch, API_BASE_URL, getAuthHeaders, parseErrorResponse } from './client';
+import { apiFetch, apiJson, API_BASE_URL, getAuthHeaders, parseErrorResponse } from './client';
 
 export interface ContactValue {
   type: string;
@@ -102,16 +102,7 @@ export async function getContacts(
 
   queryParams.append('fields', 'ID,firstname,lastname,nickname,circles,photo_thumbnail,archived');
 
-  const response = await apiFetch(
-    `${API_BASE_URL}/contacts?${queryParams.toString()}`,
-    { headers: getAuthHeaders() }
-  );
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
-
-  return response.json();
+  return apiJson(`/contacts?${queryParams.toString()}`);
 }
 
 // Get single contact
@@ -166,37 +157,19 @@ export async function updateContact(
   data: Partial<Contact>
 ): Promise<Contact> {
   const { organization, department, job_title, role, ...payload } = data;
-  const response = await apiFetch(
-    `${API_BASE_URL}/contacts/${id}`,
-    {
-      method: 'PUT',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(payload),
-    }
-  );
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
-
-  return response.json();
+  return apiJson(`/contacts/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
 }
 
 // Delete contact
 export async function deleteContact(
   id: string | number
 ): Promise<void> {
-  const response = await apiFetch(
-    `${API_BASE_URL}/contacts/${id}`,
-    {
-      method: 'DELETE',
-      headers: getAuthHeaders(),
-    }
-  );
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
+  await apiJson(`/contacts/${id}`, {
+    method: 'DELETE',
+  });
 }
 
 // Get contact profile picture
@@ -224,62 +197,28 @@ export async function uploadProfilePicture(
   const formData = new FormData();
   formData.append('photo', imageBlob, 'profile.jpg');
 
-  const response = await apiFetch(
-    `${API_BASE_URL}/contacts/${id}/profile_picture`,
-    {
-      method: 'POST',
-      body: formData
-    }
-  );
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
+  await apiJson(`/contacts/${id}/profile_picture`, {
+    method: 'POST',
+    body: formData,
+  });
 }
 
 // Get all circles
 export async function getCircles(): Promise<string[]> {
-  const response = await apiFetch(
-    `${API_BASE_URL}/contacts/circles`,
-    { headers: getAuthHeaders() }
-  );
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
-
-  const data = await response.json();
+  const data = await apiJson<unknown>('/contacts/circles');
   // Backend returns array directly, not wrapped in object
   return Array.isArray(data) ? data : [];
 }
 
 // Get random contacts (returns 5 contacts)
 export async function getRandomContacts(): Promise<Contact[]> {
-  const response = await apiFetch(
-    `${API_BASE_URL}/contacts/random`,
-    { headers: getAuthHeaders() }
-  );
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
-
-  const data = await response.json();
+  const data = await apiJson<{ contacts?: Contact[] }>('/contacts/random');
   return data.contacts || [];
 }
 
 // Get upcoming birthdays (returns up to 10 birthdays for contacts and relationships)
 export async function getUpcomingBirthdays(): Promise<Birthday[]> {
-  const response = await apiFetch(
-    `${API_BASE_URL}/contacts/birthdays`,
-    { headers: getAuthHeaders() }
-  );
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
-
-  const data = await response.json();
+  const data = await apiJson<{ birthdays?: Birthday[] }>('/contacts/birthdays');
   return data.birthdays || [];
 }
 
@@ -287,38 +226,18 @@ export async function getUpcomingBirthdays(): Promise<Birthday[]> {
 export async function archiveContact(
   id: string | number
 ): Promise<Contact> {
-  const response = await apiFetch(
-    `${API_BASE_URL}/contacts/${id}/archive`,
-    {
-      method: 'POST',
-      headers: getAuthHeaders(),
-    }
-  );
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
-
-  return response.json();
+  return apiJson(`/contacts/${id}/archive`, {
+    method: 'POST',
+  });
 }
 
 // Unarchive a contact
 export async function unarchiveContact(
   id: string | number
 ): Promise<Contact> {
-  const response = await apiFetch(
-    `${API_BASE_URL}/contacts/${id}/unarchive`,
-    {
-      method: 'POST',
-      headers: getAuthHeaders(),
-    }
-  );
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
-
-  return response.json();
+  return apiJson(`/contacts/${id}/unarchive`, {
+    method: 'POST',
+  });
 }
 
 export type DuplicateReason = 'name' | 'email' | 'phone';
@@ -383,18 +302,10 @@ export async function dismissDuplicate(
   contactAId: number,
   contactBId: number
 ): Promise<void> {
-  const response = await apiFetch(
-    `${API_BASE_URL}/contacts/duplicates/dismiss`,
-    {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ contact_a_id: contactAId, contact_b_id: contactBId }),
-    }
-  );
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
+  await apiJson('/contacts/duplicates/dismiss', {
+    method: 'POST',
+    body: JSON.stringify({ contact_a_id: contactAId, contact_b_id: contactBId }),
+  });
 }
 
 // Preview merging the source contact into the target
@@ -402,16 +313,7 @@ export async function getMergePreview(
   targetId: string | number,
   sourceId: string | number
 ): Promise<MergePreview> {
-  const response = await apiFetch(
-    `${API_BASE_URL}/contacts/${targetId}/merge-preview?source_id=${encodeURIComponent(sourceId)}`,
-    { headers: getAuthHeaders() }
-  );
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
-
-  return response.json();
+  return apiJson(`/contacts/${targetId}/merge-preview?source_id=${encodeURIComponent(sourceId)}`);
 }
 
 // Merge the source contact into the target; the source is deleted
@@ -420,18 +322,8 @@ export async function mergeContacts(
   sourceId: number,
   resolutions: Record<string, MergeResolution>
 ): Promise<Contact> {
-  const response = await apiFetch(
-    `${API_BASE_URL}/contacts/${targetId}/merge`,
-    {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ source_id: sourceId, resolutions }),
-    }
-  );
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response);
-  }
-
-  return response.json();
+  return apiJson(`/contacts/${targetId}/merge`, {
+    method: 'POST',
+    body: JSON.stringify({ source_id: sourceId, resolutions }),
+  });
 }

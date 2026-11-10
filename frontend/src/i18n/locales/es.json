@@ -999,5 +999,15 @@
     "triggerReminders": "Enviar Emails de Recordatorio",
     "triggerRemindersSuccess": "Emails de recordatorio enviados exitosamente",
     "triggerRemindersError": "Error al enviar los emails de recordatorio"
+  },
+  "errorBoundary": {
+    "title": "¡Vaya! Algo salió mal",
+    "message": "Se produjo un error inesperado. Intenta actualizar la página o vuelve a la página de inicio.",
+    "tryAgain": "Reintentar",
+    "reloadPage": "Recargar la página",
+    "goHome": "Ir al inicio",
+    "detailsTitle": "Detalles del error (solo en desarrollo)",
+    "error": "Error:",
+    "componentStack": "Pila de componentes:"
   }
 }

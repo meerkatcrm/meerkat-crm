@@ -30,11 +30,13 @@ import { handleFetchError, handleError } from './utils/errorHandler';
 import { useDateFormat } from './DateFormatProvider';
 import { isReminderOverdue } from './utils/reminderDue';
 import { useSnackbar } from './context/SnackbarContext';
+import { useConfirm } from './components/ConfirmDialog';
 
 function DashboardPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { showError } = useSnackbar();
+  const { confirm, confirmDialog } = useConfirm();
   const { formatBirthday: formatBirthdayDate, formatDate } = useDateFormat();
   const [birthdays, setBirthdays] = useState<Birthday[]>([]);
   const [randomContacts, setRandomContacts] = useState<Contact[]>([]);
@@ -106,7 +108,7 @@ function DashboardPage() {
   };
 
   const handleSkipReminder = async (reminderId: number) => {
-    if (!window.confirm(t('reminders.skipConfirm'))) {
+    if (!(await confirm({ message: t('reminders.skipConfirm'), confirmLabel: t('reminders.skip') }))) {
       return;
     }
     try {
@@ -550,6 +552,7 @@ function DashboardPage() {
           )}
         </Box>
       </Box>
+      {confirmDialog}
     </Box>
   );
 }

@@ -27,6 +27,16 @@ export async function loginUser(page: Page, credentials = TEST_USER): Promise<vo
 }
 
 /**
+ * Accepts the app's in-page confirmation dialog (ConfirmDialog), identified by
+ * its message so it is not confused with a dialog it was opened from.
+ */
+export async function acceptConfirm(page: Page, message: string | RegExp, button: string | RegExp): Promise<void> {
+  const dialog = page.getByRole('dialog').filter({ hasText: message });
+  await dialog.getByRole('button', { name: button }).click();
+  await expect(dialog).toBeHidden();
+}
+
+/**
  * Waits for any MUI loading spinners to disappear.
  */
 export async function waitForLoading(page: Page): Promise<void> {

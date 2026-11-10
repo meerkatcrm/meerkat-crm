@@ -27,6 +27,7 @@ import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import CallMergeIcon from '@mui/icons-material/CallMerge';
 import { ContactListSkeleton } from './components/LoadingSkeletons';
+import { contactDisplayName } from './utils/contactName';
 
 export default function ContactsPage() {
   const { t } = useTranslation();
@@ -276,7 +277,7 @@ export default function ContactsPage() {
                 <Box sx={{ flex: 1 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                      {[contact.firstname, contact.nickname && `"${contact.nickname}"`, contact.lastname].filter(Boolean).join(' ')}
+                      {contactDisplayName(contact, { nickname: true })}
                     </Typography>
                     {contact.archived && (
                       <Chip

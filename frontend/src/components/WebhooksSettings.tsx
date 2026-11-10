@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import ConfirmDialog from './ConfirmDialog';
 import { useDateFormat } from '../DateFormatProvider';
 import { useSnackbar } from '../context/SnackbarContext';
 import { copyToClipboard } from '../utils/clipboard';
@@ -20,7 +21,6 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogContentText,
   DialogActions,
   Switch,
   FormControlLabel,
@@ -529,22 +529,17 @@ export default function WebhooksSettings() {
       </Dialog>
 
       {/* Delete confirmation dialog */}
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
-        <DialogTitle>{t('settings.webhooks.deleteDialog.title')}</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            {t('settings.webhooks.deleteDialog.message', { name: webhookToDelete?.name ?? '' })}
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)}>
-            {t('settings.webhooks.deleteDialog.cancel')}
-          </Button>
-          <Button onClick={handleDeleteConfirm} color="error" disabled={deleting} autoFocus>
-            {t('settings.webhooks.deleteDialog.confirm')}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        title={t('settings.webhooks.deleteDialog.title')}
+        message={t('settings.webhooks.deleteDialog.message', { name: webhookToDelete?.name ?? '' })}
+        cancelLabel={t('settings.webhooks.deleteDialog.cancel')}
+        confirmLabel={t('settings.webhooks.deleteDialog.confirm')}
+        destructive
+        busy={deleting}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteDialogOpen(false)}
+      />
     </>
   );
 }
