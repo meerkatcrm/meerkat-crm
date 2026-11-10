@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetContactNotes(t *testing.T) {
@@ -355,4 +356,28 @@ func TestDeleteNote(t *testing.T) {
 	var responseBody map[string]string
 	json.Unmarshal(w.Body.Bytes(), &responseBody)
 	assert.Equal(t, "Note deleted", responseBody["message"])
+}
+
+func TestUpdateNote_DetachesFromContact(t *testing.T) {
+	db, router := setupRouter()
+	var user models.User
+	db.First(&user)
+	contact := models.Contact{UserID: user.ID, Firstname: "Ada"}
+	require.NoError(t, db.Create(&contact).Error)
+	note := models.Note{UserID: user.ID, ContactID: &contact.ID, Content: "attached", Date: time.Now()}
+	require.NoError(t, db.Create(&note).Error)
+
+	router.PUT("/notes/:id", withValidated(func() any { return &models.NoteInput{} }), UpdateNote)
+
+	body, _ := json.Marshal(map[string]any{"content": "now unassigned", "date": time.Now().Format(time.RFC3339)})
+	req, _ := http.NewRequest("PUT", "/notes/"+strconv.Itoa(int(note.ID)), bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var stored models.Note
+	require.NoError(t, db.First(&stored, note.ID).Error)
+	assert.Equal(t, "now unassigned", stored.Content)
+	assert.Nil(t, stored.ContactID, "a note saved without contact_id must be detached")
 }
