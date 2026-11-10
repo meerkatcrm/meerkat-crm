@@ -38,10 +38,8 @@ func ErrorHandlerMiddleware() gin.HandlerFunc {
 					Msg("Panic recovered")
 
 				// Create internal error response
-				appErr := ErrInternal("An unexpected error occurred")
-				appErr.WithDetails("panic", fmt.Sprintf("%v", err))
-
-				RespondWithError(c, appErr)
+				// The panic value stays in the log: it can carry internals (SQL, paths).
+				RespondWithError(c, ErrInternal("An unexpected error occurred"))
 			}
 		}()
 
@@ -89,7 +87,12 @@ func RespondWithError(c *gin.Context, err *AppError) {
 func LogError(c *gin.Context, err *AppError) {
 	log := logger.FromContext(c)
 
-	event := log.Error().
+	// Client errors (validation, not found) are expected traffic, not server faults.
+	event := log.Warn()
+	if err.HTTPStatus >= 500 {
+		event = log.Error()
+	}
+	event = event.
 		Str("code", err.Code).
 		Int("status", err.HTTPStatus).
 		Str("error", err.Message)

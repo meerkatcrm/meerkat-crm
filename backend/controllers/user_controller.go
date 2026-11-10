@@ -10,7 +10,6 @@ import (
 
 	"meerkat/config"
 	apperrors "meerkat/errors"
-	"meerkat/i18n"
 	"meerkat/logger"
 	"meerkat/middleware"
 	"meerkat/models"
@@ -239,18 +238,11 @@ func RequestPasswordReset(context *gin.Context, cfg *config.Config) {
 
 	log := logger.FromContext(context)
 
-	validated, exists := context.Get("validated")
-	if !exists {
-		apperrors.AbortWithError(context, apperrors.ErrInvalidInput("", "validation data not found"))
+	input, appErr := middleware.GetValidated[models.PasswordResetRequestInput](context)
+	if appErr != nil {
+		apperrors.AbortWithError(context, appErr)
 		return
 	}
-
-	inputPtr, ok := validated.(*models.PasswordResetRequestInput)
-	if !ok || inputPtr == nil {
-		apperrors.AbortWithError(context, apperrors.ErrInvalidInput("", "invalid validation data type"))
-		return
-	}
-	input := *inputPtr
 
 	// Normalize email to lowercase for case-insensitive matching
 	email := strings.ToLower(input.Email)
@@ -330,18 +322,11 @@ func ConfirmPasswordReset(context *gin.Context) {
 
 	log := logger.FromContext(context)
 
-	validated, exists := context.Get("validated")
-	if !exists {
-		apperrors.AbortWithError(context, apperrors.ErrInvalidInput("", "validation data not found"))
+	input, appErr := middleware.GetValidated[models.PasswordResetConfirmInput](context)
+	if appErr != nil {
+		apperrors.AbortWithError(context, appErr)
 		return
 	}
-
-	inputPtr, ok := validated.(*models.PasswordResetConfirmInput)
-	if !ok || inputPtr == nil {
-		apperrors.AbortWithError(context, apperrors.ErrInvalidInput("", "invalid validation data type"))
-		return
-	}
-	input := *inputPtr
 
 	db := context.MustGet("db").(*gorm.DB)
 
@@ -397,119 +382,57 @@ func ConfirmPasswordReset(context *gin.Context) {
 	context.JSON(http.StatusOK, gin.H{"message": "Password reset successful"})
 }
 
-// ChangePassword lets authenticated users rotate their password.
-// UpdateLanguageInput represents the request body for updating user language
-type UpdateLanguageInput struct {
-	Language string `json:"language" validate:"required,oneof=en de it es fr zh"`
-}
-
-// UpdateDateFormatInput represents the request body for updating user date format
-type UpdateDateFormatInput struct {
-	DateFormat string `json:"date_format" validate:"required,oneof=eu us iso"`
+// updateOwnPreference writes one column of the caller's user row. The caller is
+// identified by id: the username in a session token goes stale when an admin
+// renames the account, and API tokens carry none. A single-column write also
+// never rewrites the password hash or reset token with a stale copy.
+func updateOwnPreference(c *gin.Context, column, value string) bool {
+	userID, ok := currentUserID(c)
+	if !ok {
+		return false
+	}
+	db := c.MustGet("db").(*gorm.DB)
+	result := db.Model(&models.User{}).Where("id = ?", userID).Update(column, value)
+	if result.Error != nil {
+		logger.FromContext(c).Error().Err(result.Error).Uint("user_id", userID).Str("column", column).Msg("Failed to update user preference")
+		apperrors.AbortWithError(c, apperrors.ErrDatabase("update user").WithError(result.Error))
+		return false
+	}
+	if result.RowsAffected == 0 {
+		apperrors.AbortWithError(c, apperrors.ErrUnauthorized("Authentication required"))
+		return false
+	}
+	return true
 }
 
 // UpdateLanguage updates the authenticated user's language preference
 func UpdateLanguage(context *gin.Context) {
-	log := logger.FromContext(context)
-
-	var input UpdateLanguageInput
-	if err := context.ShouldBindJSON(&input); err != nil {
-		apperrors.AbortWithError(context, apperrors.ErrInvalidInput("language", "Invalid language value"))
+	input, appErr := middleware.GetValidated[models.UpdateLanguageInput](context)
+	if appErr != nil {
+		apperrors.AbortWithError(context, appErr)
 		return
 	}
 
-	// Validate language is supported
-	if !i18n.IsValidLanguage(input.Language) {
-		apperrors.AbortWithError(context, apperrors.ErrInvalidInput("language", "Unsupported language. Supported: "+strings.Join(i18n.SupportedLanguages, ", ")))
+	if !updateOwnPreference(context, "language", input.Language) {
 		return
 	}
 
-	usernameValue, exists := context.Get("username")
-	if !exists {
-		apperrors.AbortWithError(context, apperrors.ErrUnauthorized("Authentication required"))
-		return
-	}
-
-	username, ok := usernameValue.(string)
-	if !ok || username == "" {
-		apperrors.AbortWithError(context, apperrors.ErrUnauthorized("Authentication required"))
-		return
-	}
-
-	db := context.MustGet("db").(*gorm.DB)
-
-	var user models.User
-	if err := db.Where("username = ?", username).First(&user).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			apperrors.AbortWithError(context, apperrors.ErrUnauthorized("Authentication required"))
-			return
-		}
-
-		log.Error().Err(err).Msg("Failed to lookup user for language update")
-		apperrors.AbortWithError(context, apperrors.ErrDatabase("query user").WithError(err))
-		return
-	}
-
-	user.Language = input.Language
-	if err := db.Save(&user).Error; err != nil {
-		log.Error().Err(err).Uint("user_id", user.ID).Msg("Failed to update user language")
-		apperrors.AbortWithError(context, apperrors.ErrDatabase("update user").WithError(err))
-		return
-	}
-
-	context.JSON(http.StatusOK, gin.H{"message": "Language updated successfully", "language": user.Language})
+	context.JSON(http.StatusOK, gin.H{"message": "Language updated successfully", "language": input.Language})
 }
 
 // UpdateDateFormat updates the authenticated user's date format preference
 func UpdateDateFormat(context *gin.Context) {
-	log := logger.FromContext(context)
-
-	var input UpdateDateFormatInput
-	if err := context.ShouldBindJSON(&input); err != nil {
-		apperrors.AbortWithError(context, apperrors.ErrInvalidInput("date_format", "Invalid date format value"))
+	input, appErr := middleware.GetValidated[models.UpdateDateFormatInput](context)
+	if appErr != nil {
+		apperrors.AbortWithError(context, appErr)
 		return
 	}
 
-	// Validate date format is supported
-	if input.DateFormat != "eu" && input.DateFormat != "us" && input.DateFormat != "iso" {
-		apperrors.AbortWithError(context, apperrors.ErrInvalidInput("date_format", "Unsupported date format. Supported: eu, us, iso"))
+	if !updateOwnPreference(context, "date_format", input.DateFormat) {
 		return
 	}
 
-	usernameValue, exists := context.Get("username")
-	if !exists {
-		apperrors.AbortWithError(context, apperrors.ErrUnauthorized("Authentication required"))
-		return
-	}
-
-	username, ok := usernameValue.(string)
-	if !ok || username == "" {
-		apperrors.AbortWithError(context, apperrors.ErrUnauthorized("Authentication required"))
-		return
-	}
-
-	db := context.MustGet("db").(*gorm.DB)
-
-	var user models.User
-	if err := db.Where("username = ?", username).First(&user).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			apperrors.AbortWithError(context, apperrors.ErrUnauthorized("Authentication required"))
-			return
-		}
-
-		log.Error().Err(err).Msg("Failed to lookup user for date format update")
-		apperrors.AbortWithError(context, apperrors.ErrDatabase("query user").WithError(err))
-		return
-	}
-
-	user.DateFormat = input.DateFormat
-	if err := db.Save(&user).Error; err != nil {
-		log.Error().Err(err).Uint("user_id", user.ID).Msg("Failed to update user date format")
-		apperrors.AbortWithError(context, apperrors.ErrDatabase("update user").WithError(err))
-		return
-	}
-
-	context.JSON(http.StatusOK, gin.H{"message": "Date format updated successfully", "date_format": user.DateFormat})
+	context.JSON(http.StatusOK, gin.H{"message": "Date format updated successfully", "date_format": input.DateFormat})
 }
 
 // UpdateCustomFieldNames updates the authenticated user's custom field definitions
@@ -759,6 +682,7 @@ func UpdateCardDAVCircleFilter(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"mode": user.CardDAVCircleMode, "circles": user.CardDAVCircles})
 }
 
+// ChangePassword lets authenticated users rotate their password.
 func ChangePassword(context *gin.Context) {
 	// Check if demo mode is enabled - password changes are disabled in demo
 	if os.Getenv("DEMO_MODE") == "true" {
@@ -768,35 +692,21 @@ func ChangePassword(context *gin.Context) {
 
 	log := logger.FromContext(context)
 
-	validated, exists := context.Get("validated")
-	if !exists {
-		apperrors.AbortWithError(context, apperrors.ErrInvalidInput("", "validation data not found"))
+	input, appErr := middleware.GetValidated[models.ChangePasswordInput](context)
+	if appErr != nil {
+		apperrors.AbortWithError(context, appErr)
 		return
 	}
 
-	inputPtr, ok := validated.(*models.ChangePasswordInput)
-	if !ok || inputPtr == nil {
-		apperrors.AbortWithError(context, apperrors.ErrInvalidInput("", "invalid validation data type"))
-		return
-	}
-	input := *inputPtr
-
-	usernameValue, exists := context.Get("username")
-	if !exists {
-		apperrors.AbortWithError(context, apperrors.ErrUnauthorized("Authentication required"))
-		return
-	}
-
-	username, ok := usernameValue.(string)
-	if !ok || username == "" {
-		apperrors.AbortWithError(context, apperrors.ErrUnauthorized("Authentication required"))
+	userID, ok := currentUserID(context)
+	if !ok {
 		return
 	}
 
 	db := context.MustGet("db").(*gorm.DB)
 
 	var user models.User
-	if err := db.Where("username = ?", username).First(&user).Error; err != nil {
+	if err := db.First(&user, userID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apperrors.AbortWithError(context, apperrors.ErrUnauthorized("Authentication required"))
 			return

@@ -165,7 +165,7 @@ export default function SettingsPage() {
             </InputLabel>
             <Select
               labelId="language-select-label"
-              value={i18n.language}
+              value={i18n.resolvedLanguage ?? i18n.language}
               label={t('settings.language.label')}
               onChange={handleLanguageChange}
             >

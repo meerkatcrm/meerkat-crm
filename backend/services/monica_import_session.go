@@ -115,10 +115,11 @@ func (m *MonicaImportManager) CleanupExpired() {
 	for id, s := range m.sessions {
 		s.mu.Lock()
 		expired := now.After(s.expiresAt)
+		cancel := s.cancel
 		s.mu.Unlock()
 		if expired {
-			if s.cancel != nil {
-				s.cancel()
+			if cancel != nil {
+				cancel()
 			}
 			delete(m.sessions, id)
 		}
@@ -160,8 +161,15 @@ func (m *MonicaImportManager) Delete(sessionID string) {
 	s, exists := m.sessions[sessionID]
 	delete(m.sessions, sessionID)
 	m.mu.Unlock()
-	if exists && s.cancel != nil {
-		s.cancel()
+	if !exists {
+		return
+	}
+	// StartFetch sets cancel under the session lock.
+	s.mu.Lock()
+	cancel := s.cancel
+	s.mu.Unlock()
+	if cancel != nil {
+		cancel()
 	}
 }
 

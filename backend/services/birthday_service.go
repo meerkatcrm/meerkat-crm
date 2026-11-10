@@ -163,8 +163,10 @@ func DaysUntilBirthday(birthday string, now time.Time) int {
 		return 999
 	}
 
-	birthdayThisYear := time.Date(now.Year(), m.Month(), d.Day(), 0, 0, 0, 0, now.Location())
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	// Calendar days are counted in UTC, where every day has 24 hours: across a
+	// daylight-saving change, local midnights are 23 or 25 hours apart.
+	birthdayThisYear := time.Date(now.Year(), m.Month(), d.Day(), 0, 0, 0, 0, time.UTC)
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 
 	if birthdayThisYear.Before(today) {
 		birthdayThisYear = birthdayThisYear.AddDate(1, 0, 0)

@@ -28,7 +28,7 @@ func ListApiTokens(c *gin.Context) {
 	if err := db.Where("user_id = ?", userID).
 		Order("created_at DESC").
 		Find(&tokens).Error; err != nil {
-		apperrors.AbortWithError(c, apperrors.ErrDatabase("query"))
+		apperrors.AbortWithError(c, apperrors.ErrDatabase("query").WithError(err))
 		return
 	}
 
@@ -75,7 +75,7 @@ func CreateApiToken(c *gin.Context) {
 		TokenHash: hash,
 	}
 	if err := db.Create(&token).Error; err != nil {
-		apperrors.AbortWithError(c, apperrors.ErrDatabase("insert"))
+		apperrors.AbortWithError(c, apperrors.ErrDatabase("insert").WithError(err))
 		return
 	}
 
@@ -113,7 +113,7 @@ func RevokeApiToken(c *gin.Context) {
 
 	now := time.Now()
 	if err := db.Model(&token).Update("revoked_at", now).Error; err != nil {
-		apperrors.AbortWithError(c, apperrors.ErrDatabase("update"))
+		apperrors.AbortWithError(c, apperrors.ErrDatabase("update").WithError(err))
 		return
 	}
 

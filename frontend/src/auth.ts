@@ -56,8 +56,8 @@ export async function fetchAndCacheUserInfo(): Promise<UserInfo | null> {
     }
     const data = await response.json();
     const userInfo: UserInfo = {
-      user_id: data.ID,
-      username: data.Username,
+      user_id: data.id,
+      username: data.username,
       is_admin: data.is_admin || false,
     };
     localStorage.setItem(USER_INFO_KEY, JSON.stringify(userInfo));

@@ -152,6 +152,16 @@ type ContactInput struct {
 	DeceasedDate string `json:"deceased_date" validate:"omitempty,deceased_date"`
 }
 
+// UpdateLanguageInput represents the request body for updating user language
+type UpdateLanguageInput struct {
+	Language string `json:"language" validate:"required,oneof=en de it es fr zh"`
+}
+
+// UpdateDateFormatInput represents the request body for updating user date format
+type UpdateDateFormatInput struct {
+	DateFormat string `json:"date_format" validate:"required,oneof=eu us iso"`
+}
+
 // CustomFieldNamesInput represents the DTO for updating user's custom field definitions
 type CustomFieldNamesInput struct {
 	Names []string `json:"names" validate:"dive,max=100"`

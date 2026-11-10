@@ -52,16 +52,7 @@ func GetCurrentUser(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, models.CurrentUserResponse{
-		AdminUserResponse: models.AdminUserResponse{
-			ID:         user.ID,
-			Username:   user.Username,
-			Email:      user.Email,
-			Language:   user.Language,
-			DateFormat: user.DateFormat,
-			IsAdmin:    user.IsAdmin,
-			CreatedAt:  user.CreatedAt,
-			UpdatedAt:  user.UpdatedAt,
-		},
+		AdminUserResponse:      toAdminUserResponse(user),
 		CustomFieldNames:       user.CustomFieldNames,
 		EnabledContactFields:   user.EnabledContactFields,
 		HideEmptyContactFields: user.HideEmptyContactFields,
@@ -90,16 +81,7 @@ func ListUsers(c *gin.Context) {
 
 	userResponses := make([]models.AdminUserResponse, len(users))
 	for i, user := range users {
-		userResponses[i] = models.AdminUserResponse{
-			ID:         user.ID,
-			Username:   user.Username,
-			Email:      user.Email,
-			Language:   user.Language,
-			DateFormat: user.DateFormat,
-			IsAdmin:    user.IsAdmin,
-			CreatedAt:  user.CreatedAt,
-			UpdatedAt:  user.UpdatedAt,
-		}
+		userResponses[i] = toAdminUserResponse(user)
 	}
 
 	totalPages := int(total) / pagination.Limit
@@ -139,16 +121,7 @@ func GetUser(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, models.AdminUserResponse{
-		ID:         user.ID,
-		Username:   user.Username,
-		Email:      user.Email,
-		Language:   user.Language,
-		DateFormat: user.DateFormat,
-		IsAdmin:    user.IsAdmin,
-		CreatedAt:  user.CreatedAt,
-		UpdatedAt:  user.UpdatedAt,
-	})
+	c.JSON(http.StatusOK, toAdminUserResponse(user))
 }
 
 // updates a user's information (admin only)
@@ -241,16 +214,7 @@ func UpdateUser(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, models.AdminUserResponse{
-		ID:         user.ID,
-		Username:   user.Username,
-		Email:      user.Email,
-		Language:   user.Language,
-		DateFormat: user.DateFormat,
-		IsAdmin:    user.IsAdmin,
-		CreatedAt:  user.CreatedAt,
-		UpdatedAt:  user.UpdatedAt,
-	})
+	c.JSON(http.StatusOK, toAdminUserResponse(user))
 }
 
 // DeleteUser deletes a user and all their data (admin only)
@@ -385,4 +349,17 @@ func DeleteUser(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "User deleted successfully"})
+}
+
+func toAdminUserResponse(user models.User) models.AdminUserResponse {
+	return models.AdminUserResponse{
+		ID:         user.ID,
+		Username:   user.Username,
+		Email:      user.Email,
+		Language:   user.Language,
+		DateFormat: user.DateFormat,
+		IsAdmin:    user.IsAdmin,
+		CreatedAt:  user.CreatedAt,
+		UpdatedAt:  user.UpdatedAt,
+	}
 }

@@ -64,8 +64,8 @@ func main() {
 
 	logger.Info().Msg("Running scheduler...")
 	// Schedule the reminder task daily
-	if !cfg.UseResend {
-		logger.Warn().Msg("No Mails to be sent since Resend configuration is not set")
+	if !cfg.EmailEnabled() {
+		logger.Warn().Msg("No emails will be sent: neither Resend nor SMTP is configured")
 	}
 	s := gocron.NewScheduler(cfg.GetReminderLocation())
 	task := func() {

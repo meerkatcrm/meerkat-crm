@@ -18,6 +18,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -384,7 +385,7 @@ func TestChangePassword_Succeeds(t *testing.T) {
 	db.Create(&user)
 
 	router.POST("/change-password", func(c *gin.Context) {
-		c.Set("username", "changeme")
+		c.Set("userID", user.ID)
 		c.Set("validated", &models.ChangePasswordInput{
 			CurrentPassword: strongPassword,
 			NewPassword:     strongPasswordAnother,
@@ -413,8 +414,8 @@ func TestUpdateLanguage_Chinese(t *testing.T) {
 	user := models.User{Username: "polyglot", Email: "polyglot@example.com", Password: "x"}
 	db.Create(&user)
 
-	router.PATCH("/users/language", func(c *gin.Context) {
-		c.Set("username", "polyglot")
+	router.PATCH("/users/language", middleware.ValidateJSONMiddleware(&models.UpdateLanguageInput{}), func(c *gin.Context) {
+		c.Set("userID", user.ID)
 		UpdateLanguage(c)
 	})
 
@@ -663,4 +664,35 @@ func TestDeleteUser_RemovesAPITokens(t *testing.T) {
 	// Stored credentials must not survive even as soft-deleted rows
 	db.Unscoped().Model(&models.CalendarSubscription{}).Where("user_id = ?", target.ID).Count(&remaining)
 	assert.Zero(t, remaining)
+}
+
+func TestUpdateLanguageAndDateFormat_RejectUnsupportedValues(t *testing.T) {
+	db, router := setupRouter()
+	user := models.User{Username: "picky", Email: "picky@example.com", Password: "x", Language: "en", DateFormat: "eu"}
+	require.NoError(t, db.Create(&user).Error)
+	asUser := func(c *gin.Context) { c.Set("userID", user.ID) }
+	router.PATCH("/users/language", asUser, middleware.ValidateJSONMiddleware(&models.UpdateLanguageInput{}), UpdateLanguage)
+	router.PATCH("/users/date-format", asUser, middleware.ValidateJSONMiddleware(&models.UpdateDateFormatInput{}), UpdateDateFormat)
+
+	for path, body := range map[string]string{
+		"/users/language":    `{"language":"xx"}`,
+		"/users/date-format": `{"date_format":"yy"}`,
+	} {
+		req, _ := http.NewRequest("PATCH", path, bytes.NewBufferString(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusBadRequest, w.Code, path)
+	}
+
+	req, _ := http.NewRequest("PATCH", "/users/date-format", bytes.NewBufferString(`{"date_format":"iso"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var updated models.User
+	require.NoError(t, db.First(&updated, user.ID).Error)
+	assert.Equal(t, "en", updated.Language)
+	assert.Equal(t, "iso", updated.DateFormat)
 }

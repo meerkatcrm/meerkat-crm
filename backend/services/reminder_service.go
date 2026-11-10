@@ -273,10 +273,10 @@ func SendReminders(db *gorm.DB, config config.Config) error {
 			} else {
 				// Mark reminders as email_sent so they won't be re-emailed
 				for _, reminder := range userReminders {
-					reminder.EmailSent = true
-					reminder.LastSent = new(time.Time)
-					*reminder.LastSent = time.Now()
-					if err := db.Save(&reminder).Error; err != nil {
+					// Only these two columns: the row was loaded before the emails went
+					// out, and saving all of it would undo an edit made in the meantime.
+					if err := db.Model(&models.Reminder{}).Where("id = ?", reminder.ID).
+						Updates(map[string]any{"email_sent": true, "last_sent": time.Now()}).Error; err != nil {
 						logger.Error().Err(err).Uint("reminder_id", reminder.ID).Msg("Failed to update reminder after sending email")
 					} else {
 						logger.Info().Uint("reminder_id", reminder.ID).Msg("Marked reminder as email_sent")

@@ -10,6 +10,7 @@ import {
 import AppDialog from './AppDialog';
 import { useTranslation } from 'react-i18next';
 import { useDateFormat } from '../DateFormatProvider';
+import { todayISO } from '../utils/today';
 
 interface AddNoteDialogProps {
   open: boolean;
@@ -21,7 +22,7 @@ export default function AddNoteDialog({ open, onClose, onSave }: AddNoteDialogPr
   const { t } = useTranslation();
   const { formatDate, parseDateInput, autoFormatDateInput, getDatePlaceholder } = useDateFormat();
   const [content, setContent] = useState('');
-  const [date, setDate] = useState(formatDate(new Date().toISOString().split('T')[0]));
+  const [date, setDate] = useState(formatDate(todayISO()));
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -39,7 +40,7 @@ export default function AddNoteDialog({ open, onClose, onSave }: AddNoteDialogPr
 
     setSaving(true);
     try {
-      await onSave(content, parsedDate || new Date().toISOString().split('T')[0]);
+      await onSave(content, parsedDate || todayISO());
       handleClose();
     } catch {
       setError(t('noteDialog.saveError'));
@@ -50,7 +51,7 @@ export default function AddNoteDialog({ open, onClose, onSave }: AddNoteDialogPr
 
   const handleClose = () => {
     setContent('');
-    setDate(formatDate(new Date().toISOString().split('T')[0]));
+    setDate(formatDate(todayISO()));
     setError('');
     onClose();
   };

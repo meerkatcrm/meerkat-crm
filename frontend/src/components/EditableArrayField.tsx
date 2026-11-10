@@ -50,6 +50,8 @@ export default function EditableArrayField<T>({
       await onSave(draft);
       setEditing(false);
       onEditingChange?.(false);
+    } catch {
+      // The parent has already reported the failure; stay in edit mode.
     } finally {
       setSaving(false);
     }

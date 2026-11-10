@@ -33,6 +33,47 @@ var contactSelectableFields = []string{
 	"job_title", "role", "anniversary", "is_deceased", "deceased_date",
 }
 
+// contactIncludes maps a value of ?includes= to the association it preloads and
+// the table whose user_id scopes it.
+var contactIncludes = map[string]struct{ association, table string }{
+	"notes":              {"Notes", "notes"},
+	"activities":         {"Activities", "activities"},
+	"relationships":      {"Relationships", "relationships"},
+	"reminders":          {"Reminders", "reminders"},
+	"employment_history": {"EmploymentHistories", "employment_histories"},
+}
+
+// applyContactInput copies every client-writable field except the four employment
+// scalars (Organization, Department, JobTitle, Role), which create and update
+// treat differently. A new contact field is added here once, for both.
+func applyContactInput(contact *models.Contact, in *models.ContactInput) {
+	contact.Firstname = in.Firstname
+	contact.Lastname = in.Lastname
+	contact.Nickname = in.Nickname
+	contact.Gender = in.Gender
+	contact.Email = in.Email
+	contact.Phone = in.Phone
+	contact.Birthday = in.Birthday
+	contact.Address = in.Address
+	contact.HowWeMet = in.HowWeMet
+	contact.FoodPreference = in.FoodPreference
+	contact.WorkInformation = in.WorkInformation
+	contact.ContactInformation = in.ContactInformation
+	contact.Circles = in.Circles
+	contact.CustomFields = in.CustomFields
+	contact.Emails = in.Emails
+	contact.Phones = in.Phones
+	contact.Addresses = in.Addresses
+	contact.URLs = in.URLs
+	contact.IMPPs = in.IMPPs
+	contact.Prefix = in.Prefix
+	contact.MiddleName = in.MiddleName
+	contact.Suffix = in.Suffix
+	contact.Anniversary = in.Anniversary
+	contact.IsDeceased = in.IsDeceased
+	contact.DeceasedDate = in.DeceasedDate
+}
+
 func CreateContact(c *gin.Context) {
 	// Save to the database
 	db := c.MustGet("db").(*gorm.DB)
@@ -51,37 +92,13 @@ func CreateContact(c *gin.Context) {
 
 	// Create contact from validated input
 	contact := models.Contact{
-		UserID:             userID,
-		Firstname:          contactInput.Firstname,
-		Lastname:           contactInput.Lastname,
-		Nickname:           contactInput.Nickname,
-		Gender:             contactInput.Gender,
-		Email:              contactInput.Email,
-		Phone:              contactInput.Phone,
-		Birthday:           contactInput.Birthday,
-		Address:            contactInput.Address,
-		HowWeMet:           contactInput.HowWeMet,
-		FoodPreference:     contactInput.FoodPreference,
-		WorkInformation:    contactInput.WorkInformation,
-		ContactInformation: contactInput.ContactInformation,
-		Circles:            contactInput.Circles,
-		CustomFields:       contactInput.CustomFields,
-		Emails:             contactInput.Emails,
-		Phones:             contactInput.Phones,
-		Addresses:          contactInput.Addresses,
-		URLs:               contactInput.URLs,
-		IMPPs:              contactInput.IMPPs,
-		Prefix:             contactInput.Prefix,
-		MiddleName:         contactInput.MiddleName,
-		Suffix:             contactInput.Suffix,
-		Organization:       contactInput.Organization,
-		Department:         contactInput.Department,
-		JobTitle:           contactInput.JobTitle,
-		Role:               contactInput.Role,
-		Anniversary:        contactInput.Anniversary,
-		IsDeceased:         contactInput.IsDeceased,
-		DeceasedDate:       contactInput.DeceasedDate,
+		UserID:       userID,
+		Organization: contactInput.Organization,
+		Department:   contactInput.Department,
+		JobTitle:     contactInput.JobTitle,
+		Role:         contactInput.Role,
 	}
+	applyContactInput(&contact, contactInput)
 	if err := db.Create(&contact).Error; err != nil {
 		logger.FromContext(c).Error().Err(err).Msg("Error saving contact to database")
 		apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to save contact").WithError(err))
@@ -131,21 +148,6 @@ func GetContacts(c *gin.Context) {
 		selectedFields = slices.Clone(contactSelectableFields) // Use all allowed fields if none are specified
 	}
 
-	// Parse relationships to include with validation
-	var relationshipMap = map[string]bool{
-		"notes":              false,
-		"activities":         false,
-		"relationships":      false,
-		"reminders":          false,
-		"employment_history": false,
-	}
-	includes := c.Query("includes")
-	for _, rel := range strings.Split(includes, ",") {
-		if _, exists := relationshipMap[rel]; exists {
-			relationshipMap[rel] = true
-		}
-	}
-
 	// Parse and validate sort parameters
 	sortField := c.DefaultQuery("sort", "id")
 	sortOrder := c.DefaultQuery("order", "desc")
@@ -162,21 +164,30 @@ func GetContacts(c *gin.Context) {
 	includeArchived := c.Query("include_archived") == "true"
 	archivedOnly := c.Query("archived") == "true"
 
-	var contacts []models.Contact
-	query := db.Model(&models.Contact{}).Where("user_id = ?", userID).Limit(pagination.Limit).Offset(pagination.Offset)
+	searchTerm := c.Query("search")
+	circle := c.Query("circle")
 
-	// Apply archive filtering
-	if !includeArchived {
-		if archivedOnly {
-			query = query.Where("archived = ?", true)
-		} else {
-			query = query.Where("archived = ?", false)
+	// The page query and the count query must apply exactly the same filters.
+	filtered := func() *gorm.DB {
+		query := db.Model(&models.Contact{}).Where("user_id = ?", userID)
+		if !includeArchived {
+			query = query.Where("archived = ?", archivedOnly)
 		}
+		if searchTerm != "" {
+			query = applyContactSearch(query, userID, searchTerm)
+		}
+		if circle != "" {
+			query = query.Where("EXISTS (SELECT 1 FROM json_each(contacts.circles) WHERE json_each.value = ?)", circle)
+		}
+		return query
 	}
+
+	var contacts []models.Contact
+	query := filtered().Limit(pagination.Limit).Offset(pagination.Offset)
 
 	// Apply ordering - random uses RANDOM() function, others use column name
 	// For search with include_archived, order non-archived first
-	if includeArchived && c.Query("search") != "" {
+	if includeArchived && searchTerm != "" {
 		query = query.Order("archived ASC")
 	}
 	if sortField == "random" {
@@ -189,30 +200,10 @@ func GetContacts(c *gin.Context) {
 		query = query.Select(selectedFields)
 	}
 
-	// Apply search filter using parameterization
-	if searchTerm := c.Query("search"); searchTerm != "" {
-		query = applyContactSearch(query, userID, searchTerm)
-	}
-
-	if circle := c.Query("circle"); circle != "" {
-		query = query.Where("EXISTS (SELECT 1 FROM json_each(contacts.circles) WHERE json_each.value = ?)", circle)
-	}
-
 	// Preload requested relationships
-	for rel, include := range relationshipMap {
-		if include {
-			switch rel {
-			case "notes":
-				query = query.Preload("Notes", "notes.user_id = ?", userID)
-			case "activities":
-				query = query.Preload("Activities", "activities.user_id = ?", userID)
-			case "relationships":
-				query = query.Preload("Relationships", "relationships.user_id = ?", userID)
-			case "reminders":
-				query = query.Preload("Reminders", "reminders.user_id = ?", userID)
-			case "employment_history":
-				query = query.Preload("EmploymentHistories", "employment_histories.user_id = ?", userID)
-			}
+	for _, rel := range strings.Split(c.Query("includes"), ",") {
+		if preload, ok := contactIncludes[rel]; ok {
+			query = query.Preload(preload.association, preload.table+".user_id = ?", userID)
 		}
 	}
 
@@ -223,27 +214,10 @@ func GetContacts(c *gin.Context) {
 	}
 
 	var total int64
-	countQuery := db.Model(&models.Contact{}).Where("user_id = ?", userID)
-
-	// Apply the same archive filter to the count query
-	if !includeArchived {
-		if archivedOnly {
-			countQuery = countQuery.Where("archived = ?", true)
-		} else {
-			countQuery = countQuery.Where("archived = ?", false)
-		}
+	if err := filtered().Count(&total).Error; err != nil {
+		apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to count contacts").WithError(err))
+		return
 	}
-
-	// Apply the same search filters to the count query
-	if searchTerm := c.Query("search"); searchTerm != "" {
-		countQuery = applyContactSearch(countQuery, userID, searchTerm)
-	}
-
-	if circle := c.Query("circle"); circle != "" {
-		countQuery = countQuery.Where("EXISTS (SELECT 1 FROM json_each(contacts.circles) WHERE json_each.value = ?)", circle)
-	}
-
-	countQuery.Count(&total)
 
 	// Map contacts to ContactResponse with photo thumbnails
 	contactResponses := make([]models.ContactResponse, len(contacts))
@@ -352,15 +326,12 @@ func GetContact(c *gin.Context) {
 		query = query.Select(selectedFields)
 	} else {
 		// Full fetch: preload all associations
-		query = query.
-			Preload("Notes", "notes.user_id = ?", userID).
-			Preload("Activities", "activities.user_id = ?", userID).
-			Preload("Relationships", "relationships.user_id = ?", userID).
-			Preload("Reminders", "reminders.user_id = ?", userID).
-			Preload("EmploymentHistories", "employment_histories.user_id = ?", userID)
+		for _, preload := range contactIncludes {
+			query = query.Preload(preload.association, preload.table+".user_id = ?", userID)
+		}
 	}
 
-	if err := query.First(&contact, id).Error; err != nil {
+	if err := query.First(&contact, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apperrors.AbortWithError(c, apperrors.ErrNotFound("Contact").WithDetails("id", id))
 		} else {
@@ -381,7 +352,7 @@ func UpdateContact(c *gin.Context) {
 	}
 
 	var contact models.Contact
-	if err := db.Where("user_id = ?", userID).First(&contact, id).Error; err != nil {
+	if err := db.Where("user_id = ?", userID).First(&contact, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apperrors.AbortWithError(c, apperrors.ErrNotFound("Contact").WithDetails("id", id))
 		} else {
@@ -397,29 +368,7 @@ func UpdateContact(c *gin.Context) {
 		return
 	}
 
-	// Updateable fields
-	contact.Firstname = contactInput.Firstname
-	contact.Lastname = contactInput.Lastname
-	contact.Nickname = contactInput.Nickname
-	contact.Gender = contactInput.Gender
-	contact.Email = contactInput.Email
-	contact.Phone = contactInput.Phone
-	contact.Birthday = contactInput.Birthday
-	contact.Address = contactInput.Address
-	contact.HowWeMet = contactInput.HowWeMet
-	contact.FoodPreference = contactInput.FoodPreference
-	contact.WorkInformation = contactInput.WorkInformation
-	contact.ContactInformation = contactInput.ContactInformation
-	contact.Circles = contactInput.Circles
-	contact.CustomFields = contactInput.CustomFields
-	contact.Emails = contactInput.Emails
-	contact.Phones = contactInput.Phones
-	contact.Addresses = contactInput.Addresses
-	contact.URLs = contactInput.URLs
-	contact.IMPPs = contactInput.IMPPs
-	contact.Prefix = contactInput.Prefix
-	contact.MiddleName = contactInput.MiddleName
-	contact.Suffix = contactInput.Suffix
+	applyContactInput(&contact, contactInput)
 	// Organization, Department, JobTitle and Role mirror the current employment
 	// history entry. Saving the contact applies a change to that entry, or creates
 	// one if there is none (Contact.syncCurrentEmploymentHistory). The input can't
@@ -446,9 +395,6 @@ func UpdateContact(c *gin.Context) {
 	}
 	// Also covers a partial PUT whose merged values equal the ended job.
 	contact.RevertStaleEmployment = true
-	contact.Anniversary = contactInput.Anniversary
-	contact.IsDeceased = contactInput.IsDeceased
-	contact.DeceasedDate = contactInput.DeceasedDate
 
 	if err := db.Save(&contact).Error; err != nil {
 		apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to update contact").WithError(err))
@@ -470,7 +416,7 @@ func DeleteContact(c *gin.Context) {
 
 	// Check if contact exists first
 	var contact models.Contact
-	if err := db.Where("user_id = ?", userID).First(&contact, id).Error; err != nil {
+	if err := db.Where("user_id = ?", userID).First(&contact, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apperrors.AbortWithError(c, apperrors.ErrNotFound("Contact").WithDetails("id", id))
 		} else {
@@ -493,6 +439,14 @@ func DeleteContact(c *gin.Context) {
 
 		// Manually delete associated relationships
 		if err := tx.Where("contact_id = ? AND user_id = ?", id, userID).Delete(&models.Relationship{}).Error; err != nil {
+			return err
+		}
+
+		// Relationships of other contacts that point at this one keep their own
+		// name and type, but must not link to a contact that no longer exists.
+		if err := tx.Model(&models.Relationship{}).
+			Where("related_contact_id = ? AND user_id = ?", contact.ID, userID).
+			Update("related_contact_id", nil).Error; err != nil {
 			return err
 		}
 
@@ -592,7 +546,7 @@ func ArchiveContact(c *gin.Context) {
 	}
 
 	var contact models.Contact
-	if err := db.Where("user_id = ?", userID).First(&contact, id).Error; err != nil {
+	if err := db.Where("user_id = ?", userID).First(&contact, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apperrors.AbortWithError(c, apperrors.ErrNotFound("Contact").WithDetails("id", id))
 		} else {
@@ -636,7 +590,7 @@ func UnarchiveContact(c *gin.Context) {
 	}
 
 	var contact models.Contact
-	if err := db.Where("user_id = ?", userID).First(&contact, id).Error; err != nil {
+	if err := db.Where("user_id = ?", userID).First(&contact, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apperrors.AbortWithError(c, apperrors.ErrNotFound("Contact").WithDetails("id", id))
 		} else {

@@ -44,7 +44,7 @@ func GetProfilePicture(c *gin.Context, cfg *config.Config) {
 	}
 
 	// Find the contact in the database
-	if err := db.Where("user_id = ?", userID).First(&contact, contactID).Error; err != nil {
+	if err := db.Where("user_id = ?", userID).First(&contact, "id = ?", contactID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			apperrors.AbortWithError(c, apperrors.ErrNotFound("Contact"))
 			return
@@ -132,7 +132,7 @@ func AddPhotoToContact(c *gin.Context, cfg *config.Config) {
 	}
 
 	// Find the contact in the database
-	if err := db.Where("user_id = ?", userID).First(&contact, contactID).Error; err != nil {
+	if err := db.Where("user_id = ?", userID).First(&contact, "id = ?", contactID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			apperrors.AbortWithError(c, apperrors.ErrNotFound("Contact"))
 			return

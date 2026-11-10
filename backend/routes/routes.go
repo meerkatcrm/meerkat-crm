@@ -19,6 +19,7 @@ func RegisterRoutes(router *gin.Engine, cfg *config.Config, db *gorm.DB, oidcPro
 
 	// API v1 routes
 	v1 := router.Group("/api/v1")
+	v1.Use(middleware.NumericIDParamsMiddleware())
 	{
 		// OIDC routes (config always public; login/callback only when OIDC is enabled)
 		v1.GET("/auth/oidc/config", controllers.OIDCConfigHandler(cfg))
@@ -47,8 +48,8 @@ func RegisterRoutes(router *gin.Engine, cfg *config.Config, db *gorm.DB, oidcPro
 		protected.Use(middleware.AuthMiddleware(cfg))
 		{
 			protected.POST("/users/change-password", middleware.ValidateJSONMiddleware(&models.ChangePasswordInput{}), controllers.ChangePassword)
-			protected.PATCH("/users/language", controllers.UpdateLanguage)
-			protected.PATCH("/users/date-format", controllers.UpdateDateFormat)
+			protected.PATCH("/users/language", middleware.ValidateJSONMiddleware(&models.UpdateLanguageInput{}), controllers.UpdateLanguage)
+			protected.PATCH("/users/date-format", middleware.ValidateJSONMiddleware(&models.UpdateDateFormatInput{}), controllers.UpdateDateFormat)
 			protected.GET("/users/custom-fields", controllers.GetCustomFieldNames)
 			protected.PATCH("/users/custom-fields", middleware.ValidateJSONMiddleware(&models.CustomFieldNamesInput{}), controllers.UpdateCustomFieldNames)
 			protected.GET("/users/enabled-contact-fields", controllers.GetEnabledContactFields)

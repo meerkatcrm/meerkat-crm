@@ -13,7 +13,7 @@ import {
 const fetchMock = vi.fn();
 const ok = (body: object) => ({ ok: true, status: 200, json: async () => body });
 const denied = { ok: false, status: 401, json: async () => ({}) };
-const me = { ID: 7, Username: 'anna', is_admin: true };
+const me = { id: 7, username: 'anna', is_admin: true };
 const cached = { user_id: 7, username: 'anna', is_admin: true };
 
 const cache = (value: object | string) =>
@@ -66,7 +66,7 @@ describe('fetchAndCacheUserInfo', () => {
   });
 
   test('a user without is_admin is cached as a non-admin', async () => {
-    fetchMock.mockResolvedValueOnce(ok({ ID: 7, Username: 'anna' }));
+    fetchMock.mockResolvedValueOnce(ok({ id: 7, username: 'anna' }));
     await expect(fetchAndCacheUserInfo()).resolves.toMatchObject({ is_admin: false });
   });
 

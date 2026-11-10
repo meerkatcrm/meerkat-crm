@@ -125,6 +125,7 @@ export default function EditTimelineItemDialog({
             <Autocomplete
               multiple
               options={allContacts}
+              isOptionEqualToValue={(option, value) => option.ID === value.ID}
               getOptionLabel={(contact) => `${contact.firstname}${contact.nickname ? ` "${contact.nickname}"` : ''} ${contact.lastname}`}
               value={values.activityContacts || []}
               onChange={(_, newValue) => onChange({ ...values, activityContacts: newValue })}
