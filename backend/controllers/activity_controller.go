@@ -53,19 +53,19 @@ func CreateActivity(c *gin.Context) {
 		Description: activityInput.Description,
 		Location:    activityInput.Location,
 	}
-	if err := db.Create(&activity).Error; err != nil {
-		logger.FromContext(c).Error().Err(err).Msg("Error saving activity to database")
-		apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to save activity").WithError(err))
-		return
-	}
-
-	// Update the activity's contacts association
-	if len(contacts) > 0 {
-		if err := db.Model(&activity).Association("Contacts").Append(contacts); err != nil {
-			logger.FromContext(c).Error().Err(err).Msg("Error creating relationship between activity and contacts")
-			apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to associate contacts with activity").WithError(err))
-			return
+	// The activity and its participants are saved together or not at all.
+	if txErr := db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&activity).Error; err != nil {
+			return err
 		}
+		if len(contacts) == 0 {
+			return nil
+		}
+		return tx.Model(&activity).Association("Contacts").Append(contacts)
+	}); txErr != nil {
+		logger.FromContext(c).Error().Err(txErr).Msg("Error saving activity to database")
+		apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to save activity").WithError(txErr))
+		return
 	}
 
 	go services.TriggerWebhooks(db, currentConfig(c), userID, "activity.created", activity)

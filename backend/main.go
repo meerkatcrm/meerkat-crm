@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"meerkat/config"
+	"meerkat/controllers"
 	"meerkat/database"
 	apperrors "meerkat/errors"
 	"meerkat/i18n"
@@ -79,6 +80,7 @@ func main() {
 	schedule(s.Every(5).Minutes().Do(func() {
 		services.ProcessWebhookRetries(db, *cfg)
 	}))
+	schedule(s.Every(10).Minutes().Do(controllers.CleanupImportSessions))
 	// Sync calendar subscriptions regularly (rate-limited via job lock).
 	// Interval jobs also run once when the scheduler starts, so unlike the daily
 	// reminder task above they need no separate startup call.

@@ -237,3 +237,11 @@ func ConfirmVCFImport(c *gin.Context, cfg *config.Config) {
 
 	c.JSON(http.StatusOK, result)
 }
+
+// CleanupImportSessions drops expired CSV, VCF and Monica import sessions. They
+// live in memory and hold uploaded data (and, for Monica, an API token), so the
+// scheduler calls this regularly instead of waiting for the next import to start.
+func CleanupImportSessions() {
+	importSessions.CleanupExpired()
+	monicaImportSessions.CleanupExpired()
+}
