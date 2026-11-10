@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"meerkat/config"
+	apperrors "meerkat/errors"
 	"meerkat/logger"
 	"meerkat/models"
 	"net/http"
@@ -29,15 +30,13 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 			// Fall back to Authorization header (for API clients like CardDAV)
 			authHeader := c.GetHeader("Authorization")
 			if authHeader == "" {
-				c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization token required"})
-				c.Abort()
+				apperrors.AbortWithError(c, apperrors.ErrUnauthorized("Authorization token required"))
 				return
 			}
 
 			// Check if Authorization header is formatted properly
 			if !strings.HasPrefix(authHeader, "Bearer ") {
-				c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header must start with Bearer"})
-				c.Abort()
+				apperrors.AbortWithError(c, apperrors.ErrUnauthorized("Authorization header must start with Bearer"))
 				return
 			}
 
@@ -50,8 +49,7 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 			hash := fmt.Sprintf("%x", sha256.Sum256([]byte(tokenString)))
 			var apiToken models.ApiToken
 			if err := db.Where("token_hash = ? AND revoked_at IS NULL", hash).First(&apiToken).Error; err != nil {
-				c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
-				c.Abort()
+				apperrors.AbortWithError(c, apperrors.ErrTokenInvalid())
 				return
 			}
 			// Tokens of users deleted before tokens were removed with the account still exist
@@ -78,28 +76,23 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 
 		if err != nil {
 			if errors.Is(err, jwt.ErrTokenExpired) {
-				c.JSON(http.StatusUnauthorized, gin.H{"error": "Token expired"})
-				c.Abort()
+				apperrors.AbortWithError(c, apperrors.ErrTokenExpired())
 				return
 			}
 			if errors.Is(err, jwt.ErrTokenMalformed) {
-				c.JSON(http.StatusUnauthorized, gin.H{"error": "Malformed token"})
-				c.Abort()
+				apperrors.AbortWithError(c, apperrors.ErrTokenInvalid())
 				return
 			}
 			if errors.Is(err, jwt.ErrSignatureInvalid) {
-				c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token signature"})
-				c.Abort()
+				apperrors.AbortWithError(c, apperrors.ErrTokenInvalid())
 				return
 			}
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
-			c.Abort()
+			apperrors.AbortWithError(c, apperrors.ErrTokenInvalid())
 			return
 		}
 
 		if !token.Valid {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
-			c.Abort()
+			apperrors.AbortWithError(c, apperrors.ErrTokenInvalid())
 			return
 		}
 
@@ -117,13 +110,11 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 				case uint:
 					c.Set("userID", v)
 				default:
-					c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
-					c.Abort()
+					apperrors.AbortWithError(c, apperrors.ErrTokenInvalid())
 					return
 				}
 			} else {
-				c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
-				c.Abort()
+				apperrors.AbortWithError(c, apperrors.ErrTokenInvalid())
 				return
 			}
 		}
@@ -150,12 +141,11 @@ func requireExistingUser(c *gin.Context, db *gorm.DB, userID uint) bool {
 		return true
 	}
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+		apperrors.AbortWithError(c, apperrors.ErrTokenInvalid())
 	} else {
 		logger.Logger.Error().Err(err).Uint("user_id", userID).Msg("Failed to load user for authentication")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not verify user"})
+		apperrors.AbortWithError(c, apperrors.ErrInternal("Could not verify user"))
 	}
-	c.Abort()
 	return false
 }
 

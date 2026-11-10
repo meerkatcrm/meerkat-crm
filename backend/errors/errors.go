@@ -231,14 +231,6 @@ func ErrExternal(service, message string) *AppError {
 
 // --- Business Logic Errors ---
 
-// ErrBusinessLogic returns a business logic error
-func ErrBusinessLogic(message string) *AppError {
-	if message == "" {
-		message = "Business logic constraint violated"
-	}
-	return NewError(ErrCodeBusinessLogic, message, http.StatusUnprocessableEntity)
-}
-
 // ErrOperationFailed returns an operation failed error
 func ErrOperationFailed(operation, reason string) *AppError {
 	message := "Operation failed"
@@ -253,12 +245,6 @@ func ErrOperationFailed(operation, reason string) *AppError {
 		err.WithDetails("reason", reason)
 	}
 	return err
-}
-
-// IsAppError checks if an error is an AppError
-func IsAppError(err error) bool {
-	_, ok := err.(*AppError)
-	return ok
 }
 
 // GetAppError extracts an AppError from an error, or creates a generic internal error

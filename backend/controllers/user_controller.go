@@ -3,7 +3,6 @@ package controllers
 import (
 	"errors"
 	"net/http"
-	"os"
 	"slices"
 	"strings"
 	"time"
@@ -79,6 +78,13 @@ func RegisterUser(cfg *config.Config) gin.HandlerFunc {
 	}
 }
 
+// accountLockedError is the 429 for a login that is locked out after repeated failures.
+func accountLockedError(retryAfterSecs int) *apperrors.AppError {
+	return apperrors.NewError(apperrors.ErrCodeRateLimitExceeded, "Too many failed login attempts. Please try again later.", http.StatusTooManyRequests).
+		WithDetails("retry_after", retryAfterSecs).
+		WithDetails("retry_after_at", time.Now().Add(time.Duration(retryAfterSecs)*time.Second).Format(time.RFC3339))
+}
+
 // LoginInput represents the DTO for login requests
 type LoginInput struct {
 	Identifier string `json:"identifier"` // Can be username or email
@@ -118,13 +124,7 @@ func LoginUser(context *gin.Context, cfg *config.Config) {
 	// Check per-account rate limiting before attempting authentication
 	accountLimiter := middleware.GetAccountRateLimiter()
 	if isLocked, remainingSecs := accountLimiter.IsLocked(identifier); isLocked {
-		context.JSON(http.StatusTooManyRequests, gin.H{
-			"error":          "Account temporarily locked",
-			"message":        "Too many failed login attempts. Please try again later.",
-			"retry_after":    remainingSecs,
-			"retry_after_at": time.Now().Add(time.Duration(remainingSecs) * time.Second).Format(time.RFC3339),
-		})
-		context.Abort()
+		apperrors.AbortWithError(context, accountLockedError(remainingSecs))
 		return
 	}
 
@@ -156,13 +156,7 @@ func LoginUser(context *gin.Context, cfg *config.Config) {
 		// Record failed attempt for password mismatch
 		isLocked, lockoutSecs := accountLimiter.RecordFailedAttempt(identifier)
 		if isLocked {
-			context.JSON(http.StatusTooManyRequests, gin.H{
-				"error":          "Account temporarily locked",
-				"message":        "Too many failed login attempts. Please try again later.",
-				"retry_after":    lockoutSecs,
-				"retry_after_at": time.Now().Add(time.Duration(lockoutSecs) * time.Second).Format(time.RFC3339),
-			})
-			context.Abort()
+			apperrors.AbortWithError(context, accountLockedError(lockoutSecs))
 			return
 		}
 		apperrors.AbortWithError(context, apperrors.ErrInvalidCredentials())
@@ -232,7 +226,7 @@ func CheckPasswordStrength(context *gin.Context) {
 // RequestPasswordReset generates a reset token and sends instructions to the user.
 func RequestPasswordReset(context *gin.Context, cfg *config.Config) {
 	// Check if demo mode is enabled - password changes are disabled in demo
-	if os.Getenv("DEMO_MODE") == "true" {
+	if currentConfig(context).DemoMode {
 		apperrors.AbortWithError(context, apperrors.ErrForbidden("Password changes are disabled in demo mode"))
 		return
 	}
@@ -316,7 +310,7 @@ func processPasswordResetRequest(db *gorm.DB, cfg *config.Config, log *zerolog.L
 // ConfirmPasswordReset validates the token and updates the password.
 func ConfirmPasswordReset(context *gin.Context) {
 	// Check if demo mode is enabled - password changes are disabled in demo
-	if os.Getenv("DEMO_MODE") == "true" {
+	if currentConfig(context).DemoMode {
 		apperrors.AbortWithError(context, apperrors.ErrForbidden("Password changes are disabled in demo mode"))
 		return
 	}
@@ -708,7 +702,7 @@ func UpdateCardDAVCircleFilter(c *gin.Context) {
 // ChangePassword lets authenticated users rotate their password.
 func ChangePassword(context *gin.Context) {
 	// Check if demo mode is enabled - password changes are disabled in demo
-	if os.Getenv("DEMO_MODE") == "true" {
+	if currentConfig(context).DemoMode {
 		apperrors.AbortWithError(context, apperrors.ErrForbidden("Password changes are disabled in demo mode"))
 		return
 	}

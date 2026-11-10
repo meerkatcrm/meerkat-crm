@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"net/http"
+	apperrors "meerkat/errors"
 	"os"
 	"strconv"
 	"sync"
@@ -335,11 +335,7 @@ func RateLimitMiddleware(limiter *IPRateLimiter) gin.HandlerFunc {
 
 		// Check if request is allowed
 		if !rateLimiter.Allow() {
-			c.JSON(http.StatusTooManyRequests, gin.H{
-				"error":   "Rate limit exceeded",
-				"message": "Too many requests. Please try again later.",
-			})
-			c.Abort()
+			apperrors.AbortWithError(c, apperrors.ErrRateLimitExceeded())
 			return
 		}
 

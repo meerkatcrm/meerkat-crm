@@ -44,7 +44,7 @@ func setupPhotoFixture(t *testing.T) photoFixture {
 	user := newTestUser(t, db, "owner", false)
 	stranger := newTestUser(t, db, "stranger", false)
 	dir := t.TempDir()
-	cfg := &config.Config{ProfilePhotoDir: dir}
+	cfg := &config.Config{ProfilePhotoDir: dir, DemoMode: os.Getenv("DEMO_MODE") == "true"}
 
 	router := routerAs(db, user.ID, *cfg)
 	router.POST("/contacts/:id/profile_picture", func(c *gin.Context) { AddPhotoToContact(c, cfg) })
@@ -294,7 +294,7 @@ func TestGetProfilePicture_RefusesPathsOutsideThePhotoDir(t *testing.T) {
 			f := setupPhotoFixture(t)
 			dir := filepath.Join(parent, "photos")
 			require.NoError(t, os.MkdirAll(dir, 0o700))
-			cfg := &config.Config{ProfilePhotoDir: dir}
+			cfg := &config.Config{ProfilePhotoDir: dir, DemoMode: os.Getenv("DEMO_MODE") == "true"}
 			router := routerAs(f.db, f.user.ID, *cfg)
 			router.GET("/contacts/:id/profile_picture", func(c *gin.Context) { GetProfilePicture(c, cfg) })
 			require.NoError(t, f.db.Model(&models.Contact{}).Where("id = ?", f.contact.ID).Update("photo", photo).Error)
