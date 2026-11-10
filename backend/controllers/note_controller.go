@@ -233,7 +233,12 @@ func UpdateNote(c *gin.Context) {
 		}
 	}
 
-	db.Updates(&note)
+	// Select names the columns: a plain Updates skips zero values, so a note could
+	// never be detached from its contact (contact_id = NULL).
+	if err := db.Model(&note).Select("content", "date", "contact_id").Updates(&note).Error; err != nil {
+		apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to update note").WithError(err))
+		return
+	}
 
 	go services.TriggerWebhooks(db, currentConfig(c), userID, "note.updated", note)
 	c.JSON(http.StatusOK, gin.H{"message": "Note updated successfully", "note": note})
