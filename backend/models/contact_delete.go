@@ -29,3 +29,16 @@ func DeleteContactCascade(tx *gorm.DB, userID, contactID uint) error {
 
 	return tx.Where("user_id = ?", userID).Delete(&Contact{}, contactID).Error
 }
+
+// ReleaseDeletedVCardUID frees a vCard UID that only soft-deleted contacts still
+// hold. The unique (user_id, vcard_uid) index counts deleted rows, so creating a
+// contact whose UID was used by a deleted one would otherwise fail on every
+// retry. The tombstone keeps a recognisable UID of its own.
+func ReleaseDeletedVCardUID(tx *gorm.DB, userID uint, uid string) error {
+	if uid == "" {
+		return nil
+	}
+	return tx.Unscoped().Model(&Contact{}).
+		Where("user_id = ? AND vcard_uid = ? AND deleted_at IS NOT NULL", userID, uid).
+		UpdateColumn("vcard_uid", gorm.Expr("vcard_uid || '-deleted-' || id")).Error
+}

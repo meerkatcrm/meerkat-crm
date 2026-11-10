@@ -337,6 +337,11 @@ func (b *Backend) PutAddressObject(ctx context.Context, urlPath string, card vca
 
 	// Save contact
 	updatedContact.RevertStaleEmployment = true
+	if isNew {
+		if err := models.ReleaseDeletedVCardUID(db, userID, updatedContact.VCardUID); err != nil {
+			return nil, err
+		}
+	}
 	if err := db.Save(updatedContact).Error; err != nil {
 		return nil, err
 	}

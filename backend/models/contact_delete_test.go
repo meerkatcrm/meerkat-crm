@@ -92,3 +92,35 @@ func countRaw(t *testing.T, db *gorm.DB, query string, args ...any) int64 {
 	}
 	return n
 }
+
+func TestReleaseDeletedVCardUID(t *testing.T) {
+	db := setupTestDB(t)
+	if err := db.Exec("CREATE UNIQUE INDEX idx_contacts_vcard_uid_user ON contacts(user_id, vcard_uid)").Error; err != nil {
+		t.Fatal(err)
+	}
+	deleted := Contact{UserID: 1, Firstname: "Old", VCardUID: "uid-1"}
+	live := Contact{UserID: 1, Firstname: "Live", VCardUID: "uid-2"}
+	for _, c := range []*Contact{&deleted, &live} {
+		if err := db.Create(c).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.Delete(&deleted).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	if err := db.Create(&Contact{UserID: 1, Firstname: "New", VCardUID: "uid-1"}).Error; err == nil {
+		t.Fatal("expected the deleted contact to still hold its UID")
+	}
+	for _, uid := range []string{"uid-1", "uid-2"} {
+		if err := ReleaseDeletedVCardUID(db, 1, uid); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.Create(&Contact{UserID: 1, Firstname: "New", VCardUID: "uid-1"}).Error; err != nil {
+		t.Fatalf("UID of a deleted contact was not released: %v", err)
+	}
+	if n := count(t, db, &Contact{}, "vcard_uid = ?", "uid-2"); n != 1 {
+		t.Errorf("a live contact's UID was touched")
+	}
+}

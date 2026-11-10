@@ -9,6 +9,7 @@ import (
 
 	"github.com/glebarez/sqlite"
 	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"gorm.io/gorm"
 )
@@ -79,9 +80,17 @@ func RunMigrations(db *sql.DB) error {
 	}
 
 	if dirty {
-		logger.Warn().Uint("version", version).Msg("Database is in dirty state, forcing version")
-		if err := m.Force(int(version)); err != nil {
-			return fmt.Errorf("failed to force version: %w", err)
+		// Dirty means migration `version` failed. Each migration runs in one
+		// transaction, so nothing of it was applied: step back and let Up run it
+		// again. Forcing `version` itself would mark the failed migration as done
+		// and silently leave its changes out of the schema.
+		previous := int(version) - 1
+		if previous < 1 {
+			previous = database.NilVersion
+		}
+		logger.Warn().Uint("version", version).Msg("Database is in dirty state, retrying the failed migration")
+		if err := m.Force(previous); err != nil {
+			return fmt.Errorf("failed to reset dirty migration state: %w", err)
 		}
 	}
 

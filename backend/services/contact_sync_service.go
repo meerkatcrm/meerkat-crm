@@ -968,6 +968,9 @@ func (r *contactSyncRun) pullCreate(obj *remoteObject, link *models.CardDAVConta
 
 	var hash string
 	err := r.db.Transaction(func(tx *gorm.DB) error {
+		if err := models.ReleaseDeletedVCardUID(tx, r.conn.UserID, contact.VCardUID); err != nil {
+			return err
+		}
 		if err := tx.Create(contact).Error; err != nil {
 			return err
 		}

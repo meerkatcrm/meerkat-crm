@@ -989,7 +989,9 @@ func MergeImportedContact(existing *models.Contact, incoming *models.Contact) {
 	if incoming.VCardExtra != "" {
 		existing.VCardExtra = incoming.VCardExtra
 	}
-	if incoming.VCardUID != "" {
+	// The UID is the contact's identity for every synced device: replacing it
+	// makes the contact vanish there and come back as a new one.
+	if existing.VCardUID == "" && incoming.VCardUID != "" {
 		existing.VCardUID = incoming.VCardUID
 	}
 }

@@ -460,6 +460,10 @@ func (m *ImportSessionManager) ConfirmVCF(db *gorm.DB, userID uint, req models.I
 		return nil, apperrors.ErrDatabase("Import failed").WithError(txErr)
 	}
 
+	// The rows are committed: drop the session now, so a client that timed out
+	// while the photos below download cannot confirm it a second time.
+	m.Delete(req.SessionID)
+
 	// Process photos outside the transaction (file I/O and network requests).
 	for _, task := range photoTasks {
 		var photoData []byte
@@ -498,8 +502,6 @@ func (m *ImportSessionManager) ConfirmVCF(db *gorm.DB, userID uint, req models.I
 			log.Warn().Err(err).Uint("contact_id", task.contactID).Msg("Failed to update contact with photo")
 		}
 	}
-
-	m.Delete(req.SessionID)
 
 	log.Info().
 		Str("session_id", req.SessionID).
