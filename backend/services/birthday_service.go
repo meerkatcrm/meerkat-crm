@@ -61,7 +61,7 @@ func GetUpcomingBirthdays(db *gorm.DB, userID uint, now time.Time) ([]models.Bir
 	// Birthday format is now YYYY-MM-DD or --MM-DD (ISO 8601)
 	var relationships []models.Relationship
 	relationshipQuery := db.Model(&models.Relationship{}).
-		Joins("JOIN contacts ON contacts.id = relationships.contact_id AND contacts.archived = ? AND contacts.is_deceased = ?", false, false).
+		Joins("JOIN contacts ON contacts.id = relationships.contact_id AND contacts.deleted_at IS NULL AND contacts.archived = ? AND contacts.is_deceased = ?", false, false).
 		Preload("RelatedContact").
 		Where("relationships.user_id = ?", userID).
 		Where("related_contact_id IS NULL").

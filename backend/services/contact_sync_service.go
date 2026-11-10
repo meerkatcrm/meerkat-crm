@@ -1105,7 +1105,7 @@ func (r *contactSyncRun) reconcileRemoteDeletions() {
 			// Pull is necessarily enabled here: the case above covers every
 			// push-only path. Deleted remotely, so soft-delete locally.
 			if err := r.db.Transaction(func(tx *gorm.DB) error {
-				if err := tx.Delete(&models.Contact{}, contact.ID).Error; err != nil {
+				if err := models.DeleteContactCascade(tx, contact.UserID, contact.ID); err != nil {
 					return err
 				}
 				return tx.Delete(link).Error

@@ -382,8 +382,9 @@ func (b *Backend) DeleteAddressObject(ctx context.Context, urlPath string) error
 		return webdav.NewHTTPError(http.StatusNotFound, fmt.Errorf("contact not found"))
 	}
 
-	// Soft delete
-	return db.Delete(&contact).Error
+	return db.Transaction(func(tx *gorm.DB) error {
+		return models.DeleteContactCascade(tx, userID, contact.ID)
+	})
 }
 
 // circleFilter is the user's choice of which contacts CardDAV clients see

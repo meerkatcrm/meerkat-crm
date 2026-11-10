@@ -425,47 +425,8 @@ func DeleteContact(c *gin.Context) {
 		return
 	}
 
-	// Start a transaction to ensure all deletes succeed together
 	err := db.Transaction(func(tx *gorm.DB) error {
-		// Manually delete associated reminders (soft delete doesn't trigger CASCADE)
-		if err := tx.Where("contact_id = ? AND user_id = ?", id, userID).Delete(&models.Reminder{}).Error; err != nil {
-			return err
-		}
-
-		// Manually delete associated notes
-		if err := tx.Where("contact_id = ? AND user_id = ?", id, userID).Delete(&models.Note{}).Error; err != nil {
-			return err
-		}
-
-		// Manually delete associated relationships
-		if err := tx.Where("contact_id = ? AND user_id = ?", id, userID).Delete(&models.Relationship{}).Error; err != nil {
-			return err
-		}
-
-		// Relationships of other contacts that point at this one keep their own
-		// name and type, but must not link to a contact that no longer exists.
-		if err := tx.Model(&models.Relationship{}).
-			Where("related_contact_id = ? AND user_id = ?", contact.ID, userID).
-			Update("related_contact_id", nil).Error; err != nil {
-			return err
-		}
-
-		// Delete activity associations (many-to-many)
-		if err := tx.Exec("DELETE FROM activity_contacts WHERE contact_id = ? AND activity_id IN (SELECT id FROM activities WHERE user_id = ?)", id, userID).Error; err != nil {
-			return err
-		}
-
-		// Manually delete associated employment history entries
-		if err := tx.Where("contact_id = ? AND user_id = ?", id, userID).Delete(&models.EmploymentHistory{}).Error; err != nil {
-			return err
-		}
-
-		// Finally, delete the contact
-		if err := tx.Delete(&contact).Error; err != nil {
-			return err
-		}
-
-		return nil
+		return models.DeleteContactCascade(tx, userID, contact.ID)
 	})
 
 	if err != nil {
