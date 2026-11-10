@@ -27,6 +27,9 @@ import { GraphNode } from './types/graph';
 import { Activity, getActivity, updateActivity, deleteActivity } from './api/activities';
 import { Contact, getContacts } from './api/contacts';
 import { NetworkFilters, loadNetworkFilters, saveNetworkFilters } from './networkFilters';
+import { useDateFormat } from './DateFormatProvider';
+import { useSnackbar } from './context/SnackbarContext';
+import { handleError } from './utils/errorHandler';
 
 export default function NetworkPage() {
   const { t } = useTranslation();
@@ -34,6 +37,8 @@ export default function NetworkPage() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const { data, loading, error, refetch } = useGraph();
+  const { formatDate, parseDateInput } = useDateFormat();
+  const { showError } = useSnackbar();
 
   const [filters, setFilters] = useState<NetworkFilters>(loadNetworkFilters);
   const { selectedCircle, showRelationships, showActivities, showCircles } = filters;
@@ -49,6 +54,7 @@ export default function NetworkPage() {
     activityContacts?: Contact[];
   }>({});
   const [allContacts, setAllContacts] = useState<Contact[]>([]);
+  const [editDateError, setEditDateError] = useState('');
 
   const updateFilters = useCallback((patch: Partial<NetworkFilters>) => {
     setFilters(prev => ({ ...prev, ...patch }));
@@ -114,6 +120,7 @@ export default function NetworkPage() {
     try {
       const activity = await getActivity(id);
       setEditingActivity(activity);
+      setEditDateError('');
       if (allContacts.length === 0) {
         const contactsResponse = await getContacts({ page: 1, limit: 1000 });
         setAllContacts(contactsResponse.contacts || []);
@@ -122,33 +129,43 @@ export default function NetworkPage() {
         activityTitle: activity.title || '',
         activityDescription: activity.description || '',
         activityLocation: activity.location || '',
-        activityDate: activity.date ? new Date(activity.date).toISOString().split('T')[0] : '',
+        activityDate: activity.date ? formatDate(activity.date) : '',
         activityContacts: activity.contacts || [],
       });
     } catch (err) {
-      console.error('Failed to fetch activity:', err);
+      handleError(err, { operation: 'fetching activity' }, { showError });
     }
   };
 
   const handleActivityEditClose = () => {
     setEditingActivity(null);
     setEditValues({});
+    setEditDateError('');
   };
 
   const handleActivitySave = async () => {
     if (!editingActivity || !editValues.activityTitle?.trim()) return;
+
+    // The date field is free text in the user's display format.
+    const parsedDate = editValues.activityDate ? parseDateInput(editValues.activityDate) : '';
+    if (parsedDate === null) {
+      setEditDateError(t('activityDialog.dateError'));
+      return;
+    }
+    setEditDateError('');
+
     try {
       await updateActivity(editingActivity.ID, {
         title: editValues.activityTitle,
         description: editValues.activityDescription || '',
         location: editValues.activityLocation || '',
-        date: editValues.activityDate ? new Date(editValues.activityDate).toISOString() : new Date().toISOString(),
+        date: parsedDate ? new Date(parsedDate).toISOString() : new Date().toISOString(),
         contact_ids: editValues.activityContacts?.map(c => c.ID) || [],
       });
       handleActivityEditClose();
       await refetch();
     } catch (err) {
-      console.error('Failed to update activity:', err);
+      handleError(err, { operation: 'updating activity' }, { showError });
     }
   };
 
@@ -159,7 +176,7 @@ export default function NetworkPage() {
       handleActivityEditClose();
       await refetch();
     } catch (err) {
-      console.error('Failed to delete activity:', err);
+      handleError(err, { operation: 'deleting activity' }, { showError });
     }
   };
 
@@ -318,6 +335,7 @@ export default function NetworkPage() {
           values={editValues}
           onChange={setEditValues}
           allContacts={allContacts}
+          dateError={editDateError}
         />
       )}
     </Box>

@@ -99,15 +99,20 @@ export default function ContactsPage() {
     fetchData();
   }, []);
 
-  // Reset to page 1 when search or filter changes (but not on initial mount)
-  const prevFiltersRef = useRef({ searchQuery, selectedCircle });
+  // Reset to page 1 when search, filter, sort or the archived toggle changes (but not on initial mount)
+  const prevFiltersRef = useRef({ searchQuery, selectedCircle, sortOption, showArchived });
   useEffect(() => {
     const prev = prevFiltersRef.current;
-    if (prev.searchQuery !== searchQuery || prev.selectedCircle !== selectedCircle) {
+    if (
+      prev.searchQuery !== searchQuery ||
+      prev.selectedCircle !== selectedCircle ||
+      prev.sortOption !== sortOption ||
+      prev.showArchived !== showArchived
+    ) {
       setPage(1);
-      prevFiltersRef.current = { searchQuery, selectedCircle };
+      prevFiltersRef.current = { searchQuery, selectedCircle, sortOption, showArchived };
     }
-  }, [searchQuery, selectedCircle, setPage]);
+  }, [searchQuery, selectedCircle, sortOption, showArchived, setPage]);
 
   // Filter contacts by selected circle
   // With backend pagination, contacts are already filtered

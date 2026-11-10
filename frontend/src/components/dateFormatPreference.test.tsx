@@ -4,7 +4,7 @@ import { render, screen, fireEvent, cleanup, act, within } from '@testing-librar
 import { MemoryRouter } from 'react-router-dom';
 import { I18nextProvider } from 'react-i18next';
 import i18n from '../i18n/config';
-import { DateFormat, DateFormatProvider, useDateFormat } from '../DateFormatProvider';
+import { DateFormat, DateFormatProvider, initializeDateFormatFromBackend, useDateFormat } from '../DateFormatProvider';
 import ContactTimeline from './ContactTimeline';
 import ReminderList from './ReminderList';
 import type { Note } from '../api/notes';
@@ -103,6 +103,32 @@ describe.each([
     );
     expectOnly('04.03.2026', container);
   });
+});
+
+test('the preference arriving from the backend at login applies without a reload', () => {
+  const { container } = renderWith('eu', timeline);
+  expectOnly('04.03.2026', container);
+  act(() => initializeDateFormatFromBackend('us'));
+  expectOnly('03/04/2026', container);
+  expect(localStorage.getItem('dateFormat')).toBe('us');
+  // An unknown value from the server is ignored.
+  act(() => initializeDateFormatFromBackend('martian'));
+  expectOnly('03/04/2026', container);
+});
+
+test('a timeline entry dated by a timestamp shows the local day it happened on', () => {
+  // Half past midnight local time: west of UTC that is still the same UTC day,
+  // east of UTC it is the previous one.
+  const instant = new Date(2026, 2, 4, 0, 30).toISOString();
+  const lateInstant = new Date(2026, 2, 4, 23, 30).toISOString();
+  for (const at of [instant, lateInstant]) {
+    const { container, unmount } = renderWith(
+      'eu',
+      <ContactTimeline timelineItems={[{ type: 'note', data: note, date: at, instant: true }]} onEditItem={vi.fn()} />
+    );
+    expectOnly('04.03.2026', container);
+    unmount();
+  }
 });
 
 test('ReminderList without reminders shows its empty state', () => {

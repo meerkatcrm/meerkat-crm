@@ -6,6 +6,7 @@ interface DateFormatContextValue {
   dateFormat: DateFormat;
   setDateFormat: (format: DateFormat) => void;
   formatDate: (dateString: string) => string;
+  formatInstantDate: (dateString: string) => string;
   formatDateTime: (dateString: string) => string;
   formatBirthday: (birthday: string, includeAge?: boolean) => string;
   formatBirthdayForInput: (birthday: string) => string;
@@ -25,6 +26,10 @@ const DateFormatContext = createContext<DateFormatContextValue | undefined>(unde
 
 const DATE_FORMAT_STORAGE_KEY = "dateFormat";
 
+// Mounted providers, so a format arriving from the backend reaches them directly:
+// they read localStorage only once, when they mount.
+const backendFormatListeners = new Set<(format: DateFormat) => void>();
+
 // Initialize date format from backend value (called on login)
 export function initializeDateFormatFromBackend(dateFormat: string | undefined): void {
   if (typeof window === "undefined") {
@@ -33,6 +38,7 @@ export function initializeDateFormatFromBackend(dateFormat: string | undefined):
   const supportedDateFormats: DateFormat[] = ["eu", "us", "iso"];
   if (dateFormat && supportedDateFormats.includes(dateFormat as DateFormat)) {
     window.localStorage.setItem(DATE_FORMAT_STORAGE_KEY, dateFormat as DateFormat);
+    backendFormatListeners.forEach((listener) => listener(dateFormat as DateFormat));
   }
 }
 
@@ -174,6 +180,23 @@ export function formatDateWithFormat(dateString: string, format: DateFormat): st
   }
 }
 
+const pad = (value: number) => String(value).padStart(2, '0');
+
+/**
+ * Format a real instant (e.g. a created-at timestamp) as the calendar day it falls on
+ * where the user is. formatDateWithFormat reads the UTC day, which is right for
+ * date-only values stored as midnight UTC but off by one for instants near midnight.
+ */
+export function formatInstantDateWithFormat(dateString: string, format: DateFormat): string {
+  if (!dateString) return '';
+
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return dateString;
+
+  const localDay = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  return formatDateWithFormat(localDay, format);
+}
+
 /**
  * Format a timestamp to the user's preferred date format plus the local 24-hour time
  */
@@ -183,9 +206,7 @@ export function formatDateTimeWithFormat(dateString: string, format: DateFormat)
   const date = new Date(dateString);
   if (isNaN(date.getTime())) return dateString;
 
-  const pad = (value: number) => String(value).padStart(2, '0');
-  const localDay = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-  return `${formatDateWithFormat(localDay, format)} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return `${formatInstantDateWithFormat(dateString, format)} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 /**
@@ -533,8 +554,20 @@ export function DateFormatProvider({ children }: { children: ReactNode }) {
     window.localStorage.setItem(DATE_FORMAT_STORAGE_KEY, dateFormat);
   }, [dateFormat]);
 
+  useEffect(() => {
+    backendFormatListeners.add(setDateFormat);
+    return () => {
+      backendFormatListeners.delete(setDateFormat);
+    };
+  }, []);
+
   const formatDate = useCallback(
     (dateString: string) => formatDateWithFormat(dateString, dateFormat),
+    [dateFormat]
+  );
+
+  const formatInstantDate = useCallback(
+    (dateString: string) => formatInstantDateWithFormat(dateString, dateFormat),
     [dateFormat]
   );
 
@@ -625,6 +658,7 @@ export function DateFormatProvider({ children }: { children: ReactNode }) {
       dateFormat,
       setDateFormat,
       formatDate,
+      formatInstantDate,
       formatDateTime,
       formatBirthday,
       formatBirthdayForInput,
@@ -639,7 +673,7 @@ export function DateFormatProvider({ children }: { children: ReactNode }) {
       getDateFnsFormat,
       calculateAge,
     }),
-    [dateFormat, formatDate, formatDateTime, formatBirthday, formatBirthdayForInput, parseBirthdayInput, autoFormatBirthdayInput, parseDateInput, parsePartialDateInput, autoFormatDateInput, getBirthdayPlaceholder, getBirthdayFormatHint, getDatePlaceholder, getDateFnsFormat, calculateAge]
+    [dateFormat, formatDate, formatInstantDate, formatDateTime, formatBirthday, formatBirthdayForInput, parseBirthdayInput, autoFormatBirthdayInput, parseDateInput, parsePartialDateInput, autoFormatDateInput, getBirthdayPlaceholder, getBirthdayFormatHint, getDatePlaceholder, getDateFnsFormat, calculateAge]
   );
 
   return (

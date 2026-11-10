@@ -123,6 +123,9 @@ export default function MonicaImportDialog({
 
   // Session bookkeeping for cleanup on close
   const sessionRef = useRef<{ id: string } | null>(null);
+  // Bumped on every reset, so a request started before the dialog was closed can
+  // tell that its answer belongs to a dialog that no longer exists.
+  const generationRef = useRef(0);
 
   const resetDialog = useCallback(() => {
     setStep('connect');
@@ -130,6 +133,7 @@ export default function MonicaImportDialog({
     setApiToken('');
     setIncludeRelationships(true);
     setIncludeExtras(true);
+    setCollapseReciprocal(true);
     setConnectResponse(null);
     setStatus(null);
     setPreview(null);
@@ -138,6 +142,7 @@ export default function MonicaImportDialog({
     setLoading(false);
     setError(null);
     sessionRef.current = null;
+    generationRef.current += 1;
   }, []);
 
   const handleClose = () => {
@@ -151,16 +156,26 @@ export default function MonicaImportDialog({
   };
 
   const handleConnect = async () => {
+    const generation = generationRef.current;
     setLoading(true);
     setError(null);
     try {
       const response = await monicaConnect(baseUrl.trim(), apiToken.trim());
+      if (generationRef.current !== generation) {
+        // Closed while connecting: handleClose had no session to cancel yet, so
+        // drop it (and the API token it holds) now.
+        monicaCancel(response.session_id).catch(() => undefined);
+        return;
+      }
       setConnectResponse(response);
       sessionRef.current = { id: response.session_id };
     } catch (err) {
+      if (generationRef.current !== generation) return;
       setError(getErrorMessage(err));
     } finally {
-      setLoading(false);
+      if (generationRef.current === generation) {
+        setLoading(false);
+      }
     }
   };
 
@@ -184,8 +199,10 @@ export default function MonicaImportDialog({
   };
 
   const loadPreview = useCallback(async (sessionId: string) => {
+    const generation = generationRef.current;
     try {
       const response = await monicaGetPreview(sessionId);
+      if (generationRef.current !== generation) return;
       setPreview(response);
       const initialActions = new Map<number, string>();
       response.rows.forEach((row) => {
@@ -194,6 +211,7 @@ export default function MonicaImportDialog({
       setRowActions(initialActions);
       setStep('review');
     } catch (err) {
+      if (generationRef.current !== generation) return;
       setError(getErrorMessage(err));
       setStep('connect');
     }

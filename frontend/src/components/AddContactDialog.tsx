@@ -237,7 +237,7 @@ export default function AddContactDialog({
   };
 
   return (
-    <AppDialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
+    <AppDialog open={open} onClose={handleClose} busy={loading} maxWidth="md" fullWidth>
       <DialogTitle>{t('contacts.add.title')}</DialogTitle>
       <DialogContent>
         {error && (

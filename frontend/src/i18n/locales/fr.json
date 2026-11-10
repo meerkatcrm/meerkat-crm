@@ -956,6 +956,7 @@
       "warning": "Ce jeton ne sera plus affiché. Copiez-le maintenant et conservez-le en lieu sûr.",
       "copy": "Copier",
       "copied": "Copié !",
+      "copyFailed": "Copie automatique impossible. Sélectionnez le texte et copiez-le manuellement.",
       "done": "Terminé, je l'ai sauvegardé"
     },
     "revokeDialog": {

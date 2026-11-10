@@ -5,6 +5,7 @@ import {
   DateFormat,
   formatDateWithFormat,
   formatDateTimeWithFormat,
+  formatInstantDateWithFormat,
   parseDateInputWithFormat,
   formatBirthdayWithFormat,
   formatBirthdayForInputWithFormat,
@@ -47,6 +48,25 @@ describe('formatDateTimeWithFormat', () => {
   test('empty and unparseable values do not become "Invalid Date"', () => {
     expect(formatDateTimeWithFormat('', 'eu')).toBe('');
     expect(formatDateTimeWithFormat('sometime', 'eu')).toBe('sometime');
+  });
+});
+
+describe('formatInstantDateWithFormat', () => {
+  test('shows the local calendar day of a timestamp, even where UTC is on another day', () => {
+    // Just after and just before local midnight: in any timezone but UTC one of
+    // the two falls on a different UTC day.
+    const early = new Date(2026, 2, 5, 0, 30).toISOString();
+    const late = new Date(2026, 2, 5, 23, 30).toISOString();
+    for (const instant of [early, late]) {
+      expect(formatInstantDateWithFormat(instant, 'eu')).toBe('05.03.2026');
+      expect(formatInstantDateWithFormat(instant, 'us')).toBe('03/05/2026');
+      expect(formatInstantDateWithFormat(instant, 'iso')).toBe('2026-03-05');
+    }
+  });
+
+  test('empty and unparseable values do not become "Invalid Date"', () => {
+    expect(formatInstantDateWithFormat('', 'eu')).toBe('');
+    expect(formatInstantDateWithFormat('sometime', 'eu')).toBe('sometime');
   });
 });
 

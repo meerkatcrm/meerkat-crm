@@ -74,6 +74,8 @@ export default function CalendarSyncSettings() {
   const [editingUsername, setEditingUsername] = useState('');
   const [form, setForm] = useState<CalendarFormState>(emptyForm());
   const [saving, setSaving] = useState(false);
+  // Shown inside the add/edit dialog: the page-level alert renders behind it.
+  const [dialogError, setDialogError] = useState('');
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [calendarToDelete, setCalendarToDelete] = useState<CalendarSubscription | null>(null);
@@ -102,6 +104,7 @@ export default function CalendarSyncSettings() {
     setEditingHasPassword(false);
     setEditingUsername('');
     setForm(emptyForm());
+    setDialogError('');
     setDialogOpen(true);
   };
 
@@ -118,6 +121,7 @@ export default function CalendarSyncSettings() {
       past_days: String(cal.past_days),
       future_days: String(cal.future_days),
     });
+    setDialogError('');
     setDialogOpen(true);
   };
 
@@ -129,6 +133,7 @@ export default function CalendarSyncSettings() {
   const handleSave = async () => {
     setSaving(true);
     setError('');
+    setDialogError('');
     setSuccess('');
     const input = {
       name: form.name.trim(),
@@ -161,7 +166,7 @@ export default function CalendarSyncSettings() {
         await handleSync(created);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('settings.calendarSync.saveError'));
+      setDialogError(err instanceof Error ? err.message : t('settings.calendarSync.saveError'));
     } finally {
       setSaving(false);
     }
@@ -333,6 +338,7 @@ export default function CalendarSyncSettings() {
             <Alert severity="info" sx={{ py: 0.5 }}>
               {t('settings.calendarSync.dialogInfo')}
             </Alert>
+            {dialogError && <Alert severity="error" sx={{ py: 0 }}>{dialogError}</Alert>}
             <TextField
               label={t('settings.calendarSync.name')}
               value={form.name}

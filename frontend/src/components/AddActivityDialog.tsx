@@ -12,7 +12,7 @@ import {
 } from '@mui/material';
 import AppDialog from './AppDialog';
 import { useTranslation } from 'react-i18next';
-import { Contact, getContacts } from '../api/contacts';
+import { Contact, getContact, getContacts } from '../api/contacts';
 import { useDateFormat } from '../DateFormatProvider';
 import { todayISO } from '../utils/today';
 
@@ -64,26 +64,34 @@ export default function AddActivityDialog({
 
   // Load preselected contact on open
   useEffect(() => {
-    if (open && preselectedContactId) {
-      const loadPreselected = async () => {
-        setLoadingPreselected(true);
-        try {
-          const response = await getContacts({ limit: 100 });
-          const preselected = response.contacts.find((c: Contact) => c.ID === preselectedContactId);
-          if (preselected) {
-            setSelectedContacts([preselected]);
-          }
-          setContacts(response.contacts || []);
-        } catch (err) {
-          console.error('Failed to load preselected contact:', err);
-        } finally {
+    if (!open) return;
+    // The picker's options come from the search effect below either way.
+    loadContacts('');
+    if (!preselectedContactId) return;
+
+    // Fetched by id: looking for it in a page of the contact list misses
+    // everyone beyond that page.
+    let cancelled = false;
+    const loadPreselected = async () => {
+      setLoadingPreselected(true);
+      try {
+        const preselected = await getContact(preselectedContactId, ['ID', 'firstname', 'lastname', 'nickname']);
+        if (!cancelled) {
+          setSelectedContacts([preselected]);
+        }
+      } catch (err) {
+        console.error('Failed to load preselected contact:', err);
+      } finally {
+        if (!cancelled) {
           setLoadingPreselected(false);
         }
-      };
-      loadPreselected();
-    } else if (open) {
-      loadContacts('');
-    }
+      }
+    };
+    loadPreselected();
+    return () => {
+      cancelled = true;
+      setLoadingPreselected(false);
+    };
   }, [open, preselectedContactId, loadContacts]);
 
   // Debounced search effect

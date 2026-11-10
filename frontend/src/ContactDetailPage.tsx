@@ -172,6 +172,7 @@ function ContactDetail() {
   const {
     editingTimelineItem,
     editTimelineValues,
+    editTimelineDateError,
     allContacts,
     handleStartEditTimelineItem,
     handleCancelEditTimelineItem,
@@ -320,21 +321,25 @@ function ContactDetail() {
   }, [id, reloadKey, refreshReminders, refreshRelationships, refreshEmploymentHistory]);
 
   // Combine and sort notes, activities, and completions for timeline
-  const timelineItems: Array<{ type: 'note' | 'activity' | 'completion'; data: Note | Activity | ReminderCompletion; date: string }> = [
+  // note.date / activity.date are date-only; CreatedAt and completed_at are real instants.
+  const timelineItems: Array<{ type: 'note' | 'activity' | 'completion'; data: Note | Activity | ReminderCompletion; date: string; instant?: boolean }> = [
     ...notes.map(note => ({
       type: 'note' as const,
       data: note,
-      date: note.date || note.CreatedAt
+      date: note.date || note.CreatedAt,
+      instant: !note.date
     })),
     ...activities.map(activity => ({
       type: 'activity' as const,
       data: activity,
-      date: activity.date || activity.CreatedAt
+      date: activity.date || activity.CreatedAt,
+      instant: !activity.date
     })),
     ...completions.map(completion => ({
       type: 'completion' as const,
       data: completion,
-      date: completion.completed_at
+      date: completion.completed_at,
+      instant: true
     }))
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
@@ -926,6 +931,7 @@ function ContactDetail() {
           values={editTimelineValues}
           onChange={setEditTimelineValues}
           allContacts={allContacts}
+          dateError={editTimelineDateError}
         />
       )}
 

@@ -53,12 +53,15 @@ export default function CustomFieldsSettings() {
   }, [t]);
 
   const saveFields = async (newNames: string[]) => {
+    // Callers show newNames right away; this render's list is what to go back to if the save fails.
+    const previousNames = fieldNames;
     try {
       setSaving(true);
       setError('');
       const savedNames = await updateCustomFieldNames(newNames);
       setFieldNames(savedNames);
     } catch (err) {
+      setFieldNames(previousNames);
       setError(err instanceof Error ? err.message : t('settings.customFields.saveError'));
     } finally {
       setSaving(false);
@@ -156,7 +159,7 @@ export default function CustomFieldsSettings() {
                   <List dense sx={{ py: 0 }}>
                     {fieldNames.map((name, index) => (
                       <ListItem
-                        key={index}
+                        key={name}
                         sx={{ px: 0 }}
                         secondaryAction={
                           <>

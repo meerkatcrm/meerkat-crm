@@ -956,6 +956,7 @@
       "warning": "This token will not be shown again. Copy it now and store it securely.",
       "copy": "Copy",
       "copied": "Copied!",
+      "copyFailed": "Could not copy automatically. Select the text and copy it manually.",
       "done": "Done, I saved it"
     },
     "revokeDialog": {

@@ -2,8 +2,7 @@ import { useState } from 'react';
 import { loginUser, isAuthenticated, API_BASE_URL } from './auth';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import i18n from './i18n/config';
-import { initializeDateFormatFromBackend } from './DateFormatProvider';
+import { applyUserPreferences } from './utils/userPreferences';
 import {
   Box,
   TextField,
@@ -46,17 +45,12 @@ export default function LoginPage({ setToken }: LoginPageProps) {
     setLoading(true);
     setError('');
     try {
-      const { language, date_format } = await loginUser(identifier, password);
+      const preferences = await loginUser(identifier, password);
       // Signal that user is now authenticated (token is in httpOnly cookie)
       if (setToken) setToken(isAuthenticated() ? 'authenticated' : null);
 
-      // Sync language preference from backend if available
-      if (language && language !== i18n.language) {
-        i18n.changeLanguage(language);
-      }
-
-      // Sync date format preference from backend
-      initializeDateFormatFromBackend(date_format);
+      // Sync language and date format preferences from backend
+      applyUserPreferences(preferences);
 
       navigate('/');
     } catch (err) {

@@ -46,7 +46,7 @@ export async function loginUser(identifier: string, password: string): Promise<L
 }
 
 // Fetch current user info from the server and cache it
-export async function fetchAndCacheUserInfo(): Promise<UserInfo | null> {
+export async function fetchAndCacheUserInfo(): Promise<(UserInfo & LoginResponse) | null> {
   try {
     const response = await fetch(`${API_BASE_URL}/users/me`, {
       credentials: 'include',
@@ -61,7 +61,8 @@ export async function fetchAndCacheUserInfo(): Promise<UserInfo | null> {
       is_admin: data.is_admin || false,
     };
     localStorage.setItem(USER_INFO_KEY, JSON.stringify(userInfo));
-    return userInfo;
+    // The preferences are returned for the caller to apply, not cached with the identity.
+    return { ...userInfo, language: data.language, date_format: data.date_format };
   } catch {
     return null;
   }

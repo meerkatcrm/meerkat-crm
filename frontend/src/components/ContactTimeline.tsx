@@ -28,7 +28,8 @@ import { ReminderCompletion } from '../api/reminders';
 import { useDateFormat } from '../DateFormatProvider';
 
 interface ContactTimelineProps {
-  timelineItems: Array<{ type: 'note' | 'activity' | 'completion'; data: Note | Activity | ReminderCompletion; date: string }>;
+  // instant: date is a real timestamp (shown by local day) rather than a date-only value.
+  timelineItems: Array<{ type: 'note' | 'activity' | 'completion'; data: Note | Activity | ReminderCompletion; date: string; instant?: boolean }>;
   onEditItem: (type: 'note' | 'activity', item: Note | Activity) => void;
   onDeleteCompletion?: (completionId: number) => void;
 }
@@ -36,7 +37,7 @@ interface ContactTimelineProps {
 export default function ContactTimeline({ timelineItems, onEditItem, onDeleteCompletion }: ContactTimelineProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { formatDate } = useDateFormat();
+  const { formatDate, formatInstantDate } = useDateFormat();
 
   if (timelineItems.length === 0) {
     return (
@@ -62,7 +63,7 @@ export default function ContactTimeline({ timelineItems, onEditItem, onDeleteCom
                 flex: 0.3
               }}>
               <Typography variant="caption">
-                {isValidDate ? formatDate(item.date) : (item.date || t('timeline.noDate'))}
+                {isValidDate ? (item.instant ? formatInstantDate(item.date) : formatDate(item.date)) : (item.date || t('timeline.noDate'))}
               </Typography>
             </TimelineOppositeContent>
             <TimelineSeparator>

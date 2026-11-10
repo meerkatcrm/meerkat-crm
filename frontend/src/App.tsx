@@ -2,6 +2,7 @@ import { lazy, useState, useEffect, Suspense, useMemo, MouseEvent as ReactMouseE
 import LoginPage from './LoginPage';
 import RegisterPage from './RegisterPage';
 import { getToken, logoutAndRedirect, isAdmin, fetchAndCacheUserInfo } from './auth';
+import { applyUserPreferences } from './utils/userPreferences';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -109,23 +110,32 @@ function AppContent({ token, setToken }: { token: string | null; setToken: (toke
   useEffect(() => {
     if (!token || searchQuery.length < 2) {
       setSearchResults([]);
+      setSearchLoading(false);
       return;
     }
 
+    // Set by the cleanup once the query has changed, so a slow response for an
+    // older query cannot replace the results of a newer one.
+    let stale = false;
     const timer = setTimeout(async () => {
       setSearchLoading(true);
       try {
         const result = await getContacts({ search: searchQuery, limit: 10 });
+        if (stale) return;
         setSearchResults(result.contacts || []);
       } catch (err) {
+        if (stale) return;
         console.error('Search error:', err);
         setSearchResults([]);
       } finally {
-        setSearchLoading(false);
+        if (!stale) setSearchLoading(false);
       }
     }, 300);
 
-    return () => clearTimeout(timer);
+    return () => {
+      stale = true;
+      clearTimeout(timer);
+    };
   }, [searchQuery, token]);
 
   const handleLogout = async () => {
@@ -606,7 +616,10 @@ function App() {
     // localStorage is empty, so we fetch user info once to populate it.
     if (!getToken()) {
       fetchAndCacheUserInfo().then(info => {
-        if (info) setToken(getToken());
+        if (info) {
+          applyUserPreferences(info);
+          setToken(getToken());
+        }
       });
     }
   }, []);

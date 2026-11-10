@@ -956,6 +956,7 @@
       "warning": "Dieser Token wird nicht erneut angezeigt. Kopieren Sie ihn jetzt und bewahren Sie ihn sicher auf.",
       "copy": "Kopieren",
       "copied": "Kopiert!",
+      "copyFailed": "Automatisches Kopieren nicht möglich. Markieren Sie den Text und kopieren Sie ihn manuell.",
       "done": "Fertig, ich habe ihn gespeichert"
     },
     "revokeDialog": {

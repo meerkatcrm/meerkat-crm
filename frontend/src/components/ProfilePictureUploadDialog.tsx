@@ -105,10 +105,7 @@ export default function ProfilePictureUploadDialog({
     setCroppedAreaPixels(croppedAreaPixels);
   }, []);
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
+  const loadFile = (file: File) => {
     setError(null);
 
     // Validate file type
@@ -130,6 +127,24 @@ export default function ProfilePictureUploadDialog({
       setZoom(1);
     });
     reader.readAsDataURL(file);
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    // Cleared so that picking the same file again still fires a change event.
+    event.target.value = '';
+    if (file) loadFile(file);
+  };
+
+  // Without preventDefault the browser opens a dropped file, navigating away from the app.
+  const handleDragOver = (event: React.DragEvent<HTMLElement>) => {
+    event.preventDefault();
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    const file = event.dataTransfer.files?.[0];
+    if (file) loadFile(file);
   };
 
   const handleFetchFromUrl = async () => {
@@ -205,7 +220,7 @@ export default function ProfilePictureUploadDialog({
   };
 
   return (
-    <AppDialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+    <AppDialog open={open} onClose={handleClose} busy={uploading} maxWidth="sm" fullWidth>
       <DialogTitle>{t('profilePicture.title')}</DialogTitle>
       <DialogContent>
         {error && (
@@ -235,6 +250,8 @@ export default function ProfilePictureUploadDialog({
                 }
               }}
               component="label"
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
             >
               <input
                 type="file"

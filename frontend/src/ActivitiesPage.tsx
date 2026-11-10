@@ -32,9 +32,12 @@ import AddActivityDialog from './components/AddActivityDialog';
 import EditTimelineItemDialog from './components/EditTimelineItemDialog';
 import { ListSkeleton } from './components/LoadingSkeletons';
 import { useDateFormat } from './DateFormatProvider';
+import { useSnackbar } from './context/SnackbarContext';
+import { handleError } from './utils/errorHandler';
 
 const ActivitiesPage: React.FC = () => {
   const { t } = useTranslation();
+  const { showError } = useSnackbar();
   const { formatDate, parseDateInput, autoFormatDateInput, getDatePlaceholder } = useDateFormat();
 
   const [searchInput, setSearchInput] = useState('');
@@ -175,7 +178,7 @@ const ActivitiesPage: React.FC = () => {
       setEditValues({});
       refetch();
     } catch (err) {
-      console.error('Failed to update activity:', err);
+      handleError(err, { operation: 'updating activity' }, { showError });
     }
   };
 
@@ -194,7 +197,7 @@ const ActivitiesPage: React.FC = () => {
       setEditValues({});
       refetch();
     } catch (err) {
-      console.error('Failed to delete activity:', err);
+      handleError(err, { operation: 'deleting activity' }, { showError });
     }
   };
 

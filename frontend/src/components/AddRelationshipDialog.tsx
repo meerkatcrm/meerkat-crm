@@ -273,7 +273,7 @@ export default function AddRelationshipDialog({
   const isEditing = !!relationship;
 
   return (
-    <AppDialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+    <AppDialog open={open} onClose={handleClose} busy={saving} maxWidth="sm" fullWidth>
       <DialogTitle>
         {isEditing ? t('relationships.editRelationship') : t('relationships.addRelationship')}
       </DialogTitle>
