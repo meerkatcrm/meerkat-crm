@@ -170,22 +170,13 @@ func validateSafeURL(fl validator.FieldLevel) bool {
 
 var birthdayRe = regexp.MustCompile(`^(--|\d{4}-)\d{2}-\d{2}$`)
 
-// validateBirthday validates a real calendar date as YYYY-MM-DD, or --MM-DD when
-// the year is unknown.
+// validateBirthday validates the shape YYYY-MM-DD, or --MM-DD when the year is
+// unknown. It does not check that the date exists: imports and CardDAV store
+// dates checked for shape only, every edit sends the stored birthday back, and a
+// stricter check here would block all edits of such a contact.
 func validateBirthday(fl validator.FieldLevel) bool {
 	birthday := fl.Field().String()
-	if birthday == "" {
-		return true // Allow empty (use 'required' tag if needed)
-	}
-	if !birthdayRe.MatchString(birthday) {
-		return false
-	}
-	// Without a year, check against a leap year so that --02-29 stays valid.
-	if rest, ok := strings.CutPrefix(birthday, "--"); ok {
-		birthday = "2000-" + rest
-	}
-	_, err := time.Parse("2006-01-02", birthday)
-	return err == nil
+	return birthday == "" || birthdayRe.MatchString(birthday)
 }
 
 // validateDeceasedDate validates that a deceased date is a full YYYY-MM-DD

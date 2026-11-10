@@ -44,7 +44,10 @@ func ExportData(c *gin.Context) {
 	// Fetch all user data
 	var contacts []models.Contact
 	if err := db.Where("user_id = ?", userID).
-		Preload("Relationships.RelatedContact").
+		Preload("Relationships", "relationships.user_id = ?", userID).
+		Preload("Relationships.RelatedContact", func(db *gorm.DB) *gorm.DB {
+			return db.Select("id", "firstname", "lastname").Where("user_id = ?", userID)
+		}).
 		Order("firstname ASC, lastname ASC").
 		Find(&contacts).Error; err != nil {
 		log.Error().Err(err).Msg("Failed to fetch contacts for export")

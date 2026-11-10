@@ -167,7 +167,9 @@ export default function NetworkPage() {
     updateFilters({ selectedCircle: event.target.value });
   };
 
-  if (loading) {
+  // Only the first load replaces the page: a reload after an edit keeps the graph
+  // (and its layout and zoom) on screen.
+  if (loading && !data) {
     return (
       <Box
         sx={{

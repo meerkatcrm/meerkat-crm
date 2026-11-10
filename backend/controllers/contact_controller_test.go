@@ -1097,4 +1097,36 @@ func TestContactHandlers_TreatANonNumericIDAsAValue(t *testing.T) {
 		router.ServeHTTP(w, req)
 		assert.Equal(t, http.StatusNotFound, w.Code, path)
 	}
+
+	// Handlers that write look their row up before reading the body.
+	require.NoError(t, db.Create(&models.Relationship{UserID: user.ID, ContactID: 1, Name: "Kid", Type: "child"}).Error)
+	router.PUT("/contacts/:id", UpdateContact)
+	router.DELETE("/contacts/:id", DeleteContact)
+	router.POST("/contacts/:id/archive", ArchiveContact)
+	router.PUT("/contacts/:id/relationships/:rid", UpdateRelationship)
+	router.DELETE("/contacts/:id/relationships/:rid", DeleteRelationship)
+	router.DELETE("/notes/:id", DeleteNote)
+	router.DELETE("/reminders/:id", DeleteReminder)
+	router.DELETE("/activities/:id", DeleteActivity)
+	for _, route := range [][2]string{
+		{"PUT", "/contacts/" + injected},
+		{"DELETE", "/contacts/" + injected},
+		{"POST", "/contacts/" + injected + "/archive"},
+		{"PUT", "/contacts/1/relationships/" + injected},
+		{"DELETE", "/contacts/1/relationships/" + injected},
+		{"DELETE", "/notes/" + injected},
+		{"DELETE", "/reminders/" + injected},
+		{"DELETE", "/activities/" + injected},
+	} {
+		req, _ := http.NewRequest(route[0], route[1], nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusNotFound, w.Code, route[0]+" "+route[1])
+	}
+
+	var contacts, relationships int64
+	db.Model(&models.Contact{}).Count(&contacts)
+	db.Model(&models.Relationship{}).Count(&relationships)
+	assert.Equal(t, int64(1), contacts)
+	assert.Equal(t, int64(1), relationships)
 }

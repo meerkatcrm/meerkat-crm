@@ -57,7 +57,6 @@ value in `details.panic`. It now stays in the log only.
 | `controllers/export_controller.go` | "Related Contact Name" was always empty: `RelatedContact` was never preloaded. | Preloads `Relationships.RelatedContact`. |
 | `services/import_session.go` | Two lookups of the existing contact had no `user_id` filter. Not exploitable today (the id comes from a server-built preview). | Scoped by user. |
 | `services/monica_import_session.go` | `s.cancel` was read without the session lock in `Delete` and `CleanupExpired`. | Read under the lock. |
-| `middleware/validation.go` `validateBirthday` | Only the shape was checked; `2020-13-45` passed. | Must be a real date; `--02-29` stays valid. A contact that already stores an impossible date must have it corrected on its next edit. |
 | `main.go` | Startup warned "no mails" whenever Resend was off, even with SMTP configured. | Uses `cfg.EmailEnabled()`. |
 | `graph_controller.go`, `api_token_controller.go` | Errors bypassed the `AppError` envelope, or dropped the underlying error. | Use `apperrors` with `WithError`. |
 | `errors/middleware.go` `LogError` | Every 400 and 404 was logged at error level. | Warn below 500. |
@@ -231,6 +230,13 @@ also decode the body in the controller, against the project rule.
 **Writes that belong in a transaction (verified).** `CreateActivity` (row, then
 association), `UpdateActivity` (association, then row), `CompleteReminder`
 (completion record, then reminder).
+
+**Birthday validation checks the shape only (verified).** `2020-13-45` passes
+`validateBirthday`, and the import and CardDAV paths check no more than that either.
+Tightening the API alone would block every edit of a contact that already stores such
+a date, because each edit sends the stored birthday back (2.1 C). Validate real dates
+in one shared function used by the API, the importers and the vCard mapper, and
+repair stored values in a migration.
 
 **Contact field checklist.** `MergeImportedContact` (`import_service.go:908-994`) and
 the CSV export (`export_controller.go:93-97`) are hand-kept field lists that the
