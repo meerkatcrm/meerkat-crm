@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func CreateActivity(c *gin.Context) {
@@ -83,7 +84,7 @@ func GetActivity(c *gin.Context) {
 
 	if err := db.Preload("Contacts", func(db *gorm.DB) *gorm.DB {
 		return db.Select("ID", "Firstname", "Lastname", "PhotoThumbnail", "Circles").Where("user_id = ?", userID)
-	}).Where("user_id = ?", userID).First(&activity, id).Error; err != nil {
+	}).Where("user_id = ?", userID).First(&activity, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apperrors.AbortWithError(c, apperrors.ErrNotFound("Activity").WithDetails("id", id))
 		} else {
@@ -187,7 +188,7 @@ func UpdateActivity(c *gin.Context) {
 	}
 
 	var activity models.Activity
-	if err := db.Preload("Contacts", "contacts.user_id = ?", userID).Where("user_id = ?", userID).First(&activity, id).Error; err != nil {
+	if err := db.Preload("Contacts", "contacts.user_id = ?", userID).Where("user_id = ?", userID).First(&activity, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apperrors.AbortWithError(c, apperrors.ErrNotFound("Activity").WithDetails("id", id))
 		} else {
@@ -235,14 +236,16 @@ func UpdateActivity(c *gin.Context) {
 	}
 
 	// Save the activity
-	if err := db.Save(&activity).Error; err != nil {
+	// The association was replaced above; saving it again would re-run every
+	// participant's Contact hooks.
+	if err := db.Omit(clause.Associations).Save(&activity).Error; err != nil {
 		logger.FromContext(c).Error().Err(err).Msg("Error saving activity")
 		apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to save activity").WithError(err))
 		return
 	}
 
 	// Reload the activity with contacts to return complete data
-	if err := db.Preload("Contacts", "contacts.user_id = ?", userID).Where("user_id = ?", userID).First(&activity, id).Error; err != nil {
+	if err := db.Preload("Contacts", "contacts.user_id = ?", userID).Where("user_id = ?", userID).First(&activity, "id = ?", id).Error; err != nil {
 		apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to reload activity").WithError(err))
 		return
 	}
@@ -262,7 +265,7 @@ func DeleteActivity(c *gin.Context) {
 
 	// Check if activity exists first
 	var activity models.Activity
-	if err := db.Where("user_id = ?", userID).First(&activity, id).Error; err != nil {
+	if err := db.Where("user_id = ?", userID).First(&activity, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apperrors.AbortWithError(c, apperrors.ErrNotFound("Activity").WithDetails("id", id))
 		} else {
@@ -293,7 +296,7 @@ func GetActivitiesForContact(c *gin.Context) {
 	}
 
 	var contact models.Contact
-	if err := db.Where("user_id = ?", userID).First(&contact, contactID).Error; err != nil {
+	if err := db.Where("user_id = ?", userID).First(&contact, "id = ?", contactID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apperrors.AbortWithError(c, apperrors.ErrNotFound("Contact").WithDetails("id", contactID))
 		} else {

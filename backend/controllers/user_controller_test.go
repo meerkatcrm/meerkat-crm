@@ -384,7 +384,7 @@ func TestChangePassword_Succeeds(t *testing.T) {
 	db.Create(&user)
 
 	router.POST("/change-password", func(c *gin.Context) {
-		c.Set("username", "changeme")
+		c.Set("userID", user.ID)
 		c.Set("validated", &models.ChangePasswordInput{
 			CurrentPassword: strongPassword,
 			NewPassword:     strongPasswordAnother,
@@ -414,7 +414,7 @@ func TestUpdateLanguage_Chinese(t *testing.T) {
 	db.Create(&user)
 
 	router.PATCH("/users/language", func(c *gin.Context) {
-		c.Set("username", "polyglot")
+		c.Set("userID", user.ID)
 		UpdateLanguage(c)
 	})
 

@@ -267,7 +267,7 @@ func (m *ImportSessionManager) Confirm(db *gorm.DB, userID uint, req models.Impo
 				}
 
 				var existing models.Contact
-				if err := tx.Unscoped().First(&existing, preview.DuplicateMatch.ExistingContactID).Error; err != nil {
+				if err := tx.Unscoped().Where("user_id = ?", userID).First(&existing, preview.DuplicateMatch.ExistingContactID).Error; err != nil {
 					result.Errors = append(result.Errors, fmt.Sprintf("Row %d: Failed to fetch existing contact: %v", preview.RowIndex+1, err))
 					result.Skipped++
 					continue
@@ -410,7 +410,7 @@ func (m *ImportSessionManager) ConfirmVCF(db *gorm.DB, userID uint, req models.I
 				}
 
 				var existing models.Contact
-				if err := tx.Unscoped().First(&existing, preview.DuplicateMatch.ExistingContactID).Error; err != nil {
+				if err := tx.Unscoped().Where("user_id = ?", userID).First(&existing, preview.DuplicateMatch.ExistingContactID).Error; err != nil {
 					result.Errors = append(result.Errors, fmt.Sprintf("Row %d: Failed to fetch existing contact: %v", preview.RowIndex+1, err))
 					result.Skipped++
 					continue

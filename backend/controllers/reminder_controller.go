@@ -26,7 +26,7 @@ func CreateReminder(c *gin.Context) {
 
 	// Find the contact by the ID
 	var contact models.Contact
-	if err := db.Where("user_id = ?", userID).First(&contact, contactID).Error; err != nil {
+	if err := db.Where("user_id = ?", userID).First(&contact, "id = ?", contactID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apperrors.AbortWithError(c, apperrors.ErrNotFound("Contact").WithDetails("id", contactID))
 		} else {
@@ -60,7 +60,7 @@ func CreateReminder(c *gin.Context) {
 		reminder.RemindAt.Day(), 0, 0, 0, 0, reminder.RemindAt.Location())
 
 	// Save the new reminder to the database
-	if err := db.Create(&reminder).Error; err != nil {
+	if err := db.Create(reminder).Error; err != nil {
 		logger.FromContext(c).Error().Err(err).Msg("Error saving reminder to database")
 		apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to save reminder").WithError(err))
 		return
@@ -79,7 +79,7 @@ func GetReminder(c *gin.Context) {
 		return
 	}
 
-	if err := db.Where("user_id = ?", userID).First(&reminder, id).Error; err != nil {
+	if err := db.Where("user_id = ?", userID).First(&reminder, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apperrors.AbortWithError(c, apperrors.ErrNotFound("Reminder").WithDetails("id", id))
 		} else {
@@ -101,7 +101,7 @@ func UpdateReminder(c *gin.Context) {
 		return
 	}
 
-	if err := db.Where("user_id = ?", userID).First(&reminder, id).Error; err != nil {
+	if err := db.Where("user_id = ?", userID).First(&reminder, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apperrors.AbortWithError(c, apperrors.ErrNotFound("Reminder").WithDetails("id", id))
 		} else {
@@ -177,7 +177,7 @@ func DeleteReminder(c *gin.Context) {
 
 	// Check if reminder exists first
 	var reminder models.Reminder
-	if err := db.Where("user_id = ?", userID).First(&reminder, id).Error; err != nil {
+	if err := db.Where("user_id = ?", userID).First(&reminder, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apperrors.AbortWithError(c, apperrors.ErrNotFound("Reminder").WithDetails("id", id))
 		} else {
@@ -206,7 +206,7 @@ func GetRemindersForContact(c *gin.Context) {
 
 	var contact models.Contact
 
-	if err := db.Preload("Reminders", "reminders.user_id = ?", userID).Where("user_id = ?", userID).First(&contact, contactID).Error; err != nil {
+	if err := db.Preload("Reminders", "reminders.user_id = ?", userID).Where("user_id = ?", userID).First(&contact, "id = ?", contactID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apperrors.AbortWithError(c, apperrors.ErrNotFound("Contact").WithDetails("id", contactID))
 		} else {
@@ -299,7 +299,7 @@ func CompleteReminder(c *gin.Context) {
 	}
 
 	var reminder models.Reminder
-	if err := db.Where("user_id = ?", userID).First(&reminder, id).Error; err != nil {
+	if err := db.Where("user_id = ?", userID).First(&reminder, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apperrors.AbortWithError(c, apperrors.ErrNotFound("Reminder").WithDetails("id", id))
 		} else {
@@ -386,7 +386,7 @@ func GetCompletionsForContact(c *gin.Context) {
 
 	// Verify contact belongs to user
 	var contact models.Contact
-	if err := db.Where("user_id = ?", userID).First(&contact, contactID).Error; err != nil {
+	if err := db.Where("user_id = ?", userID).First(&contact, "id = ?", contactID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apperrors.AbortWithError(c, apperrors.ErrNotFound("Contact").WithDetails("id", contactID))
 		} else {
@@ -419,7 +419,7 @@ func DeleteCompletion(c *gin.Context) {
 	}
 
 	var completion models.ReminderCompletion
-	if err := db.Where("user_id = ?", userID).First(&completion, id).Error; err != nil {
+	if err := db.Where("user_id = ?", userID).First(&completion, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apperrors.AbortWithError(c, apperrors.ErrNotFound("Reminder completion").WithDetails("id", id))
 		} else {

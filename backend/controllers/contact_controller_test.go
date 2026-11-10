@@ -1062,3 +1062,39 @@ func TestUpdateContact_EmploymentFieldsWhitespaceCreatesNoEntry(t *testing.T) {
 	assert.Empty(t, got.Organization)
 	assert.Empty(t, employmentEntries(t, db, contact.ID))
 }
+
+// Without the route-level guard, a non-numeric id must still be bound as a value
+// instead of reaching GORM as an inline (raw SQL) condition.
+func TestContactHandlers_TreatANonNumericIDAsAValue(t *testing.T) {
+	db, router := setupRouter()
+	var user models.User
+	db.First(&user)
+	require.NoError(t, db.Create(&models.Contact{UserID: user.ID, Firstname: "Mine"}).Error)
+
+	router.GET("/contacts/:id", GetContact)
+	router.GET("/contacts/:id/notes", GetNotesForContact)
+	router.GET("/contacts/:id/reminders", GetRemindersForContact)
+	router.GET("/contacts/:id/relationships", GetRelationships)
+	router.GET("/contacts/:id/activities", GetActivitiesForContact)
+	router.GET("/notes/:id", GetNote)
+	router.GET("/reminders/:id", GetReminder)
+	router.GET("/activities/:id", GetActivity)
+
+	// True for every row: as raw SQL it would match the caller's first record.
+	injected := url.PathEscape("EXISTS(SELECT 1 FROM users)")
+	for _, path := range []string{
+		"/contacts/" + injected,
+		"/contacts/" + injected + "/notes",
+		"/contacts/" + injected + "/reminders",
+		"/contacts/" + injected + "/relationships",
+		"/contacts/" + injected + "/activities",
+		"/notes/" + injected,
+		"/reminders/" + injected,
+		"/activities/" + injected,
+	} {
+		req, _ := http.NewRequest("GET", path, nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusNotFound, w.Code, path)
+	}
+}

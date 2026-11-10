@@ -168,21 +168,24 @@ func validateSafeURL(fl validator.FieldLevel) bool {
 	return true
 }
 
-// validateBirthday validates date format (YYYY-MM-DD or --MM-DD)
+var birthdayRe = regexp.MustCompile(`^(--|\d{4}-)\d{2}-\d{2}$`)
+
+// validateBirthday validates a real calendar date as YYYY-MM-DD, or --MM-DD when
+// the year is unknown.
 func validateBirthday(fl validator.FieldLevel) bool {
 	birthday := fl.Field().String()
 	if birthday == "" {
 		return true // Allow empty (use 'required' tag if needed)
 	}
-
-	// Check format YYYY-MM-DD or --MM-DD (ISO 8601 format, year optional)
-	match, _ := regexp.MatchString(`^(--|\d{4}-)\d{2}-\d{2}$`, birthday)
-	if !match {
+	if !birthdayRe.MatchString(birthday) {
 		return false
 	}
-
-	// Additional validation could check if date is valid
-	return true
+	// Without a year, check against a leap year so that --02-29 stays valid.
+	if rest, ok := strings.CutPrefix(birthday, "--"); ok {
+		birthday = "2000-" + rest
+	}
+	_, err := time.Parse("2006-01-02", birthday)
+	return err == nil
 }
 
 // validateDeceasedDate validates that a deceased date is a full YYYY-MM-DD

@@ -23,7 +23,7 @@ func GetRelationships(c *gin.Context) {
 	}
 
 	var contact models.Contact
-	if err := db.Where("user_id = ?", userID).First(&contact, contactID).Error; err != nil {
+	if err := db.Where("user_id = ?", userID).First(&contact, "id = ?", contactID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apperrors.AbortWithError(c, apperrors.ErrNotFound("Contact").WithDetails("id", contactID))
 		} else {
@@ -58,7 +58,7 @@ func GetIncomingRelationships(c *gin.Context) {
 	}
 
 	var contact models.Contact
-	if err := db.Where("user_id = ?", userID).First(&contact, contactID).Error; err != nil {
+	if err := db.Where("user_id = ?", userID).First(&contact, "id = ?", contactID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apperrors.AbortWithError(c, apperrors.ErrNotFound("Contact").WithDetails("id", contactID))
 		} else {
@@ -106,7 +106,7 @@ func CreateRelationship(c *gin.Context) {
 	}
 
 	var contact models.Contact
-	if err := db.Where("user_id = ?", userID).First(&contact, contactID).Error; err != nil {
+	if err := db.Where("user_id = ?", userID).First(&contact, "id = ?", contactID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apperrors.AbortWithError(c, apperrors.ErrNotFound("Contact").WithDetails("id", contactIDParam))
 		} else {
@@ -157,7 +157,7 @@ func UpdateRelationship(c *gin.Context) {
 		return
 	}
 
-	if err := db.Where("user_id = ?", userID).First(&relationship, id).Error; err != nil {
+	if err := db.Where("user_id = ?", userID).First(&relationship, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apperrors.AbortWithError(c, apperrors.ErrNotFound("Relationship").WithDetails("id", id))
 		} else {
@@ -192,7 +192,10 @@ func UpdateRelationship(c *gin.Context) {
 		}
 	}
 
-	db.Save(&relationship)
+	if err := db.Save(&relationship).Error; err != nil {
+		apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to update relationship").WithError(err))
+		return
+	}
 
 	c.JSON(http.StatusOK, relationship)
 }
@@ -208,7 +211,7 @@ func DeleteRelationship(c *gin.Context) {
 
 	// Check if relationship exists first
 	var relationship models.Relationship
-	if err := db.Where("user_id = ?", userID).First(&relationship, id).Error; err != nil {
+	if err := db.Where("user_id = ?", userID).First(&relationship, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apperrors.AbortWithError(c, apperrors.ErrNotFound("Relationship").WithDetails("id", id))
 		} else {

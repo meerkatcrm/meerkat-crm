@@ -29,7 +29,7 @@ func CreateNote(c *gin.Context) {
 
 	// Find the contact by the ID
 	var contact models.Contact
-	if err := db.Where("user_id = ?", userID).First(&contact, contactID).Error; err != nil {
+	if err := db.Where("user_id = ?", userID).First(&contact, "id = ?", contactID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apperrors.AbortWithError(c, apperrors.ErrNotFound("Contact").WithDetails("id", contactID))
 		} else {
@@ -117,7 +117,7 @@ func GetNote(c *gin.Context) {
 		return
 	}
 
-	if err := db.Where("user_id = ?", userID).First(&note, id).Error; err != nil {
+	if err := db.Where("user_id = ?", userID).First(&note, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apperrors.AbortWithError(c, apperrors.ErrNotFound("Note").WithDetails("id", id))
 		} else {
@@ -200,7 +200,7 @@ func UpdateNote(c *gin.Context) {
 	var note models.Note
 
 	// Retrieve the existing note from the database
-	if err := db.Where("user_id = ?", userID).First(&note, id).Error; err != nil {
+	if err := db.Where("user_id = ?", userID).First(&note, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apperrors.AbortWithError(c, apperrors.ErrNotFound("Note").WithDetails("id", id))
 		} else {
@@ -250,7 +250,7 @@ func DeleteNote(c *gin.Context) {
 
 	// Check if note exists first
 	var note models.Note
-	if err := db.Where("user_id = ?", userID).First(&note, id).Error; err != nil {
+	if err := db.Where("user_id = ?", userID).First(&note, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apperrors.AbortWithError(c, apperrors.ErrNotFound("Note").WithDetails("id", id))
 		} else {
@@ -285,7 +285,7 @@ func GetNotesForContact(c *gin.Context) {
 	var contact models.Contact
 
 	// Fetch the contact and preload associated notes
-	if err := db.Preload("Notes", "notes.user_id = ?", userID).Where("user_id = ?", userID).First(&contact, contactID).Error; err != nil {
+	if err := db.Preload("Notes", "notes.user_id = ?", userID).Where("user_id = ?", userID).First(&contact, "id = ?", contactID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			// If no contact found, return a 404 error
 			apperrors.AbortWithError(c, apperrors.ErrNotFound("Contact").WithDetails("id", contactID))

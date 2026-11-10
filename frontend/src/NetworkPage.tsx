@@ -33,7 +33,7 @@ export default function NetworkPage() {
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const { data, loading, error } = useGraph();
+  const { data, loading, error, refetch } = useGraph();
 
   const [filters, setFilters] = useState<NetworkFilters>(loadNetworkFilters);
   const { selectedCircle, showRelationships, showActivities, showCircles } = filters;
@@ -146,6 +146,7 @@ export default function NetworkPage() {
         contact_ids: editValues.activityContacts?.map(c => c.ID) || [],
       });
       handleActivityEditClose();
+      await refetch();
     } catch (err) {
       console.error('Failed to update activity:', err);
     }
@@ -156,6 +157,7 @@ export default function NetworkPage() {
     try {
       await deleteActivity(editingActivity.ID);
       handleActivityEditClose();
+      await refetch();
     } catch (err) {
       console.error('Failed to delete activity:', err);
     }

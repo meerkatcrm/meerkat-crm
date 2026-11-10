@@ -607,7 +607,7 @@ export default function MonicaImportDialog({
                       <Tooltip
                         title={t('contacts.import.preview.duplicateOf', 'Matches: {{name}} ({{reason}})', {
                           name: `${row.duplicate_match.existing_firstname} ${row.duplicate_match.existing_lastname}`,
-                          reason: row.duplicate_match.match_reason,
+                          reason: t(`contacts.import.preview.matchReason.${row.duplicate_match.match_reason}`, row.duplicate_match.match_reason),
                         })}
                       >
                         <Chip icon={<WarningIcon />} label={t('contacts.import.preview.duplicateStatus')} size="small" color="warning" />

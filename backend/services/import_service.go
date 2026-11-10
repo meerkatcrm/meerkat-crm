@@ -79,6 +79,11 @@ func ParseVCF(reader io.Reader, db *gorm.DB, userID uint) (contacts []VCFContact
 		if decodeErr == io.EOF {
 			break
 		}
+		// Checked before the error branch: malformed entries count too, or a file
+		// of junk lines would produce an unbounded preview.
+		if rowIdx >= MaxVCFContacts {
+			return nil, nil, stats, fmt.Errorf("too many contacts: maximum is %d contacts", MaxVCFContacts)
+		}
 		if decodeErr != nil {
 			// Skip malformed vCards but continue parsing. The empty contact keeps both
 			// slices aligned, because confirming looks contacts up by RowIndex.
@@ -91,10 +96,6 @@ func ParseVCF(reader io.Reader, db *gorm.DB, userID uint) (contacts []VCFContact
 			})
 			stats.ErrorCount++
 			continue
-		}
-
-		if rowIdx >= MaxVCFContacts {
-			return nil, nil, stats, fmt.Errorf("too many contacts: maximum is %d contacts", MaxVCFContacts)
 		}
 
 		// Convert vCard to Contact using existing carddav mapper

@@ -7,6 +7,7 @@ import (
 	"meerkat/models"
 	"net/http"
 	"path"
+	"strconv"
 	"strings"
 
 	"github.com/emersion/go-vcard"
@@ -166,9 +167,9 @@ func (b *Backend) GetAddressObject(ctx context.Context, urlPath string, req *car
 	// Try to find by vcard_uid first, then by ID
 	err = db.Where("user_id = ? AND vcard_uid = ?", userID, uid).First(&contact).Error
 	if err == gorm.ErrRecordNotFound {
-		// Try parsing as numeric ID for backwards compatibility
-		var id uint
-		if _, scanErr := fmt.Sscanf(uid, "%d", &id); scanErr == nil {
+		// Paths from before contacts had a vCard UID used the numeric ID. The whole
+		// name must be a number: "42f1e0c2-…" is a UID, not contact 42.
+		if id, parseErr := strconv.ParseUint(uid, 10, 64); parseErr == nil {
 			err = db.Where("user_id = ? AND id = ?", userID, id).First(&contact).Error
 		}
 	}
@@ -361,8 +362,9 @@ func (b *Backend) DeleteAddressObject(ctx context.Context, urlPath string) error
 	var contact models.Contact
 	err = db.Where("user_id = ? AND vcard_uid = ?", userID, uid).First(&contact).Error
 	if err == gorm.ErrRecordNotFound {
-		var id uint
-		if _, scanErr := fmt.Sscanf(uid, "%d", &id); scanErr == nil {
+		// Paths from before contacts had a vCard UID used the numeric ID. The whole
+		// name must be a number: "42f1e0c2-…" is a UID, not contact 42.
+		if id, parseErr := strconv.ParseUint(uid, 10, 64); parseErr == nil {
 			err = db.Where("user_id = ? AND id = ?", userID, id).First(&contact).Error
 		}
 	}

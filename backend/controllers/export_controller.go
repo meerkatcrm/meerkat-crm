@@ -44,7 +44,7 @@ func ExportData(c *gin.Context) {
 	// Fetch all user data
 	var contacts []models.Contact
 	if err := db.Where("user_id = ?", userID).
-		Preload("Relationships").
+		Preload("Relationships.RelatedContact").
 		Order("firstname ASC, lastname ASC").
 		Find(&contacts).Error; err != nil {
 		log.Error().Err(err).Msg("Failed to fetch contacts for export")
@@ -401,7 +401,7 @@ func ExportContactAsVCF(c *gin.Context, photoDir string) {
 	contactID := c.Param("id")
 
 	var contact models.Contact
-	if err := db.Where("user_id = ?", userID).First(&contact, contactID).Error; err != nil {
+	if err := db.Where("user_id = ?", userID).First(&contact, "id = ?", contactID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apperrors.AbortWithError(c, apperrors.ErrNotFound("Contact").WithDetails("id", contactID))
 		} else {

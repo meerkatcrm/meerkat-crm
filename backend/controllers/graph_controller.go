@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"fmt"
+	apperrors "meerkat/errors"
 	"meerkat/models"
 	"net/http"
 	"strings"
@@ -24,7 +25,7 @@ func GetGraph(c *gin.Context) {
 	if err := db.Select("id", "firstname", "lastname", "photo_thumbnail", "circles").
 		Where("user_id = ? AND archived = ?", userID, false).
 		Find(&contacts).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch contacts"})
+		apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to fetch contacts").WithError(err))
 		return
 	}
 
@@ -32,7 +33,7 @@ func GetGraph(c *gin.Context) {
 	var relationships []models.Relationship
 	if err := db.Where("user_id = ? AND related_contact_id IS NOT NULL", userID).
 		Find(&relationships).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch relationships"})
+		apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to fetch relationships").WithError(err))
 		return
 	}
 
@@ -41,7 +42,7 @@ func GetGraph(c *gin.Context) {
 	if err := db.Preload("Contacts", func(db *gorm.DB) *gorm.DB {
 		return db.Select("id").Where("user_id = ?", userID)
 	}).Where("user_id = ?", userID).Find(&activities).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch activities"})
+		apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to fetch activities").WithError(err))
 		return
 	}
 

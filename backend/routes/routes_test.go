@@ -8,6 +8,7 @@ import (
 	"meerkat/services"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"regexp"
 	"strings"
 	"sync/atomic"
@@ -213,4 +214,29 @@ func TestRoutes_PublicEndpointsAnswerWithoutCredentials(t *testing.T) {
 	wellKnown := request(router, http.MethodGet, "/.well-known/carddav", nil)
 	assert.Less(t, wellKnown.Code, 400)
 	assert.NotEqual(t, http.StatusUnauthorized, wellKnown.Code)
+}
+
+// GORM runs a non-numeric string passed as an inline condition as raw SQL, so an id
+// from the URL must never reach a query as anything but a number.
+func TestRoutes_NonNumericIDsAreRejected(t *testing.T) {
+	cfg := testConfig()
+	router, db := newRouter(t, cfg, nil)
+	user := models.User{Username: "regular", Email: "regular@example.com", Password: "x"}
+	require.NoError(t, db.Create(&user).Error)
+	token, err := middleware.GenerateToken(user, cfg)
+	require.NoError(t, err)
+	asUser := func(r *http.Request) { r.Header.Set("Authorization", "Bearer "+token) }
+
+	// A numeric id passes the guard and reaches the handler, which has no such contact.
+	assert.Equal(t, http.StatusNotFound, request(router, http.MethodGet, "/api/v1/contacts/1", asUser).Code)
+	for _, id := range []string{
+		"EXISTS(SELECT 1 FROM users)", // as raw SQL this is true for every row
+		"1 OR 1=1",
+		"abc",
+		"0",
+		"-1",
+	} {
+		path := "/api/v1/contacts/" + url.PathEscape(id)
+		assert.Equal(t, http.StatusBadRequest, request(router, http.MethodGet, path, asUser).Code, id)
+	}
 }

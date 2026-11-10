@@ -48,6 +48,8 @@ export default function ReminderList({
     try {
       setLoading(reminderId);
       await onComplete(reminderId);
+    } catch {
+      // The parent has already reported the failure.
     } finally {
       setLoading(null);
     }
@@ -65,6 +67,8 @@ export default function ReminderList({
         await onDelete(reminderToDelete);
         setDeleteDialogOpen(false);
         setReminderToDelete(null);
+      } catch {
+        // The parent has already reported the failure; keep the dialog open.
       } finally {
         setLoading(null);
       }

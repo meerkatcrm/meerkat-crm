@@ -84,7 +84,15 @@ export const CONTACT_DETAIL_COLUMNS = [
   'job_title', 'role', 'anniversary', 'is_deceased', 'deceased_date'
 ];
 
+// The route reuses one component instance for every contact. Keying by id resets
+// all state on navigation, so an edit opened on one contact can never be saved
+// onto the next one.
 export default function ContactDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  return <ContactDetail key={id} />;
+}
+
+function ContactDetail() {
   const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();

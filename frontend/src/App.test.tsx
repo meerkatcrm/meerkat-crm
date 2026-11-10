@@ -75,7 +75,7 @@ test('logged in shows the app shell with navigation and the dashboard', async ()
 });
 
 test('a server session without cached user info (OIDC redirect) restores the app shell', async () => {
-  serverSession({ ID: 1, Username: 'anna', is_admin: false });
+  serverSession({ id: 1, username: 'anna', is_admin: false });
   render(<App />);
   await expectAppShell();
   expect(JSON.parse(localStorage.getItem('user_info')!)).toEqual({ user_id: 1, username: 'anna', is_admin: false });
