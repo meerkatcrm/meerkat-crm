@@ -82,6 +82,7 @@ function AppContent({ token, setToken }: { token: string | null; setToken: (toke
   const location = useLocation();
   const navigate = useNavigate();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isPhoneWidth = useMediaQuery(theme.breakpoints.down('sm'));
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
@@ -324,13 +325,14 @@ function AppContent({ token, setToken }: { token: string | null; setToken: (toke
               color="inherit" 
               aria-label="menu" 
               onClick={handleDrawerToggle} 
-              sx={{ mr: 2 }}
+              sx={{ mr: { xs: 1, sm: 2 } }}
             >
               <MenuIcon />
             </IconButton>
           )}
           <Typography 
             variant="h6" 
+            noWrap
             component={Link} 
             to="/" 
             onClick={() => {
@@ -339,6 +341,7 @@ function AppContent({ token, setToken }: { token: string | null; setToken: (toke
             }}
             sx={{ 
               flexGrow: 1, 
+              minWidth: 0,
               textDecoration: 'none', 
               color: 'inherit',
               '&:hover': { opacity: 0.8 }
@@ -376,8 +379,8 @@ function AppContent({ token, setToken }: { token: string | null; setToken: (toke
                 placeholder={t('contacts.search')}
                 variant="outlined"
                 sx={{
-                  width: { xs: 150, sm: 200, md: 250 },
-                  mr: 2,
+                  width: { xs: 135, sm: 200, md: 250 },
+                  mr: { xs: 1, sm: 2 },
                   '& .MuiOutlinedInput-root': {
                     backgroundColor: 'rgba(255, 255, 255, 0.15)',
                     '&:hover': {
@@ -455,9 +458,17 @@ function AppContent({ token, setToken }: { token: string | null; setToken: (toke
               </li>
             )}
           />
-          <Button color="inherit" startIcon={<LogoutIcon />} onClick={handleLogout}>
-            {t('app.logout')}
-          </Button>
+          {isPhoneWidth ? (
+            <Tooltip title={t('app.logout')}>
+              <IconButton color="inherit" edge="end" aria-label={t('app.logout')} onClick={handleLogout}>
+                <LogoutIcon />
+              </IconButton>
+            </Tooltip>
+          ) : (
+            <Button color="inherit" startIcon={<LogoutIcon />} onClick={handleLogout}>
+              {t('app.logout')}
+            </Button>
+          )}
         </Toolbar>
       </AppBar>
 
@@ -513,6 +524,9 @@ function AppContent({ token, setToken }: { token: string | null; setToken: (toke
         component="main"
         sx={{
           flexGrow: 1,
+          // A flex item won't shrink below its content by default, which would let
+          // one wide table or canvas stretch the whole page past the viewport.
+          minWidth: 0,
           p: 2,
           width: { md: `calc(100% - ${drawerWidth}px)` },
           mt: 7,

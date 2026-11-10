@@ -157,7 +157,8 @@ export default function CustomFieldsSettings() {
                     {fieldNames.map((name, index) => (
                       <ListItem
                         key={index}
-                        sx={{ px: 0 }}
+                        // Keep the text clear of the absolutely positioned action buttons.
+                        sx={{ pl: 0, pr: 15, overflowWrap: 'anywhere' }}
                         secondaryAction={
                           <>
                             <IconButton
@@ -211,7 +212,7 @@ export default function CustomFieldsSettings() {
                     onChange={(e) => setNewFieldName(e.target.value)}
                     onKeyDown={handleKeyDown}
                     disabled={saving}
-                    sx={{ flexGrow: 1 }}
+                    sx={{ flexGrow: 1, minWidth: 0 }}
                     slotProps={{ htmlInput: { maxLength: 100 } }}
                   />
                   <Button
@@ -220,6 +221,7 @@ export default function CustomFieldsSettings() {
                     startIcon={<AddIcon />}
                     onClick={handleAddField}
                     disabled={saving || !newFieldName.trim()}
+                    sx={{ flexShrink: 0 }}
                   >
                     {t('settings.customFields.add')}
                   </Button>

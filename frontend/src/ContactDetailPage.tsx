@@ -805,9 +805,16 @@ export default function ContactDetailPage() {
         />
 
         {/* Timeline and Reminders Tabs */}
-        <Card sx={{ flex: 1 }}>
+        <Card sx={{ flex: 1, minWidth: 0 }}>
           <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-            <Tabs value={activeTab} onChange={(_, newValue) => setActiveTab(newValue)} aria-label="timeline and reminders tabs">
+            <Tabs
+              value={activeTab}
+              onChange={(_, newValue) => setActiveTab(newValue)}
+              aria-label="timeline and reminders tabs"
+              variant="scrollable"
+              scrollButtons="auto"
+              allowScrollButtonsMobile
+            >
               <Tab label={t('contactDetail.timeline')} />
               <Tab label={t('reminders.title')} />
             </Tabs>
@@ -816,7 +823,7 @@ export default function ContactDetailPage() {
           {/* Tab Panel 0: Timeline - Notes and Activities */}
           {activeTab === 0 && (
             <CardContent sx={{ py: 2 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mb: 1.5, gap: 0.5 }}>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center', mb: 1.5, gap: 0.5 }}>
                 <Button 
                   startIcon={<NoteIcon />} 
                   onClick={() => setNoteDialogOpen(true)}
