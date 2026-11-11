@@ -914,6 +914,7 @@
     "endDateHelp": "如果关系仍在持续，请留空",
     "ended": "已结束",
     "since": "自 {{date}} 起",
+    "startingOn": "将于 {{date}} 开始",
     "endedOn": "结束于 {{date}}",
     "dateRange": "{{start}} – {{end}}",
     "endBeforeStart": "结束日期不能早于开始日期",

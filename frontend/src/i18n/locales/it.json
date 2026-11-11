@@ -914,6 +914,7 @@
     "endDateHelp": "Lascia vuoto se la relazione è ancora in corso",
     "ended": "Terminata",
     "since": "dal {{date}}",
+    "startingOn": "a partire da {{date}}",
     "endedOn": "terminata {{date}}",
     "dateRange": "{{start}} – {{end}}",
     "endBeforeStart": "La data di fine non può essere precedente alla data di inizio",

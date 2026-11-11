@@ -78,3 +78,17 @@ test('ended incoming relationship is marked too', () => {
   expect(screen.getByText('Ended')).toBeInTheDocument();
   expect(screen.getByText('ended 2019')).toBeInTheDocument();
 });
+
+test('a start date still ahead reads "starting", not "since"', () => {
+  window.localStorage.setItem('dateFormat', 'iso');
+  const nextYear = String(new Date().getFullYear() + 1);
+  renderList([rel({ type: 'Partner', start_date: `${nextYear}-06` })]);
+  expect(screen.getByText(`starting ${nextYear}-06`)).toBeInTheDocument();
+  expect(screen.queryByText(/since/)).not.toBeInTheDocument();
+});
+
+test('a start in the current year still reads "since"', () => {
+  const thisYear = String(new Date().getFullYear());
+  renderList([rel({ start_date: thisYear })]);
+  expect(screen.getByText(`since ${thisYear}`)).toBeInTheDocument();
+});

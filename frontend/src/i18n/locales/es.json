@@ -914,6 +914,7 @@
     "endDateHelp": "Déjalo en blanco si la relación continúa",
     "ended": "Terminada",
     "since": "desde {{date}}",
+    "startingOn": "a partir de {{date}}",
     "endedOn": "terminó {{date}}",
     "dateRange": "{{start}} – {{end}}",
     "endBeforeStart": "La fecha de fin no puede ser anterior a la de inicio",

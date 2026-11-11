@@ -12,7 +12,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Relationship, IncomingRelationship, isRelationshipEnded } from '../api/relationships';
+import { Relationship, IncomingRelationship, isRelationshipEnded, isPartialDateInFuture } from '../api/relationships';
 import { useDateFormat } from '../DateFormatProvider';
 import { useConfirm } from './ConfirmDialog';
 import { contactDisplayName } from '../utils/contactName';
@@ -63,13 +63,18 @@ export default function RelationshipList({
     return translated === translationKey ? type : translated;
   };
 
-  // "since 2010", "ended 06.2018" or "2010 – 06.2018"; null when no dates are set
+  // "since 2010", "starting 06.2027", "ended 06.2018" or "2010 – 06.2018"; null when no dates are set
   const formatRelationshipDates = (rel: { start_date?: string; end_date?: string }) => {
     const start = rel.start_date ? formatDate(rel.start_date) : '';
     const end = rel.end_date ? formatDate(rel.end_date) : '';
     if (start && end) return t('relationships.dateRange', { start, end });
     if (end) return t('relationships.endedOn', { date: end });
-    if (start) return t('relationships.since', { date: start });
+    if (start) {
+      // A start date may lie ahead (e.g. an upcoming wedding); don't call it "since"
+      return isPartialDateInFuture(rel.start_date)
+        ? t('relationships.startingOn', { date: start })
+        : t('relationships.since', { date: start });
+    }
     return null;
   };
 

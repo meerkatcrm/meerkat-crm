@@ -69,13 +69,15 @@ export function isEndBeforeStart(startDate?: string, endDate?: string): boolean 
   return padPartialDate(endDate, 'end') < padPartialDate(startDate, 'start');
 }
 
-// Mirrors the backend rule that an end date must not lie in the future. The period
-// counts from its first day, so "2026" is fine at any point during 2026.
-export function isEndInFuture(endDate?: string, today: Date = new Date()): boolean {
-  if (!endDate) return false;
+// Whether a partial date has not begun yet. The period counts from its first day,
+// so "2026" is not in the future at any point during 2026. Used to mirror the
+// backend rule that an end date must not lie in the future, and to word a start
+// date that is still ahead ("starting …" rather than "since …").
+export function isPartialDateInFuture(date?: string, today: Date = new Date()): boolean {
+  if (!date) return false;
   const pad = (n: number) => String(n).padStart(2, '0');
   const todayISO = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
-  return padPartialDate(endDate, 'start') > todayISO;
+  return padPartialDate(date, 'start') > todayISO;
 }
 
 // Get all relationships for a contact

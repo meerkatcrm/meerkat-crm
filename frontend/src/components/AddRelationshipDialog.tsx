@@ -20,7 +20,7 @@ import {
 } from '@mui/material';
 import AppDialog from './AppDialog';
 import { useTranslation } from 'react-i18next';
-import { Relationship, RelationshipFormData, RELATIONSHIP_TYPES, isEndBeforeStart, isEndInFuture } from '../api/relationships';
+import { Relationship, RelationshipFormData, RELATIONSHIP_TYPES, isEndBeforeStart, isPartialDateInFuture } from '../api/relationships';
 import { Contact, createContact } from '../api/contacts';
 import { useContactSearch } from '../hooks/useContactSearch';
 import { useSnackbar } from '../context/SnackbarContext';
@@ -218,7 +218,7 @@ export default function AddRelationshipDialog({
     }
     // Checked before anything is saved: in "new contact" mode a server-side rejection
     // would come only after the contact had already been created.
-    if (isEndInFuture(parsedEndDate)) {
+    if (isPartialDateInFuture(parsedEndDate)) {
       setError(t('relationships.endInFuture'));
       return;
     }

@@ -914,6 +914,7 @@
     "endDateHelp": "Leave blank if the relationship is ongoing",
     "ended": "Ended",
     "since": "since {{date}}",
+    "startingOn": "starting {{date}}",
     "endedOn": "ended {{date}}",
     "dateRange": "{{start}} – {{end}}",
     "endBeforeStart": "End date must not be before the start date",
