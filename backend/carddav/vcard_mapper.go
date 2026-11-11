@@ -1022,6 +1022,9 @@ func extractUnmappedProperties(card vcard.Card) VCardExtra {
 // and "\;" to the same text, so a note containing a literal backslash-semicolon
 // comes back as a plain semicolon. The distinction is lost before this code sees
 // the value, and go-vcard's encoder never escapes ';', so nothing here can restore it.
+//
+// Also known: only the text of a NOTE is kept. A grouped or labelled NOTE (item1.NOTE
+// with an X-ABLabel, say) loses its group and parameters; common clients write neither.
 var noteEscapes = strings.NewReplacer(`\;`, ";")
 
 // noteFromCard reads the NOTE properties into one string. vCard allows several but

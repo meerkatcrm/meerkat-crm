@@ -1,5 +1,8 @@
 -- Hand the note back to vcard_extra as a NOTE property before the column goes, so
 -- the previous release keeps round-tripping it over CardDAV instead of losing it.
+-- The "\;" escape the up migration removed is not put back: the previous release's
+-- encoder would double its backslash and send the phone "\\;". A bare ";" is what
+-- clients accept in practice.
 UPDATE contacts
 SET vcard_extra = json_set(
   CASE

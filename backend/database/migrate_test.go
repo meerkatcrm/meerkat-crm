@@ -241,7 +241,8 @@ func TestMigration34_MovesVCardNoteIntoColumn(t *testing.T) {
 	_, err = db.Exec(`INSERT INTO users (id, username, password, email, enabled_contact_fields) VALUES
 		(1, 'configured', 'hash', 'a@example.com', '["emails"]'),
 		(2, 'defaults', 'hash', 'b@example.com', NULL),
-		(3, 'configured_no_note', 'hash', 'c@example.com', '["phones"]')`)
+		(3, 'configured_no_note', 'hash', 'c@example.com', '["phones"]'),
+		(4, 'configured_empty', 'hash', 'd@example.com', '[]')`)
 	require.NoError(t, err)
 	_, err = db.Exec(`INSERT INTO contacts (id, user_id, firstname, vcard_extra) VALUES
 		(1, 1, 'one_note', '{"properties":{"NOTE":[{"Value":"Met at a wedding\\; bring cake","Params":{},"Group":""}],"X-KEEP":[{"Value":"k","Params":{},"Group":""}]}}'),
@@ -283,6 +284,7 @@ func TestMigration34_MovesVCardNoteIntoColumn(t *testing.T) {
 	assert.Equal(t, `["emails","note"]`, fields(1).String, "a saved selection gains the field")
 	assert.False(t, fields(2).Valid, "the frontend defaults already include it")
 	assert.Equal(t, `["phones","note"]`, fields(3).String, "also without a note yet: a later sync may bring one")
+	assert.Equal(t, `[]`, fields(4).String, "a deliberately empty selection is respected")
 
 	require.NoError(t, m.Migrate(33))
 	assert.JSONEq(t, `{"properties":{"X-KEEP":[{"Value":"k","Params":{},"Group":""}],"NOTE":[{"Value":"Met at a wedding; bring cake"}]}}`, extra(1).String)

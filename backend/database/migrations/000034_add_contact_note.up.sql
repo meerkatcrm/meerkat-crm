@@ -33,10 +33,12 @@ WHERE vcard_extra IS NOT NULL AND vcard_extra != '' AND json_valid(vcard_extra)
 -- Users who saved their own field selection would not see the new field, so a note
 -- that comes from their phone, now or with a later sync, would still look lost (the
 -- symptom of #290). Unlike a field users type into, the note is filled by sync, so the
--- field is switched on for every saved selection. NULL selections get the frontend
--- defaults, which include it.
+-- field is switched on for every saved selection. An empty selection is a deliberate
+-- choice to show no extended fields and is left alone. NULL selections get the
+-- frontend defaults, which include it.
 UPDATE users
 SET enabled_contact_fields = json_insert(enabled_contact_fields, '$[#]', 'note')
 WHERE enabled_contact_fields IS NOT NULL AND json_valid(enabled_contact_fields)
   AND json_type(enabled_contact_fields) = 'array'
+  AND EXISTS (SELECT 1 FROM json_each(users.enabled_contact_fields))
   AND NOT EXISTS (SELECT 1 FROM json_each(users.enabled_contact_fields) WHERE value = 'note');
