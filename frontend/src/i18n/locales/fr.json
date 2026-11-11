@@ -465,6 +465,12 @@
     "fetch": "Récupérer",
     "urlFetchError": "Échec de la récupération de l'image depuis l'URL"
   },
+  "itemImage": {
+    "alt": "Image jointe",
+    "attach": "Joindre une image",
+    "replace": "Remplacer l'image",
+    "remove": "Supprimer l'image"
+  },
   "settings": {
     "title": "Paramètres",
     "language": {

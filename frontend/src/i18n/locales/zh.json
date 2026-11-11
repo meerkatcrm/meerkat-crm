@@ -465,6 +465,12 @@
     "fetch": "获取",
     "urlFetchError": "从 URL 获取图片失败"
   },
+  "itemImage": {
+    "alt": "附加的图片",
+    "attach": "附加图片",
+    "replace": "替换图片",
+    "remove": "移除图片"
+  },
   "settings": {
     "title": "设置",
     "language": {

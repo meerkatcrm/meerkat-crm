@@ -416,6 +416,13 @@ func DeleteContact(c *gin.Context) {
 		return
 	}
 
+	// The contact's notes go with it, so their images must too.
+	var noteImages []string
+	if err := db.Model(&models.Note{}).Where("contact_id = ? AND user_id = ? AND image <> ''", contact.ID, userID).Pluck("image", &noteImages).Error; err != nil {
+		apperrors.AbortWithError(c, apperrors.ErrDatabase("find").WithError(err))
+		return
+	}
+
 	err := db.Transaction(func(tx *gorm.DB) error {
 		return models.DeleteContactCascade(tx, userID, contact.ID)
 	})
@@ -428,6 +435,9 @@ func DeleteContact(c *gin.Context) {
 	// Cleanup profile photos after successful database transaction
 	// This is done outside the transaction since file deletion cannot be rolled back
 	deleteContactPhotos(c, contact)
+	for _, image := range noteImages {
+		removeItemImageFile(c, currentConfig(c).ProfilePhotoDir, image)
+	}
 
 	go services.TriggerWebhooks(db, currentConfig(c), userID, "contact.deleted", gin.H{"id": contact.ID})
 	c.JSON(http.StatusOK, gin.H{"message": "Contact deleted"})

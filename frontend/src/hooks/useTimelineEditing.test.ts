@@ -6,12 +6,14 @@ import { useTimelineEditing } from './useTimelineEditing';
 import * as contactsApi from '../api/contacts';
 import * as notesApi from '../api/notes';
 import * as activitiesApi from '../api/activities';
+import * as itemImagesApi from '../api/itemImages';
 import type { Note } from '../api/notes';
 import type { Activity } from '../api/activities';
 
 vi.mock('../api/contacts');
 vi.mock('../api/notes');
 vi.mock('../api/activities');
+vi.mock('../api/itemImages');
 
 const contacts = vi.mocked(contactsApi);
 const notes = vi.mocked(notesApi);
@@ -54,7 +56,7 @@ test('editing a note fills the form with its content and its date in the display
   const { result } = setup();
   await act(() => result.current.handleStartEditTimelineItem('note', note));
   expect(result.current.editingTimelineItem).toEqual({ type: 'note', id: 1 });
-  expect(result.current.editTimelineValues).toEqual({ noteContent: 'Hello', noteDate: '15.03.2026' });
+  expect(result.current.editTimelineValues).toEqual({ noteContent: 'Hello', noteDate: '15.03.2026', itemId: 1, image: undefined });
   expect(contacts.getContacts).not.toHaveBeenCalled();
 });
 
@@ -74,6 +76,8 @@ test('editing an activity fills the form; the participant picker searches on its
     activityLocation: 'Berlin',
     activityDate: '01.04.2026',
     activityContacts: [person],
+    itemId: 2,
+    image: undefined,
   });
   // No bulk contact fetch: the backend caps a page at 100, so it could never be complete.
   expect(contacts.getContacts).not.toHaveBeenCalled();
@@ -218,4 +222,21 @@ test('a failed delete notifies and keeps the edit open', async () => {
   expect(showError.mock.calls).toEqual([['n'], ['a']]);
   expect(onRefresh).not.toHaveBeenCalled();
   expect(result.current.editingTimelineItem).toEqual({ type: 'note', id: 1 });
+});
+
+test('saving an edited note applies the staged image change before refreshing', async () => {
+  const { result, onRefresh } = setup();
+  const itemImages = vi.mocked(itemImagesApi);
+  const file = new File(['x'], 'card.jpg', { type: 'image/jpeg' });
+  const order: string[] = [];
+  itemImages.applyImageChange.mockImplementation(async () => { order.push('image'); });
+  onRefresh.mockImplementation(async () => { order.push('refresh'); });
+
+  await act(() => result.current.handleStartEditTimelineItem('note', { ...note, image: 'old_image.jpg' }));
+  expect(result.current.editTimelineValues.image).toBe('old_image.jpg');
+  act(() => result.current.setEditTimelineValues({ ...result.current.editTimelineValues, imageChange: file }));
+  await act(() => result.current.handleUpdateNote(1));
+
+  expect(itemImages.applyImageChange).toHaveBeenCalledWith('notes', 1, file);
+  expect(order).toEqual(['image', 'refresh']);
 });

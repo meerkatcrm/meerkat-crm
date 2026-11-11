@@ -465,6 +465,12 @@
     "fetch": "Obtener",
     "urlFetchError": "Error al obtener la imagen desde la URL"
   },
+  "itemImage": {
+    "alt": "Imagen adjunta",
+    "attach": "Adjuntar imagen",
+    "replace": "Reemplazar imagen",
+    "remove": "Quitar imagen"
+  },
   "settings": {
     "title": "Configuración",
     "language": {

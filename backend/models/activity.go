@@ -14,5 +14,6 @@ type Activity struct {
 	Description string    `json:"description" validate:"max=2000"`
 	Location    string    `json:"location" validate:"max=300"`
 	Date        time.Time `json:"date" validate:"required"`
+	Image       string    `gorm:"not null;default:''" json:"image"` // set only through the image endpoints
 	Contacts    []Contact `gorm:"many2many:activity_contacts;foreignKey:ID;joinForeignKey:ActivityID;References:ID;joinReferences:ContactID" json:"contacts,omitempty"`
 }

@@ -1,0 +1,2 @@
+ALTER TABLE notes DROP COLUMN image;
+ALTER TABLE activities DROP COLUMN image;

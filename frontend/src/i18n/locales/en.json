@@ -465,6 +465,12 @@
     "fetch": "Fetch",
     "urlFetchError": "Failed to fetch image from URL"
   },
+  "itemImage": {
+    "alt": "Attached image",
+    "attach": "Attach image",
+    "replace": "Replace image",
+    "remove": "Remove image"
+  },
   "settings": {
     "title": "Settings",
     "language": {

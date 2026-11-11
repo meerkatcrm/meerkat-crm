@@ -465,6 +465,12 @@
     "fetch": "Abrufen",
     "urlFetchError": "Bild konnte nicht von URL abgerufen werden"
   },
+  "itemImage": {
+    "alt": "Angehängtes Bild",
+    "attach": "Bild anhängen",
+    "replace": "Bild ersetzen",
+    "remove": "Bild entfernen"
+  },
   "settings": {
     "title": "Einstellungen",
     "language": {

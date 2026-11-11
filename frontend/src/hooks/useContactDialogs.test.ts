@@ -3,9 +3,13 @@ import { renderHook, act } from '@testing-library/react';
 import { useContactDialogs } from './useContactDialogs';
 import * as notesApi from '../api/notes';
 import * as activitiesApi from '../api/activities';
+import * as itemImagesApi from '../api/itemImages';
+import type { Note } from '../api/notes';
+import type { Activity } from '../api/activities';
 
 vi.mock('../api/notes');
 vi.mock('../api/activities');
+vi.mock('../api/itemImages');
 
 const notes = vi.mocked(notesApi);
 const activities = vi.mocked(activitiesApi);
@@ -95,4 +99,26 @@ test('a failed activity save notifies and rethrows a displayable error', async (
   });
   expect(showError).toHaveBeenCalledWith('boom');
   expect(onRefresh).not.toHaveBeenCalled();
+});
+
+test('an image chosen in the add dialogs is uploaded to the created note or activity', async () => {
+  const { result, onRefresh } = setup();
+  const itemImages = vi.mocked(itemImagesApi);
+  const file = new File(['x'], 'card.jpg', { type: 'image/jpeg' });
+  notes.createNote.mockResolvedValue({ ID: 7 } as Note);
+  activities.createActivity.mockResolvedValue({ ID: 8 } as Activity);
+
+  await act(() => result.current.handleSaveNote('Hello', '2026-03-15', file));
+  await act(() => result.current.handleSaveActivity(activity, file));
+
+  expect(itemImages.uploadItemImage).toHaveBeenCalledWith('notes', 7, file);
+  expect(itemImages.uploadItemImage).toHaveBeenCalledWith('activities', 8, file);
+  expect(onRefresh).toHaveBeenCalledTimes(2);
+});
+
+test('without an image nothing is uploaded', async () => {
+  const { result } = setup();
+  notes.createNote.mockResolvedValue({ ID: 7 } as Note);
+  await act(() => result.current.handleSaveNote('Hello', '2026-03-15'));
+  expect(vi.mocked(itemImagesApi).uploadItemImage).not.toHaveBeenCalled();
 });
