@@ -10,6 +10,8 @@ export interface Relationship {
   type: string;
   gender?: string;
   birthday?: string;
+  start_date?: string;
+  end_date?: string;
   contact_id: number;
   related_contact_id?: number;
   related_contact?: Pick<Contact, 'ID' | 'firstname' | 'lastname' | 'gender' | 'birthday'>;
@@ -20,6 +22,8 @@ export interface RelationshipFormData {
   type: string;
   gender?: string;
   birthday?: string;
+  start_date?: string;
+  end_date?: string;
   related_contact_id?: number | null;
 }
 
@@ -35,12 +39,34 @@ export interface IncomingRelationship {
   type: string;
   gender?: string;
   birthday?: string;
+  start_date?: string;
+  end_date?: string;
   contact_id: number;
   source_contact: Pick<Contact, 'ID' | 'firstname' | 'lastname'>;
 }
 
 export interface IncomingRelationshipsResponse {
   incoming_relationships: IncomingRelationship[];
+}
+
+// Whether a relationship has ended (it carries an end date)
+export function isRelationshipEnded(rel: { end_date?: string }): boolean {
+  return !!rel.end_date;
+}
+
+// Pads a partial date (YYYY, YYYY-MM, YYYY-MM-DD) to the first or last day of its
+// period, so two partial dates compare correctly as plain strings.
+function padPartialDate(value: string, edge: 'start' | 'end'): string {
+  if (/^\d{4}$/.test(value)) return edge === 'start' ? `${value}-01-01` : `${value}-12-31`;
+  if (/^\d{4}-\d{2}$/.test(value)) return edge === 'start' ? `${value}-01` : `${value}-31`;
+  return value;
+}
+
+// Mirrors the backend rule: an end date (taken at the end of its period) must not be
+// before the start date (taken at the start of its period). Either may be empty.
+export function isEndBeforeStart(startDate?: string, endDate?: string): boolean {
+  if (!startDate || !endDate) return false;
+  return padPartialDate(endDate, 'end') < padPartialDate(startDate, 'start');
 }
 
 // Get all relationships for a contact

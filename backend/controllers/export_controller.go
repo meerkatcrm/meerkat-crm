@@ -166,7 +166,7 @@ func ExportData(c *gin.Context) {
 
 	relationshipHeaders := []string{
 		"ID", "Contact ID", "Contact Name", "Name", "Type", "Gender", "Birthday",
-		"Related Contact ID", "Related Contact Name", "Created At", "Updated At",
+		"Start Date", "End Date", "Related Contact ID", "Related Contact Name", "Created At", "Updated At",
 	}
 	if err := writer.Write(relationshipHeaders); err != nil {
 		log.Error().Err(err).Msg("Failed to write relationship headers")
@@ -193,6 +193,8 @@ func ExportData(c *gin.Context) {
 				rel.Type,
 				rel.Gender,
 				rel.Birthday,
+				rel.StartDate,
+				rel.EndDate,
 				relatedContactID,
 				relatedContactName,
 				rel.CreatedAt.Format(time.RFC3339),

@@ -6,12 +6,13 @@ import {
   Paper,
   Link,
   Divider,
+  Chip,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Relationship, IncomingRelationship } from '../api/relationships';
+import { Relationship, IncomingRelationship, isRelationshipEnded } from '../api/relationships';
 import { useDateFormat } from '../DateFormatProvider';
 import { useConfirm } from './ConfirmDialog';
 import { contactDisplayName } from '../utils/contactName';
@@ -31,7 +32,7 @@ export default function RelationshipList({
 }: RelationshipListProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { formatBirthday, calculateAge } = useDateFormat();
+  const { formatBirthday, formatDate, calculateAge } = useDateFormat();
   const { confirm, confirmDialog } = useConfirm();
 
   const handleDeleteClick = async (relationshipId: number) => {
@@ -62,6 +63,20 @@ export default function RelationshipList({
     return translated === translationKey ? type : translated;
   };
 
+  // "since 2010", "ended 06.2018" or "2010 – 06.2018"; null when no dates are set
+  const formatRelationshipDates = (rel: { start_date?: string; end_date?: string }) => {
+    const start = rel.start_date ? formatDate(rel.start_date) : '';
+    const end = rel.end_date ? formatDate(rel.end_date) : '';
+    if (start && end) return t('relationships.dateRange', { start, end });
+    if (end) return t('relationships.endedOn', { date: end });
+    if (start) return t('relationships.since', { date: start });
+    return null;
+  };
+
+  const endedChip = (
+    <Chip label={t('relationships.ended')} size="small" variant="outlined" sx={{ ml: 1, verticalAlign: 'middle' }} />
+  );
+
   const hasNoRelationships = relationships.length === 0 && incomingRelationships.length === 0;
 
   if (hasNoRelationships) {
@@ -88,20 +103,25 @@ export default function RelationshipList({
           : relationship.name;
         const displayGender = linkedContact?.gender || relationship.gender;
         const displayBirthday = linkedContact?.birthday || relationship.birthday;
+        const ended = isRelationshipEnded(relationship);
+        const dates = formatRelationshipDates(relationship);
 
         return (
           <Paper
             key={relationship.ID}
             variant="outlined"
+            data-ended={ended || undefined}
             sx={{
               p: 2,
+              // Ended relationships stay visible but recede
+              ...(ended && { bgcolor: 'action.hover', '& .relationship-details': { opacity: 0.7 } }),
               '&:hover .action-buttons': {
                 opacity: 1,
               },
             }}
           >
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <Box sx={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>
+              <Box className="relationship-details" sx={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>
                 {linkedContact ? (
                   <Link
                     component="button"
@@ -112,10 +132,11 @@ export default function RelationshipList({
                     {displayName}
                   </Link>
                 ) : (
-                  <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
+                  <Typography variant="subtitle1" component="span" sx={{ fontWeight: 500 }}>
                     {displayName}
                   </Typography>
                 )}
+                {ended && endedChip}
                 <Typography variant="body2" sx={{
                   color: "text.secondary"
                 }}>
@@ -124,6 +145,11 @@ export default function RelationshipList({
                   {displayBirthday && ` · ${t('relationships.birthday')}: ${formatBirthday(displayBirthday)}`}
                   {displayBirthday && calculateAge(displayBirthday) !== null && ` ${t('dashboard.yearsOld', { age: calculateAge(displayBirthday) })}`}
                 </Typography>
+                {dates && (
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                    {dates}
+                  </Typography>
+                )}
               </Box>
               <Box
                 className="action-buttons"
@@ -170,14 +196,17 @@ export default function RelationshipList({
           {incomingRelationships.map((incoming) => {
             const sourceContact = incoming.source_contact;
             const sourceName = contactDisplayName(sourceContact);
+            const ended = isRelationshipEnded(incoming);
+            const dates = formatRelationshipDates(incoming);
 
             return (
               <Paper
                 key={`incoming-${incoming.ID}`}
                 variant="outlined"
+                data-ended={ended || undefined}
                 sx={{ p: 2, bgcolor: 'action.hover' }}
               >
-                <Box sx={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>
+                <Box sx={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere', ...(ended && { opacity: 0.7 }) }}>
                   <Typography variant="body2" sx={{
                     color: "text.secondary"
                   }}>
@@ -191,6 +220,12 @@ export default function RelationshipList({
                   >
                     {sourceName}
                   </Link>
+                  {ended && endedChip}
+                  {dates && (
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                      {dates}
+                    </Typography>
+                  )}
                 </Box>
               </Paper>
             );

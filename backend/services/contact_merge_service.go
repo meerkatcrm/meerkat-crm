@@ -479,8 +479,8 @@ type mergedRelationshipKey struct {
 // moveRelationships re-points the source's relationships at the target. A
 // relationship between the two contacts would become a self-relationship and
 // is dropped, as is a source relationship the target already has (same type,
-// same person); the copy that stays picks up any birthday or gender only the
-// dropped one had. Relationships not involving the source are never touched.
+// same person); the copy that stays picks up any birthday, gender or start/end
+// dates only the dropped one had. Relationships not involving the source are never touched.
 func moveRelationships(tx *gorm.DB, userID, targetID, sourceID uint) error {
 	var rels []models.Relationship
 	if err := tx.Where("user_id = ? AND (contact_id IN ? OR related_contact_id IN ?)", userID,
@@ -543,6 +543,13 @@ func moveRelationships(tx *gorm.DB, userID, targetID, sourceID uint) error {
 			if existing.Gender == "" && r.Gender != "" {
 				existing.Gender = r.Gender
 				setUpdate(existing.ID, "gender", r.Gender)
+			}
+			// Dates travel as a pair so the kept row never ends up with
+			// one side's start and the other side's end.
+			if existing.StartDate == "" && existing.EndDate == "" && (r.StartDate != "" || r.EndDate != "") {
+				existing.StartDate, existing.EndDate = r.StartDate, r.EndDate
+				setUpdate(existing.ID, "start_date", r.StartDate)
+				setUpdate(existing.ID, "end_date", r.EndDate)
 			}
 			drop = append(drop, r.ID)
 			continue

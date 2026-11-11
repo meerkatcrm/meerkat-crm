@@ -11,6 +11,8 @@ type Relationship struct {
 	Type             string   `json:"type" validate:"required,min=1,max=50"`                                 // Relationship type (e.g., "Child", "Mother")
 	Gender           string   `json:"gender" validate:"omitempty,oneof=male female other prefer_not_to_say"` // Gender of the related person
 	Birthday         string   `json:"birthday" validate:"omitempty,birthday"`                                // Birthday of the related person
+	StartDate        string   `json:"start_date" validate:"omitempty,partialdate"`                           // When the relationship began (YYYY, YYYY-MM or YYYY-MM-DD)
+	EndDate          string   `json:"end_date" validate:"omitempty,partialdate"`                             // When the relationship ended; empty means ongoing
 	ContactID        uint     `json:"contact_id" validate:"required"`                                        // Contact this relationship belongs to
 	RelatedContactID *uint    `json:"related_contact_id"`                                                    // Optional link to an existing Contact
 	RelatedContact   *Contact `gorm:"foreignKey:RelatedContactID" json:"related_contact,omitempty"`          // Linked Contact if exists

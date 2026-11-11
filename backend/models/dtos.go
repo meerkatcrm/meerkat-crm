@@ -218,6 +218,8 @@ type RelationshipInput struct {
 	Type             string `json:"type" validate:"required,min=1,max=50"`
 	Gender           string `json:"gender" validate:"omitempty,oneof=male female other prefer_not_to_say"`
 	Birthday         string `json:"birthday" validate:"omitempty,birthday"`
+	StartDate        string `json:"start_date" validate:"omitempty,partialdate"`
+	EndDate          string `json:"end_date" validate:"omitempty,partialdate"`
 	RelatedContactID *uint  `json:"related_contact_id"`
 }
 
