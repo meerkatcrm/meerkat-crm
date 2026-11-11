@@ -41,7 +41,7 @@ test('a staged file is previewed before it is uploaded', () => {
 
 test('the saved image is shown and removing it stages a delete', () => {
   const onChange = renderField({ id: 4, image: 'abc_image.jpg', value: undefined });
-  expect(screen.getByRole('img').getAttribute('src')).toContain('/notes/4/image?v=abc_image.jpg');
+  expect(screen.getByRole('button', { name: 'Attached image' }).getAttribute('src')).toContain('/notes/4/image?v=abc_image.jpg');
 
   fireEvent.click(screen.getByRole('button', { name: 'Remove image' }));
   expect(onChange).toHaveBeenCalledWith(null);
@@ -49,7 +49,7 @@ test('the saved image is shown and removing it stages a delete', () => {
 
 test('once removed, the saved image is no longer shown', () => {
   renderField({ id: 4, image: 'abc_image.jpg', value: null });
-  expect(screen.queryByRole('img')).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Attached image' })).toBeNull();
   expect(screen.getByText('Attach image')).toBeInTheDocument();
 });
 
@@ -57,4 +57,10 @@ test('removing a newly picked file when nothing was saved just drops it', () => 
   const onChange = renderField({ value: file });
   fireEvent.click(screen.getByRole('button', { name: 'Remove image' }));
   expect(onChange).toHaveBeenCalledWith(undefined);
+});
+
+test('the saved image opens full size from the keyboard', () => {
+  renderField({ id: 4, image: 'abc_image.jpg', value: undefined });
+  fireEvent.keyDown(screen.getByRole('button', { name: 'Attached image' }), { key: 'Enter' });
+  expect(screen.getByRole('dialog')).toBeInTheDocument();
 });

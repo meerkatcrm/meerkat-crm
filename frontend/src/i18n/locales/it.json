@@ -376,7 +376,8 @@
     "cancel": "Annulla",
     "save": "Salva",
     "required": "Titolo e data sono obbligatori",
-    "dateError": "Formato data non valido. Controlla le impostazioni del formato data."
+    "dateError": "Formato data non valido. Controlla le impostazioni del formato data.",
+    "saveError": "Impossibile salvare l'attività"
   },
   "activities": {
     "title": "Attività",

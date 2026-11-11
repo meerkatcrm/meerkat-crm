@@ -376,7 +376,8 @@
     "cancel": "Abbrechen",
     "save": "Speichern",
     "required": "Titel und Datum sind erforderlich",
-    "dateError": "Ungültiges Datumsformat. Überprüfen Sie Ihre Datumsformat-Einstellung."
+    "dateError": "Ungültiges Datumsformat. Überprüfen Sie Ihre Datumsformat-Einstellung.",
+    "saveError": "Aktivität konnte nicht gespeichert werden"
   },
   "activities": {
     "title": "Aktivitäten",

@@ -24,7 +24,15 @@ export default function ItemImage({ type, id, image, maxHeight = 200 }: ItemImag
         src={src}
         alt={t('itemImage.alt')}
         loading="lazy"
+        role="button"
+        tabIndex={0}
         onClick={() => setOpen(true)}
+        onKeyDown={(e: React.KeyboardEvent) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setOpen(true);
+          }
+        }}
         sx={{ display: 'block', mt: 1, maxWidth: '100%', maxHeight, borderRadius: 1, cursor: 'zoom-in' }}
       />
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="lg">

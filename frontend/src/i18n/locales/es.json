@@ -376,7 +376,8 @@
     "cancel": "Cancelar",
     "save": "Guardar",
     "required": "El título y la fecha son obligatorios",
-    "dateError": "Formato de fecha inválido. Verifica tu configuración de formato de fecha."
+    "dateError": "Formato de fecha inválido. Verifica tu configuración de formato de fecha.",
+    "saveError": "No se pudo guardar la actividad"
   },
   "activities": {
     "title": "Actividades",

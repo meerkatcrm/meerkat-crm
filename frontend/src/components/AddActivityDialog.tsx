@@ -110,7 +110,7 @@ export default function AddActivityDialog({
       }, image ?? undefined);
       handleClose();
     } catch {
-      setError('Failed to save activity');
+      setError(t('activityDialog.saveError'));
     } finally {
       setSaving(false);
     }

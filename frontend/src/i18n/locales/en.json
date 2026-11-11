@@ -376,7 +376,8 @@
     "cancel": "Cancel",
     "save": "Save",
     "required": "Title and date are required",
-    "dateError": "Invalid date format. Check your date format setting."
+    "dateError": "Invalid date format. Check your date format setting.",
+    "saveError": "Failed to save activity"
   },
   "activities": {
     "title": "Activities",
