@@ -1,5 +1,7 @@
 // Persistence for the network page's filter controls to save user selection
 
+import type { GraphEdge } from './types/graph';
+
 export interface NetworkFilters {
   /** Circle name to restrict the graph to; '' means "all circles". */
   selectedCircle: string;
@@ -9,8 +11,6 @@ export interface NetworkFilters {
   showActivities: boolean;
   showCircles: boolean;
 }
-
-import type { GraphEdge } from './types/graph';
 
 // Whether an edge stands for a relationship that has ended
 export function isEndedRelationshipEdge(edge: Pick<GraphEdge, 'type' | 'end_date'>): boolean {
