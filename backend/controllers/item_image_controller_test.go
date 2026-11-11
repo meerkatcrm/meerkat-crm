@@ -2,12 +2,14 @@ package controllers
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"image"
 	"image/jpeg"
 	"meerkat/config"
 	"meerkat/models"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -228,31 +230,52 @@ func TestItemImage_UpdatingTheNoteKeepsTheImage(t *testing.T) {
 	assert.Equal(t, "kept_image.jpg", f.noteImage(t))
 }
 
-func TestItemImage_WebhookPayloadCarriesTheNewImage(t *testing.T) {
+// Image changes fire the item's update webhook with the current filename, so
+// consumers are not left with the one a preceding PUT carried.
+func TestItemImage_ChangesFireTheUpdateWebhook(t *testing.T) {
 	f := setupItemImageFixture(t)
+	received := make(chan map[string]any, 8)
+	hook := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&payload)
+		received <- payload
+	}))
+	defer hook.Close()
+	require.NoError(t, f.db.Create(&models.Webhook{
+		UserID: f.user.ID, Name: "test", URL: hook.URL, Secret: "s", IsActive: true,
+		Events: []string{"note.updated", "activity.updated"},
+	}).Error)
+
+	next := func() map[string]any {
+		t.Helper()
+		select {
+		case payload := <-received:
+			return payload
+		case <-time.After(5 * time.Second):
+			t.Fatal("no webhook delivered")
+			return nil
+		}
+	}
+
 	for _, tc := range []struct {
-		item ImageItem
-		id   uint
-		path string
+		path  string
+		event string
 	}{
-		{NoteImages, f.note.ID, "/notes/%d/image"},
-		{ActivityImages, f.activity.ID, "/activities/%d/image"},
+		{fmt.Sprintf("/notes/%d/image", f.note.ID), "note.updated"},
+		{fmt.Sprintf("/activities/%d/image", f.activity.ID), "activity.updated"},
 	} {
-		w := doUpload(t, f.router, fmt.Sprintf(tc.path, tc.id), "image", "a.png", encodePNG(t, sidesAndCenterImage(10, 10)))
+		w := doUpload(t, f.router, tc.path, "image", "a.png", encodePNG(t, sidesAndCenterImage(10, 10)))
 		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 		image := decodeJSON[map[string]string](t, w)["image"]
 
-		payload, err := tc.item.load(f.db, fmt.Sprint(tc.id), f.user.ID)
-		require.NoError(t, err)
-		switch p := payload.(type) {
-		case models.Note:
-			assert.Equal(t, image, p.Image)
-		case models.Activity:
-			assert.Equal(t, image, p.Image)
-		default:
-			t.Fatalf("unexpected payload %T", payload)
-		}
-		assert.NotEmpty(t, tc.item.Event)
+		payload := next()
+		assert.Equal(t, tc.event, payload["event"])
+		assert.Equal(t, image, payload["data"].(map[string]any)["image"], "upload sends the new filename")
+
+		require.Equal(t, http.StatusOK, doRequest(f.router, http.MethodDelete, tc.path, nil, "").Code)
+		payload = next()
+		assert.Equal(t, tc.event, payload["event"])
+		assert.Equal(t, "", payload["data"].(map[string]any)["image"], "removal sends no filename")
 	}
 }
 
