@@ -163,6 +163,11 @@ func ContactToVCard(contact *models.Contact, photoDir string) vcard.Card {
 		card.SetValue(vcard.FieldGender, code)
 	}
 
+	// NOTE. One property: clients show a single notes box.
+	if contact.Note != "" {
+		card.SetValue(vcard.FieldNote, contact.Note)
+	}
+
 	// CATEGORIES (circles)
 	if len(contact.Circles) > 0 {
 		card.SetValue(vcard.FieldCategories, strings.Join(contact.Circles, ","))
@@ -433,6 +438,9 @@ func VCardToContact(card vcard.Card, existing *models.Contact) (*models.Contact,
 		contact.Anniversary = normalizeBirthday(anniv)
 	}
 
+	// NOTE
+	contact.Note = noteFromCard(card)
+
 	// Extract photo data for separate processing
 	var photoData []byte
 	var photoMediaType string
@@ -472,6 +480,7 @@ func clearVCardOwnedFields(contact *models.Contact) {
 	// the employment history when the card carries no ORG, TITLE or ROLE.
 	contact.Organization, contact.Department = "", ""
 	contact.JobTitle, contact.Role = "", ""
+	contact.Note = ""
 	contact.VCardExtra = ""
 }
 
@@ -981,6 +990,7 @@ func mappedVCardFields() map[string]bool {
 		vcard.FieldTitle:         true,
 		vcard.FieldRole:          true,
 		vcard.FieldAnniversary:   true,
+		vcard.FieldNote:          true,
 		fieldABLabel:             true,
 	}
 }
@@ -1002,4 +1012,35 @@ func extractUnmappedProperties(card vcard.Card) VCardExtra {
 	}
 
 	return extra
+}
+
+// noteEscapes undoes the "\;" escape that go-vcard leaves in place (it decodes
+// "\n", "\," and "\\" itself). RFC 2426 requires it for a semicolon in a text value.
+// It runs on already-decoded text, so it stays limited to this one sequence.
+//
+// Known limit: go-vcard decodes both "\\;" (a literal backslash before a semicolon)
+// and "\;" to the same text, so a note containing a literal backslash-semicolon
+// comes back as a plain semicolon. The distinction is lost before this code sees
+// the value, and go-vcard's encoder never escapes ';', so nothing here can restore it.
+//
+// Also known: only the text of a NOTE is kept. A grouped or labelled NOTE (item1.NOTE
+// with an X-ABLabel, say) loses its group and parameters; common clients write neither.
+var noteEscapes = strings.NewReplacer(`\;`, ";")
+
+// noteFromCard reads the NOTE properties into one string. vCard allows several but
+// every common client writes, and shows, a single one, so they are joined with a
+// blank line rather than losing all but the first. Longer text is cut at the
+// column limit: rejecting the card instead would fail the whole sync or import.
+func noteFromCard(card vcard.Card) string {
+	var notes []string
+	for _, f := range card[vcard.FieldNote] {
+		if v := strings.TrimSpace(noteEscapes.Replace(f.Value)); v != "" {
+			notes = append(notes, v)
+		}
+	}
+	note := strings.Join(notes, "\n\n")
+	if r := []rune(note); len(r) > models.MaxNoteLength {
+		note = strings.TrimSpace(string(r[:models.MaxNoteLength]))
+	}
+	return note
 }

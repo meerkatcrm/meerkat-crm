@@ -229,3 +229,69 @@ func TestMigration33_KeepsFieldsOfUsersWithWorkInformation(t *testing.T) {
 	assert.Equal(t, `["emails"]`, fields(2).String)
 	assert.Equal(t, `[]`, fields(3).String)
 }
+
+func TestMigration34_MovesVCardNoteIntoColumn(t *testing.T) {
+	db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "test.db"))
+	require.NoError(t, err)
+	defer db.Close()
+	db.SetMaxOpenConns(1)
+	m := newMigrator(t, db)
+	require.NoError(t, m.Migrate(33))
+
+	_, err = db.Exec(`INSERT INTO users (id, username, password, email, enabled_contact_fields) VALUES
+		(1, 'configured', 'hash', 'a@example.com', '["emails"]'),
+		(2, 'defaults', 'hash', 'b@example.com', NULL),
+		(3, 'configured_no_note', 'hash', 'c@example.com', '["phones"]'),
+		(4, 'configured_empty', 'hash', 'd@example.com', '[]')`)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO contacts (id, user_id, firstname, vcard_extra) VALUES
+		(1, 1, 'one_note', '{"properties":{"NOTE":[{"Value":"Met at a wedding\\; bring cake","Params":{},"Group":""}],"X-KEEP":[{"Value":"k","Params":{},"Group":""}]}}'),
+		(2, 2, 'two_notes', '{"properties":{"NOTE":[{"Value":"First","Params":{},"Group":""},{"Value":" ","Params":{},"Group":""},{"Value":"Second","Params":{},"Group":""}]}}'),
+		(3, 3, 'no_note', '{"properties":{"X-KEEP":[{"Value":"k","Params":{},"Group":""}]}}'),
+		(4, 3, 'no_extra', NULL),
+		(5, 3, 'broken_extra', 'not json'),
+		(6, 3, 'blank_notes', '{"properties":{"NOTE":[{"Value":"","Params":{},"Group":""},{"Value":"\n\t ","Params":{},"Group":""}]}}'),
+		(7, 3, 'padded_note', '{"properties":{"NOTE":[{"Value":"\n  Padded\t\r\n","Params":{},"Group":""}]}}')`)
+	require.NoError(t, err)
+
+	noteOf := func(id int) string {
+		var v string
+		require.NoError(t, db.QueryRow(`SELECT note FROM contacts WHERE id = ?`, id).Scan(&v))
+		return v
+	}
+	extra := func(id int) sql.NullString {
+		var v sql.NullString
+		require.NoError(t, db.QueryRow(`SELECT vcard_extra FROM contacts WHERE id = ?`, id).Scan(&v))
+		return v
+	}
+	fields := func(id int) sql.NullString {
+		var v sql.NullString
+		require.NoError(t, db.QueryRow(`SELECT enabled_contact_fields FROM users WHERE id = ?`, id).Scan(&v))
+		return v
+	}
+
+	require.NoError(t, m.Migrate(34))
+	assert.Equal(t, "Met at a wedding; bring cake", noteOf(1), "the \\; escape left by go-vcard is undone, as in noteFromCard")
+	assert.Equal(t, `{"properties":{"X-KEEP":[{"Value":"k","Params":{},"Group":""}]}}`, extra(1).String)
+	assert.Equal(t, "First\n\nSecond", noteOf(2))
+	assert.NotContains(t, extra(2).String, "NOTE")
+	assert.Equal(t, "", noteOf(3))
+	assert.Equal(t, "", noteOf(4))
+	assert.False(t, extra(4).Valid)
+	assert.Equal(t, "not json", extra(5).String)
+	assert.Equal(t, "", noteOf(6), "blank and whitespace-only notes must not trip the NOT NULL column")
+	assert.Equal(t, "Padded", noteOf(7), "tabs and line breaks are trimmed like strings.TrimSpace")
+	assert.NotContains(t, extra(6).String, "NOTE")
+
+	assert.Equal(t, `["emails","note"]`, fields(1).String, "a saved selection gains the field")
+	assert.False(t, fields(2).Valid, "the frontend defaults already include it")
+	assert.Equal(t, `["phones","note"]`, fields(3).String, "also without a note yet: a later sync may bring one")
+	assert.Equal(t, `[]`, fields(4).String, "a deliberately empty selection is respected")
+
+	require.NoError(t, m.Migrate(33))
+	assert.JSONEq(t, `{"properties":{"X-KEEP":[{"Value":"k","Params":{},"Group":""}],"NOTE":[{"Value":"Met at a wedding; bring cake"}]}}`, extra(1).String)
+	assert.JSONEq(t, `{"properties":{"NOTE":[{"Value":"First\n\nSecond"}]}}`, extra(2).String)
+	assert.False(t, extra(4).Valid)
+	assert.Equal(t, `["emails"]`, fields(1).String)
+	assert.Equal(t, `["phones"]`, fields(3).String)
+}
