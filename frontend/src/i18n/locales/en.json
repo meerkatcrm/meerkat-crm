@@ -912,6 +912,12 @@
     "startDate": "Start Date",
     "endDate": "End Date",
     "endDateHelp": "Leave blank if the relationship is ongoing",
+    "dateFormats": {
+      "eu": "YYYY, MM.YYYY, or DD.MM.YYYY",
+      "us": "YYYY, MM/YYYY, or MM/DD/YYYY",
+      "iso": "YYYY, YYYY-MM, or YYYY-MM-DD"
+    },
+    "dateFormatError": "Dates must be {{formats}}",
     "ended": "Ended",
     "since": "since {{date}}",
     "startingOn": "starting {{date}}",

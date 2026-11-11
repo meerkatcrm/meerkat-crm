@@ -912,6 +912,12 @@
     "startDate": "Beginn",
     "endDate": "Ende",
     "endDateHelp": "Leer lassen, wenn die Beziehung noch besteht",
+    "dateFormats": {
+      "eu": "JJJJ, MM.JJJJ oder TT.MM.JJJJ",
+      "us": "JJJJ, MM/JJJJ oder MM/TT/JJJJ",
+      "iso": "JJJJ, JJJJ-MM oder JJJJ-MM-TT"
+    },
+    "dateFormatError": "Daten müssen {{formats}} sein",
     "ended": "Beendet",
     "since": "seit {{date}}",
     "startingOn": "ab {{date}}",

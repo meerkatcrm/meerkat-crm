@@ -63,7 +63,7 @@ export default function AddRelationshipDialog({
     formatBirthdayForInput,
     autoFormatBirthdayInput,
   } = useDateFormat();
-  const dateFormats = t(`employmentHistory.dateFormats.${dateFormat}`);
+  const dateFormats = t(`relationships.dateFormats.${dateFormat}`);
   const [entryMode, setEntryMode] = useState<EntryMode>('manual');
   const [name, setName] = useState('');
   const [firstname, setFirstname] = useState('');
@@ -213,7 +213,7 @@ export default function AddRelationshipDialog({
     const parsedStartDate = parsePartialDateInput(startDate);
     const parsedEndDate = parsePartialDateInput(endDate);
     if (parsedStartDate === null || parsedEndDate === null) {
-      setError(t('employmentHistory.dateFormatError', { formats: dateFormats }));
+      setError(t('relationships.dateFormatError', { formats: dateFormats }));
       return;
     }
     // Checked before anything is saved: in "new contact" mode a server-side rejection

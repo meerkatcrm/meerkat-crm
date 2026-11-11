@@ -912,6 +912,12 @@
     "startDate": "Data di inizio",
     "endDate": "Data di fine",
     "endDateHelp": "Lascia vuoto se la relazione è ancora in corso",
+    "dateFormats": {
+      "eu": "AAAA, MM.AAAA o GG.MM.AAAA",
+      "us": "AAAA, MM/AAAA o MM/GG/AAAA",
+      "iso": "AAAA, AAAA-MM o AAAA-MM-GG"
+    },
+    "dateFormatError": "Le date devono essere {{formats}}",
     "ended": "Terminata",
     "since": "dal {{date}}",
     "startingOn": "a partire da {{date}}",

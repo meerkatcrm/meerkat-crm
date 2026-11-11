@@ -912,6 +912,12 @@
     "startDate": "开始日期",
     "endDate": "结束日期",
     "endDateHelp": "如果关系仍在持续，请留空",
+    "dateFormats": {
+      "eu": "YYYY、MM.YYYY 或 DD.MM.YYYY",
+      "us": "YYYY、MM/YYYY 或 MM/DD/YYYY",
+      "iso": "YYYY、YYYY-MM 或 YYYY-MM-DD"
+    },
+    "dateFormatError": "日期必须为 {{formats}}",
     "ended": "已结束",
     "since": "自 {{date}} 起",
     "startingOn": "将于 {{date}} 开始",
