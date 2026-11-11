@@ -9,6 +9,9 @@ export type ImageItemType = 'notes' | 'activities';
  */
 export type ImageChange = File | null | undefined;
 
+// For a plain <img src>: the browser authenticates only with the httpOnly
+// auth_token cookie (getAuthHeaders sends no Authorization header), so the
+// image request is authenticated like any apiFetch call.
 // The filename changes with every upload, so it doubles as a cache buster.
 export function itemImageUrl(type: ImageItemType, id: number, image: string): string {
   return `${API_BASE_URL}/${type}/${id}/image?v=${encodeURIComponent(image)}`;
