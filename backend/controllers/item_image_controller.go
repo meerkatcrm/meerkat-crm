@@ -144,7 +144,7 @@ func GetItemImage(c *gin.Context, cfg *config.Config, it ImageItem) {
 // multipart field "image".
 func UploadItemImage(c *gin.Context, cfg *config.Config, it ImageItem) {
 	if cfg.DemoMode {
-		apperrors.AbortWithError(c, apperrors.ErrForbidden("Photo uploads are disabled in demo mode"))
+		apperrors.AbortWithError(c, apperrors.ErrForbidden("Image changes are disabled in demo mode"))
 		return
 	}
 	db := c.MustGet("db").(*gorm.DB)
@@ -187,6 +187,8 @@ func UploadItemImage(c *gin.Context, cfg *config.Config, it ImageItem) {
 	img = resize.Thumbnail(maxItemImageSize, maxItemImageSize, img, resize.Lanczos3)
 	image := uuid.New().String() + "_image.jpg"
 	if err := saveImage(filepath.Join(cfg.ProfilePhotoDir, image), img); err != nil {
+		// A failed encode can leave a partial file that no row refers to.
+		carddav.RemoveContactPhotoFile(cfg.ProfilePhotoDir, image)
 		apperrors.AbortWithError(c, apperrors.ErrInternal("Failed to save image").WithError(err))
 		return
 	}
@@ -211,6 +213,10 @@ func DeleteItemImage(c *gin.Context, cfg *config.Config, it ImageItem) {
 	db := c.MustGet("db").(*gorm.DB)
 	image, ok := it.ownedImage(c, db)
 	if !ok {
+		return
+	}
+	if image == "" {
+		apperrors.AbortWithError(c, apperrors.ErrNotFound("Image"))
 		return
 	}
 	if err := it.setImage(c, db, image, ""); err != nil {

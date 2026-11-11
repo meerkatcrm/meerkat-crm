@@ -193,6 +193,19 @@ func TestItemImage_DemoModeBlocksUploadAndDelete(t *testing.T) {
 	assert.Equal(t, "seeded_image.jpg", f.noteImage(t))
 }
 
+func TestItemImage_DeletingAMissingImageIsNotFound(t *testing.T) {
+	f := setupItemImageFixture(t)
+	var before models.Note
+	require.NoError(t, f.db.First(&before, f.note.ID).Error)
+
+	w := doRequest(f.router, http.MethodDelete, fmt.Sprintf("/notes/%d/image", f.note.ID), nil, "")
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	var after models.Note
+	require.NoError(t, f.db.First(&after, f.note.ID).Error)
+	assert.True(t, before.UpdatedAt.Equal(after.UpdatedAt), "a no-op delete must not touch the note")
+}
+
 func TestItemImage_RefusesPathsOutsideTheDir(t *testing.T) {
 	f := setupItemImageFixture(t)
 	require.NoError(t, f.db.Model(&f.note).Update("image", "../secret.jpg").Error)
