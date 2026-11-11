@@ -105,7 +105,8 @@ const NotesPage: React.FC = () => {
   const handleNoteSave = async (content: string, date: string, image?: File) => {
     try {
       const note = await createUnassignedNote({ content, date: new Date(date).toISOString() });
-      if (image) await uploadItemImage('notes', note.ID, image);
+      // The note exists either way: a failed upload must not make Save create it again.
+      if (image) await uploadItemImage('notes', note.ID, image).catch((err) => handleError(err, { operation: 'uploading image' }, { showError }));
       setAddDialogOpen(false);
       refetch();
     } catch (err) {

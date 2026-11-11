@@ -2,14 +2,14 @@ package controllers
 
 import (
 	"errors"
+	"meerkat/carddav"
 	"meerkat/config"
 	apperrors "meerkat/errors"
-	"meerkat/logger"
-	"meerkat/models"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -23,16 +23,21 @@ import (
 // maxItemImageSize caps the longest side of a stored note or activity image.
 const maxItemImageSize = 1600
 
-// ImageItem names a model with an image column, such as &models.Note{}.
+// ImageItem names a soft-deletable table with an image column. A table name
+// rather than a shared model value: GORM writes updates back into a model.
 type ImageItem struct {
-	Model any
+	Table string
 	Name  string
 }
 
 var (
-	NoteImages     = ImageItem{Model: &models.Note{}, Name: "Note"}
-	ActivityImages = ImageItem{Model: &models.Activity{}, Name: "Activity"}
+	NoteImages     = ImageItem{Table: "notes", Name: "Note"}
+	ActivityImages = ImageItem{Table: "activities", Name: "Activity"}
 )
+
+func (it ImageItem) owned(db *gorm.DB, c *gin.Context, userID uint) *gorm.DB {
+	return db.Table(it.Table).Where("id = ? AND user_id = ? AND deleted_at IS NULL", c.Param("id"), userID)
+}
 
 // ownedImage returns the image filename of the caller's item named by :id.
 func (it ImageItem) ownedImage(c *gin.Context, db *gorm.DB) (string, bool) {
@@ -41,7 +46,7 @@ func (it ImageItem) ownedImage(c *gin.Context, db *gorm.DB) (string, bool) {
 		return "", false
 	}
 	var images []string
-	if err := db.Model(it.Model).Where("id = ? AND user_id = ?", c.Param("id"), userID).Pluck("image", &images).Error; err != nil {
+	if err := it.owned(db, c, userID).Pluck("image", &images).Error; err != nil {
 		apperrors.AbortWithError(c, apperrors.ErrDatabase("find").WithError(err))
 		return "", false
 	}
@@ -52,9 +57,23 @@ func (it ImageItem) ownedImage(c *gin.Context, db *gorm.DB) (string, bool) {
 	return images[0], true
 }
 
+// setImage stores the image filename; gorm.ErrRecordNotFound means the item
+// was deleted since it was looked up.
 func (it ImageItem) setImage(c *gin.Context, db *gorm.DB, image string) error {
 	userID, _ := currentUserID(c)
-	return db.Model(it.Model).Where("id = ? AND user_id = ?", c.Param("id"), userID).Update("image", image).Error
+	result := it.owned(db, c, userID).Updates(map[string]any{"image": image, "updated_at": time.Now()})
+	if result.Error == nil && result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return result.Error
+}
+
+func abortSetImage(c *gin.Context, it ImageItem, err error) {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		apperrors.AbortWithError(c, apperrors.ErrNotFound(it.Name))
+		return
+	}
+	apperrors.AbortWithError(c, apperrors.ErrDatabase("update").WithError(err))
 }
 
 // GetItemImage serves the image of a note or activity.
@@ -128,11 +147,11 @@ func UploadItemImage(c *gin.Context, cfg *config.Config, it ImageItem) {
 	}
 
 	if err := it.setImage(c, db, image); err != nil {
-		removeItemImageFile(c, cfg.ProfilePhotoDir, image)
-		apperrors.AbortWithError(c, apperrors.ErrDatabase("update").WithError(err))
+		carddav.RemoveContactPhotoFile(cfg.ProfilePhotoDir, image)
+		abortSetImage(c, it, err)
 		return
 	}
-	removeItemImageFile(c, cfg.ProfilePhotoDir, oldImage)
+	carddav.RemoveContactPhotoFile(cfg.ProfilePhotoDir, oldImage)
 	c.JSON(http.StatusOK, gin.H{"image": image})
 }
 
@@ -144,20 +163,9 @@ func DeleteItemImage(c *gin.Context, cfg *config.Config, it ImageItem) {
 		return
 	}
 	if err := it.setImage(c, db, ""); err != nil {
-		apperrors.AbortWithError(c, apperrors.ErrDatabase("update").WithError(err))
+		abortSetImage(c, it, err)
 		return
 	}
-	removeItemImageFile(c, cfg.ProfilePhotoDir, image)
+	carddav.RemoveContactPhotoFile(cfg.ProfilePhotoDir, image)
 	c.JSON(http.StatusOK, gin.H{"image": ""})
-}
-
-// removeItemImageFile deletes a note or activity image from disk. Call it only
-// after the database no longer refers to the file.
-func removeItemImageFile(c *gin.Context, dir, image string) {
-	if dir == "" || image == "" || strings.Contains(image, "..") || filepath.IsAbs(image) {
-		return
-	}
-	if err := os.Remove(filepath.Join(dir, image)); err != nil && !os.IsNotExist(err) {
-		logger.FromContext(c).Warn().Err(err).Str("image", image).Msg("Failed to delete image")
-	}
 }

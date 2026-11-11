@@ -130,7 +130,8 @@ const ActivitiesPage: React.FC = () => {
         ...activity,
         date: new Date(activity.date).toISOString()
       });
-      if (image) await uploadItemImage('activities', created.ID, image);
+      // The activity exists either way: a failed upload must not make Save create it again.
+      if (image) await uploadItemImage('activities', created.ID, image).catch((err) => handleError(err, { operation: 'uploading image' }, { showError }));
       setAddDialogOpen(false);
       refetch();
     } catch (err) {

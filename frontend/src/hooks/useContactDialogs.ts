@@ -16,12 +16,14 @@ export function useContactDialogs(
     if (!contactId) return;
 
     try {
+      // The note exists once created: a failed image upload is reported, not thrown,
+      // so the dialog closes instead of offering a retry that would duplicate it.
       const note = await createNote(contactId, {
         content,
         date: new Date(date).toISOString(),
         contact_id: parseInt(contactId)
       });
-      if (image) await uploadItemImage('notes', note.ID, image);
+      if (image) await uploadItemImage('notes', note.ID, image).catch((err) => handleError(err, { operation: 'uploading image' }, notifier));
       await onRefresh();
     } catch (err) {
       handleError(err, { operation: 'saving note' }, notifier);
@@ -44,7 +46,7 @@ export function useContactDialogs(
         date: new Date(activity.date).toISOString(),
         contact_ids: activity.contact_ids
       });
-      if (image) await uploadItemImage('activities', created.ID, image);
+      if (image) await uploadItemImage('activities', created.ID, image).catch((err) => handleError(err, { operation: 'uploading image' }, notifier));
       await onRefresh();
     } catch (err) {
       handleError(err, { operation: 'saving activity' }, notifier);

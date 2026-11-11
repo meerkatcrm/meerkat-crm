@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"errors"
+	"meerkat/carddav"
 	apperrors "meerkat/errors"
 	"meerkat/logger"
 	"meerkat/middleware"
@@ -269,7 +270,7 @@ func DeleteActivity(c *gin.Context) {
 		return
 	}
 
-	removeItemImageFile(c, currentConfig(c).ProfilePhotoDir, activity.Image)
+	carddav.RemoveContactPhotoFile(currentConfig(c).ProfilePhotoDir, activity.Image)
 
 	go services.TriggerWebhooks(db, currentConfig(c), userID, "activity.deleted", gin.H{"id": activity.ID})
 	c.JSON(http.StatusOK, gin.H{"message": "Activity deleted"})

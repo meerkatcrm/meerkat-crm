@@ -107,6 +107,7 @@ test('an image chosen in the add dialogs is uploaded to the created note or acti
   const file = new File(['x'], 'card.jpg', { type: 'image/jpeg' });
   notes.createNote.mockResolvedValue({ ID: 7 } as Note);
   activities.createActivity.mockResolvedValue({ ID: 8 } as Activity);
+  itemImages.uploadItemImage.mockResolvedValue(undefined);
 
   await act(() => result.current.handleSaveNote('Hello', '2026-03-15', file));
   await act(() => result.current.handleSaveActivity(activity, file));
@@ -121,4 +122,17 @@ test('without an image nothing is uploaded', async () => {
   notes.createNote.mockResolvedValue({ ID: 7 } as Note);
   await act(() => result.current.handleSaveNote('Hello', '2026-03-15'));
   expect(vi.mocked(itemImagesApi).uploadItemImage).not.toHaveBeenCalled();
+});
+
+test('a failed image upload is reported but does not fail the save, so the dialog does not retry the create', async () => {
+  const { result, onRefresh, showError } = setup();
+  quietLogs();
+  notes.createNote.mockResolvedValue({ ID: 7 } as Note);
+  vi.mocked(itemImagesApi).uploadItemImage.mockRejectedValue(new Error('too large'));
+
+  await act(() => result.current.handleSaveNote('Hello', '2026-03-15', new File(['x'], 'a.jpg')));
+
+  expect(showError).toHaveBeenCalled();
+  expect(onRefresh).toHaveBeenCalledTimes(1);
+  expect(notes.createNote).toHaveBeenCalledTimes(1);
 });

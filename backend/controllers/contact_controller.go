@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"database/sql"
 	"errors"
+	"meerkat/carddav"
 	apperrors "meerkat/errors"
 	"meerkat/logger"
 	"meerkat/middleware"
@@ -436,7 +437,7 @@ func DeleteContact(c *gin.Context) {
 	// This is done outside the transaction since file deletion cannot be rolled back
 	deleteContactPhotos(c, contact)
 	for _, image := range noteImages {
-		removeItemImageFile(c, currentConfig(c).ProfilePhotoDir, image)
+		carddav.RemoveContactPhotoFile(currentConfig(c).ProfilePhotoDir, image)
 	}
 
 	go services.TriggerWebhooks(db, currentConfig(c), userID, "contact.deleted", gin.H{"id": contact.ID})
