@@ -153,13 +153,13 @@ func TestMergeContacts(t *testing.T) {
 	require.NoError(t, db.Create(&onlySource).Error)
 
 	rels := []models.Relationship{
-		{UserID: userID, Name: "Anna", Type: "Spouse", ContactID: target.ID, RelatedContactID: &source.ID}, // between the two: dropped
-		{UserID: userID, Name: "Max", Type: "Child", ContactID: target.ID},                                 // target's own
-		{UserID: userID, Name: "max", Type: "child", ContactID: source.ID, Birthday: "2015-04-01"},         // same child: dropped, birthday kept
-		{UserID: userID, Name: "Tom", Type: "Child", ContactID: target.ID},                                 // target's own...
-		{UserID: userID, Name: "Tom", Type: "Child", ContactID: target.ID},                                 // ...pre-existing duplicate: left alone
-		{UserID: userID, Name: "Lena", Type: "Child", ContactID: source.ID},                                // moved
-		{UserID: userID, Name: "Anna", Type: "Friend", ContactID: friend.ID, RelatedContactID: &source.ID}, // incoming: re-pointed
+		{UserID: userID, Name: "Anna", Type: "Spouse", ContactID: target.ID, RelatedContactID: &source.ID},                                // between the two: dropped
+		{UserID: userID, Name: "Max", Type: "Child", ContactID: target.ID},                                                                // target's own
+		{UserID: userID, Name: "max", Type: "child", ContactID: source.ID, Birthday: "2015-04-01", StartDate: "2015-04", EndDate: "2020"}, // same child: dropped, birthday and dates kept
+		{UserID: userID, Name: "Tom", Type: "Child", ContactID: target.ID},                                                                // target's own...
+		{UserID: userID, Name: "Tom", Type: "Child", ContactID: target.ID},                                                                // ...pre-existing duplicate: left alone
+		{UserID: userID, Name: "Lena", Type: "Child", ContactID: source.ID},                                                               // moved
+		{UserID: userID, Name: "Anna", Type: "Friend", ContactID: friend.ID, RelatedContactID: &source.ID},                                // incoming: re-pointed
 	}
 	require.NoError(t, db.Create(&rels).Error)
 
@@ -218,6 +218,8 @@ func TestMergeContacts(t *testing.T) {
 	assert.Equal(t, "Max", remaining[0].Name)
 	assert.Equal(t, target.ID, remaining[0].ContactID)
 	assert.Equal(t, "2015-04-01", remaining[0].Birthday, "the dropped duplicate's birthday is kept")
+	assert.Equal(t, "2015-04", remaining[0].StartDate, "the dropped duplicate's start date is kept")
+	assert.Equal(t, "2020", remaining[0].EndDate, "the dropped duplicate's end date is kept")
 	assert.Equal(t, "Tom", remaining[1].Name)
 	assert.Equal(t, "Tom", remaining[2].Name)
 	assert.Equal(t, "Lena", remaining[3].Name)
@@ -321,4 +323,40 @@ func TestMergeContactsResultReflectsMovedEmployment(t *testing.T) {
 	result, err := MergeContacts(db, userID, target.ID, source.ID, nil)
 	require.NoError(t, err)
 	assert.Equal(t, "Acme", result.Contact.Organization)
+}
+
+func TestMergeRelationshipDatesFillPerField(t *testing.T) {
+	cases := []struct {
+		name                     string
+		keptStart, keptEnd       string
+		droppedStart, droppedEnd string
+		wantStart, wantEnd       string
+	}{
+		{"kept has start, dropped has end", "2012", "", "", "2020", "2012", "2020"},
+		{"kept has end, dropped has start", "", "2020-06", "2015", "", "2015", "2020-06"},
+		{"kept has neither", "", "", "2001", "2010", "2001", "2010"},
+		{"kept has both: untouched", "2001", "2005", "1999", "2010", "2001", "2005"},
+		{"filling would put end before start: untouched", "2015", "", "", "2010", "2015", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			db, userID := setupMergeDB(t)
+			target := createContact(t, db, models.Contact{UserID: userID, Firstname: "T"})
+			source := createContact(t, db, models.Contact{UserID: userID, Firstname: "S"})
+			rels := []models.Relationship{
+				{UserID: userID, Name: "Max", Type: "Child", ContactID: target.ID, StartDate: tc.keptStart, EndDate: tc.keptEnd},
+				{UserID: userID, Name: "Max", Type: "Child", ContactID: source.ID, StartDate: tc.droppedStart, EndDate: tc.droppedEnd},
+			}
+			require.NoError(t, db.Create(&rels).Error)
+
+			_, err := MergeContacts(db, userID, target.ID, source.ID, nil)
+			require.NoError(t, err)
+
+			var remaining []models.Relationship
+			require.NoError(t, db.Find(&remaining).Error)
+			require.Len(t, remaining, 1)
+			assert.Equal(t, tc.wantStart, remaining[0].StartDate)
+			assert.Equal(t, tc.wantEnd, remaining[0].EndDate)
+		})
+	}
 }

@@ -1,11 +1,20 @@
 // Persistence for the network page's filter controls to save user selection
 
+import type { GraphEdge } from './types/graph';
+
 export interface NetworkFilters {
   /** Circle name to restrict the graph to; '' means "all circles". */
   selectedCircle: string;
   showRelationships: boolean;
+  /** Whether ended relationships (those with an end date) are drawn; only applies while relationships are shown. */
+  showEndedRelationships: boolean;
   showActivities: boolean;
   showCircles: boolean;
+}
+
+// Whether an edge stands for a relationship that has ended
+export function isEndedRelationshipEdge(edge: Pick<GraphEdge, 'type' | 'end_date'>): boolean {
+  return edge.type === 'relationship' && !!edge.end_date;
 }
 
 export const NETWORK_FILTERS_STORAGE_KEY = 'network-filters';
@@ -14,6 +23,7 @@ export const NETWORK_FILTERS_STORAGE_KEY = 'network-filters';
 export const DEFAULT_NETWORK_FILTERS: NetworkFilters = {
   selectedCircle: '',
   showRelationships: true,
+  showEndedRelationships: true,
   showActivities: true,
   showCircles: false,
 };

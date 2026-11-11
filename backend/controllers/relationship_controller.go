@@ -92,6 +92,10 @@ func CreateRelationship(c *gin.Context) {
 		apperrors.AbortWithError(c, validationErr)
 		return
 	}
+	if err := validatePeriodDates(input.StartDate, input.EndDate); err != nil {
+		apperrors.AbortWithError(c, err)
+		return
+	}
 
 	var contact models.Contact
 	if err := db.Where("user_id = ?", userID).First(&contact, "id = ?", contactID).Error; err != nil {
@@ -109,6 +113,8 @@ func CreateRelationship(c *gin.Context) {
 		Type:             input.Type,
 		Gender:           input.Gender,
 		Birthday:         input.Birthday,
+		StartDate:        input.StartDate,
+		EndDate:          input.EndDate,
 		RelatedContactID: input.RelatedContactID,
 		ContactID:        uint(contactID),
 		UserID:           userID,
@@ -155,12 +161,18 @@ func UpdateRelationship(c *gin.Context) {
 		apperrors.AbortWithError(c, err)
 		return
 	}
+	if err := validatePeriodDates(input.StartDate, input.EndDate); err != nil {
+		apperrors.AbortWithError(c, err)
+		return
+	}
 
 	// Update fields from input (ContactID stays the same, comes from URL)
 	relationship.Name = input.Name
 	relationship.Type = input.Type
 	relationship.Gender = input.Gender
 	relationship.Birthday = input.Birthday
+	relationship.StartDate = input.StartDate
+	relationship.EndDate = input.EndDate
 	relationship.RelatedContactID = input.RelatedContactID
 
 	if relationship.RelatedContactID != nil {

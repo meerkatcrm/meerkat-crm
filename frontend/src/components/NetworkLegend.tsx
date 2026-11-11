@@ -5,9 +5,10 @@ interface NetworkLegendProps {
   showCircles?: boolean;
   showActivities?: boolean;
   showRelationships?: boolean;
+  showEndedRelationships?: boolean;
 }
 
-export default function NetworkLegend({ showCircles, showActivities, showRelationships }: NetworkLegendProps) {
+export default function NetworkLegend({ showCircles, showActivities, showRelationships, showEndedRelationships }: NetworkLegendProps) {
   const theme = useTheme();
   const { t } = useTranslation();
 
@@ -16,6 +17,11 @@ export default function NetworkLegend({ showCircles, showActivities, showRelatio
       color: theme.palette.primary.main,
       label: t('network.legend.relationships'),
       type: 'line',
+    }] : []),
+    ...(showRelationships && showEndedRelationships ? [{
+      color: theme.palette.text.disabled,
+      label: t('network.legend.endedRelationship'),
+      type: 'dashed',
     }] : []),
     ...(showActivities ? [{
       color: theme.palette.secondary.main,
@@ -72,6 +78,16 @@ export default function NetworkLegend({ showCircles, showActivities, showRelatio
                 height: 3,
                 bgcolor: item.color,
                 borderRadius: 1,
+              }}
+            />
+          ) : item.type === 'dashed' ? (
+            <Box
+              data-testid="legend-dashed-line"
+              sx={{
+                width: 20,
+                height: 0,
+                borderTop: '3px dashed',
+                borderColor: item.color,
               }}
             />
           ) : (

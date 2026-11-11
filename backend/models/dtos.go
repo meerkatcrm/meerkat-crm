@@ -219,6 +219,8 @@ type RelationshipInput struct {
 	Type             string `json:"type" validate:"required,min=1,max=50"`
 	Gender           string `json:"gender" validate:"omitempty,oneof=male female other prefer_not_to_say"`
 	Birthday         string `json:"birthday" validate:"omitempty,birthday"`
+	StartDate        string `json:"start_date" validate:"omitempty,partialdate"`
+	EndDate          string `json:"end_date" validate:"omitempty,partialdate"`
 	RelatedContactID *uint  `json:"related_contact_id"`
 }
 
@@ -269,6 +271,12 @@ type GraphEdge struct {
 	Target string `json:"target"` // Target node ID
 	Type   string `json:"type"`   // "relationship" or "activity"
 	Label  string `json:"label"`  // Relationship type or activity title
+	// EndDate is set on relationship edges whose relationship has ended
+	// (YYYY, YYYY-MM or YYYY-MM-DD), so the graph can draw them as ended.
+	EndDate string `json:"end_date,omitempty"`
+	// StartDate is set on relationship edges with a start date, so the graph can
+	// tell a relationship that has not begun yet (e.g. an upcoming wedding).
+	StartDate string `json:"start_date,omitempty"`
 }
 
 // GraphResponse is the API response for the network graph

@@ -3,11 +3,13 @@ package controllers
 import (
 	"bytes"
 	"encoding/json"
+	"meerkat/middleware"
 	"meerkat/models"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -163,4 +165,74 @@ func TestDeleteRelationship(t *testing.T) {
 	var deletedRelationship models.Relationship
 	result := db.First(&deletedRelationship, relationshipToDelete.ID)
 	assert.Error(t, result.Error) // This should return an error as it has been deleted
+}
+
+func TestRelationshipStartAndEndDates(t *testing.T) {
+	db, router := setupRouter()
+
+	var user models.User
+	db.First(&user)
+	router.POST("/contacts/:id/relationships", middleware.ValidateJSONMiddleware(&models.RelationshipInput{}), CreateRelationship)
+	router.PUT("/contacts/:id/relationships/:rid", middleware.ValidateJSONMiddleware(&models.RelationshipInput{}), UpdateRelationship)
+
+	contact := models.Contact{UserID: user.ID, Firstname: "Dana"}
+	db.Create(&contact)
+	base := "/contacts/" + strconv.Itoa(int(contact.ID)) + "/relationships"
+
+	send := func(method, url string, body map[string]any) *httptest.ResponseRecorder {
+		jsonValue, _ := json.Marshal(body)
+		req, _ := http.NewRequest(method, url, bytes.NewBuffer(jsonValue))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		return w
+	}
+
+	// Create with both dates: persisted as sent.
+	w := send("POST", base, map[string]any{"name": "Sam", "type": "Spouse", "start_date": "2010-05", "end_date": "2018"})
+	assert.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	var created struct {
+		Relationship models.Relationship `json:"relationship"`
+	}
+	json.Unmarshal(w.Body.Bytes(), &created)
+	var stored models.Relationship
+	db.First(&stored, created.Relationship.ID)
+	assert.Equal(t, "2010-05", stored.StartDate)
+	assert.Equal(t, "2018", stored.EndDate)
+
+	// Only an end date (start unknown) is fine.
+	w = send("POST", base, map[string]any{"name": "Kim", "type": "Partner", "end_date": "2019-02-03"})
+	assert.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+
+	// A start date in the future is allowed (e.g. an upcoming wedding).
+	future := time.Now().AddDate(1, 0, 0).Format("2006-01-02")
+	w = send("POST", base, map[string]any{"name": "Lee", "type": "Fiance", "start_date": future})
+	assert.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+
+	// Rejected: end before start, end in the future, malformed date.
+	for name, body := range map[string]map[string]any{
+		"end before start": {"name": "X", "type": "Spouse", "start_date": "2015", "end_date": "2014-12"},
+		"end in future":    {"name": "X", "type": "Spouse", "end_date": future},
+		"malformed":        {"name": "X", "type": "Spouse", "end_date": "2014/12"},
+	} {
+		w = send("POST", base, body)
+		assert.Equal(t, http.StatusBadRequest, w.Code, name)
+	}
+
+	// Update: an unrelated edit that resends the dates keeps them; clearing works too.
+	rid := strconv.Itoa(int(created.Relationship.ID))
+	w = send("PUT", base+"/"+rid, map[string]any{"name": "Samuel", "type": "Spouse", "start_date": "2010-05", "end_date": "2018"})
+	assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	db.First(&stored, created.Relationship.ID)
+	assert.Equal(t, "Samuel", stored.Name)
+	assert.Equal(t, "2010-05", stored.StartDate)
+	assert.Equal(t, "2018", stored.EndDate)
+
+	w = send("PUT", base+"/"+rid, map[string]any{"name": "Samuel", "type": "Spouse", "start_date": "2016", "end_date": "2015"})
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	w = send("PUT", base+"/"+rid, map[string]any{"name": "Samuel", "type": "Spouse", "start_date": "2010-05", "end_date": ""})
+	assert.Equal(t, http.StatusOK, w.Code)
+	db.First(&stored, created.Relationship.ID)
+	assert.Equal(t, "", stored.EndDate)
 }

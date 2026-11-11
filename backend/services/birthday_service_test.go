@@ -99,3 +99,38 @@ func TestGetUpcomingBirthdays_ExcludesRelationshipOfDeceasedContact(t *testing.T
 	assert.Contains(t, names, "ChildOfAlive")
 	assert.NotContains(t, names, "ChildOfDeceased")
 }
+
+// TestGetUpcomingBirthdays_KeepsEndedRelationship pins the decision that a
+// relationship with an end date (e.g. a former partner) still shows its
+// birthday: the relationship ended, the person did not.
+func TestGetUpcomingBirthdays_KeepsEndedRelationship(t *testing.T) {
+	db, _ := setupRouter()
+
+	user := models.User{Username: "ended-rel-user", Password: "password123", Email: "ended-rel@example.com"}
+	require.NoError(t, db.Create(&user).Error)
+
+	today := time.Now()
+
+	parent := models.Contact{UserID: user.ID, Firstname: "Parent"}
+	require.NoError(t, db.Create(&parent).Error)
+
+	ended := models.Relationship{
+		UserID:    user.ID,
+		Name:      "FormerSpouse",
+		Type:      "Spouse",
+		ContactID: parent.ID,
+		Birthday:  fmt.Sprintf("1980-%02d-%02d", today.Month(), today.Day()),
+		StartDate: "2005",
+		EndDate:   "2015-06",
+	}
+	require.NoError(t, db.Create(&ended).Error)
+
+	birthdays, err := GetUpcomingBirthdays(db, user.ID, today)
+	require.NoError(t, err)
+
+	names := make([]string, 0, len(birthdays))
+	for _, b := range birthdays {
+		names = append(names, b.Name)
+	}
+	assert.Contains(t, names, "FormerSpouse")
+}

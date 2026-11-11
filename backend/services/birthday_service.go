@@ -57,7 +57,11 @@ func GetUpcomingBirthdays(db *gorm.DB, userID uint, now time.Time) ([]models.Bir
 	}
 
 	// Query upcoming relationship birthdays (only those without their own contact)
-	// Exclude relationships whose parent contact is archived or deceased
+	// Exclude relationships whose parent contact is archived or deceased.
+	// A relationship with an end_date (e.g. a former partner) is deliberately NOT
+	// excluded: the relationship ended, but the person still exists and their
+	// birthday can still matter (co-parents, ex-in-laws). Users who do not want it
+	// can clear the birthday or delete the relationship.
 	// Birthday format is now YYYY-MM-DD or --MM-DD (ISO 8601)
 	var relationships []models.Relationship
 	relationshipQuery := db.Model(&models.Relationship{}).

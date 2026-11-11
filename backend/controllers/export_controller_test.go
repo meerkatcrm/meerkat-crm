@@ -52,6 +52,8 @@ func TestExportData(t *testing.T) {
 		Name:      "Charlie",
 		Type:      "Friend",
 		Birthday:  "1985-05-20",
+		StartDate: "2001",
+		EndDate:   "2019-08",
 	}
 	db.Create(&relationship)
 
@@ -139,6 +141,9 @@ func TestExportData(t *testing.T) {
 	// Verify reminders section
 	assert.Contains(t, body, "=== REMINDERS ===")
 	assert.Contains(t, body, "Birthday reminder")
+	// Relationship dates are appended after the pre-existing columns.
+	assert.Contains(t, body, "Related Contact ID,Related Contact Name,Created At,Updated At,Start Date,End Date")
+	assert.Regexp(t, `Charlie,Friend,,1985-05-20,,,[^,]+,[^,]+,2001,2019-08`, body)
 	assert.Contains(t, body, "yearly")
 }
 

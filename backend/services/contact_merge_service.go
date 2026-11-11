@@ -467,6 +467,15 @@ func moveContactData(tx *gorm.DB, userID, targetID, sourceID uint) error {
 	return moveRelationships(tx, userID, targetID, sourceID)
 }
 
+// relationshipEndBeforeStart reports whether end (taken at the end of its
+// period) lies before start (taken at the start of its period). Unparseable or
+// empty dates never conflict.
+func relationshipEndBeforeStart(start, end string) bool {
+	s, sOk := models.PartialDateStart(start)
+	e, eOk := models.PartialDateEnd(end)
+	return sOk && eOk && e.Before(s)
+}
+
 // mergedRelationshipKey identifies a relationship once both of its ends are
 // expressed in merged terms. RelatedID is 0 for a person without a contact of
 // their own, who is then told apart by name.
@@ -480,8 +489,8 @@ type mergedRelationshipKey struct {
 // moveRelationships re-points the source's relationships at the target. A
 // relationship between the two contacts would become a self-relationship and
 // is dropped, as is a source relationship the target already has (same type,
-// same person); the copy that stays picks up any birthday or gender only the
-// dropped one had. Relationships not involving the source are never touched.
+// same person); the copy that stays picks up any birthday, gender or start/end
+// dates only the dropped one had. Relationships not involving the source are never touched.
 func moveRelationships(tx *gorm.DB, userID, targetID, sourceID uint) error {
 	var rels []models.Relationship
 	if err := tx.Where("user_id = ? AND (contact_id IN ? OR related_contact_id IN ?)", userID,
@@ -544,6 +553,24 @@ func moveRelationships(tx *gorm.DB, userID, targetID, sourceID uint) error {
 			if existing.Gender == "" && r.Gender != "" {
 				existing.Gender = r.Gender
 				setUpdate(existing.ID, "gender", r.Gender)
+			}
+			// Each empty date is filled from the dropped copy, as long as the
+			// combined pair stays consistent (end not before start).
+			start, end := existing.StartDate, existing.EndDate
+			if start == "" {
+				start = r.StartDate
+			}
+			if end == "" {
+				end = r.EndDate
+			}
+			if (start != existing.StartDate || end != existing.EndDate) && !relationshipEndBeforeStart(start, end) {
+				if start != existing.StartDate {
+					setUpdate(existing.ID, "start_date", start)
+				}
+				if end != existing.EndDate {
+					setUpdate(existing.ID, "end_date", end)
+				}
+				existing.StartDate, existing.EndDate = start, end
 			}
 			drop = append(drop, r.ID)
 			continue

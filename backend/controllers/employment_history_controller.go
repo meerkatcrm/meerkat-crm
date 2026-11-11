@@ -67,10 +67,10 @@ func validateEmploymentHistoryContent(in *models.EmploymentHistoryInput) *apperr
 // user anywhere in the world never counts as a future date.
 const maxUTCOffset = 14 * time.Hour
 
-// validateEmploymentHistoryDates rejects an entry whose EndDate is in the future or
-// before its StartDate. Either field may be empty (an open-ended or undated entry), in
+// validatePeriodDates rejects a dated period (employment entry, relationship) whose EndDate is in the future or
+// before its StartDate. Either field may be empty (open-ended or undated), in
 // which case there is nothing to compare.
-func validateEmploymentHistoryDates(startDate, endDate string) *apperrors.AppError {
+func validatePeriodDates(startDate, endDate string) *apperrors.AppError {
 	if endDate == "" {
 		return nil
 	}
@@ -89,7 +89,7 @@ func validateEmploymentHistoryDates(startDate, endDate string) *apperrors.AppErr
 
 	if end.Before(start) {
 		if start.After(time.Now().UTC()) {
-			return apperrors.ErrInvalidInput("end_date", "Start date is in the future; an entry that has not started cannot be ended")
+			return apperrors.ErrInvalidInput("end_date", "Start date is in the future; something that has not started cannot have ended")
 		}
 		return apperrors.ErrInvalidInput("end_date", "End date must not be before start date")
 	}
@@ -124,7 +124,7 @@ func CreateEmploymentHistory(c *gin.Context) {
 		return
 	}
 
-	if err := validateEmploymentHistoryDates(input.StartDate, input.EndDate); err != nil {
+	if err := validatePeriodDates(input.StartDate, input.EndDate); err != nil {
 		apperrors.AbortWithError(c, err)
 		return
 	}
@@ -193,7 +193,7 @@ func UpdateEmploymentHistory(c *gin.Context) {
 		return
 	}
 
-	if err := validateEmploymentHistoryDates(input.StartDate, input.EndDate); err != nil {
+	if err := validatePeriodDates(input.StartDate, input.EndDate); err != nil {
 		apperrors.AbortWithError(c, err)
 		return
 	}
@@ -282,7 +282,7 @@ func EndEmploymentHistory(c *gin.Context) {
 		apperrors.AbortWithError(c, apperrors.ErrInvalidInput("date", "Date must be YYYY-MM-DD"))
 		return
 	}
-	if err := validateEmploymentHistoryDates(entry.StartDate, entry.EndDate); err != nil {
+	if err := validatePeriodDates(entry.StartDate, entry.EndDate); err != nil {
 		apperrors.AbortWithError(c, err)
 		return
 	}

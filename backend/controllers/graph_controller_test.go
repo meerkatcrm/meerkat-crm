@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"meerkat/models"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -118,4 +119,34 @@ func TestGetGraph_EmptyForAUserWithoutData(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, w.Code)
 	assert.JSONEq(t, `{"nodes":[],"edges":[]}`, w.Body.String(), "empty lists, not null, so the frontend can iterate them")
+}
+
+func TestGetGraph_RelationshipEdgesCarryEndDate(t *testing.T) {
+	db := newTestDB(t)
+	user := newTestUser(t, db, "owner", false)
+	ada := newTestContact(t, db, user.ID, "Ada")
+	bob := newTestContact(t, db, user.ID, "Bob")
+	cy := newTestContact(t, db, user.ID, "Cy")
+
+	ended := models.Relationship{UserID: user.ID, ContactID: ada.ID, RelatedContactID: &bob.ID, Name: "Bob", Type: "Spouse", StartDate: "2005", EndDate: "2015-06"}
+	current := models.Relationship{UserID: user.ID, ContactID: ada.ID, RelatedContactID: &cy.ID, Name: "Cy", Type: "Partner", StartDate: "2016"}
+	require.NoError(t, db.Create(&ended).Error)
+	require.NoError(t, db.Create(&current).Error)
+
+	router := routerForUser(db, user.ID)
+	router.GET("/graph", GetGraph)
+	w := doRequest(router, http.MethodGet, "/graph", nil, "")
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	edges := map[string]models.GraphEdge{}
+	for _, edge := range decodeJSON[models.GraphResponse](t, w).Edges {
+		edges[edge.ID] = edge
+	}
+	assert.Equal(t, "2015-06", edges[fmt.Sprintf("r-%d", ended.ID)].EndDate)
+	assert.Equal(t, "", edges[fmt.Sprintf("r-%d", current.ID)].EndDate)
+	assert.Equal(t, "2005", edges[fmt.Sprintf("r-%d", ended.ID)].StartDate)
+	assert.Equal(t, "2016", edges[fmt.Sprintf("r-%d", current.ID)].StartDate)
+	// Ongoing relationships omit the field entirely.
+	assert.Contains(t, w.Body.String(), `"end_date":"2015-06"`)
+	assert.Equal(t, 1, strings.Count(w.Body.String(), `"end_date"`))
 }

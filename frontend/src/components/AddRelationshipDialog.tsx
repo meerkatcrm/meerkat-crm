@@ -20,7 +20,7 @@ import {
 } from '@mui/material';
 import AppDialog from './AppDialog';
 import { useTranslation } from 'react-i18next';
-import { Relationship, RelationshipFormData, RELATIONSHIP_TYPES } from '../api/relationships';
+import { Relationship, RelationshipFormData, RELATIONSHIP_TYPES, isEndBeforeStart, isPartialDateInFuture } from '../api/relationships';
 import { Contact, createContact } from '../api/contacts';
 import { useContactSearch } from '../hooks/useContactSearch';
 import { useSnackbar } from '../context/SnackbarContext';
@@ -54,7 +54,16 @@ export default function AddRelationshipDialog({
 }: AddRelationshipDialogProps) {
   const { t } = useTranslation();
   const { showError, showSuccess } = useSnackbar();
-  const { parseBirthdayInput, getBirthdayPlaceholder, formatBirthdayForInput, autoFormatBirthdayInput } = useDateFormat();
+  const {
+    dateFormat,
+    formatDate,
+    parsePartialDateInput,
+    parseBirthdayInput,
+    getBirthdayPlaceholder,
+    formatBirthdayForInput,
+    autoFormatBirthdayInput,
+  } = useDateFormat();
+  const dateFormats = t(`relationships.dateFormats.${dateFormat}`);
   const [entryMode, setEntryMode] = useState<EntryMode>('manual');
   const [name, setName] = useState('');
   const [firstname, setFirstname] = useState('');
@@ -63,6 +72,9 @@ export default function AddRelationshipDialog({
   const [customType, setCustomType] = useState('');
   const [gender, setGender] = useState('');
   const [birthday, setBirthday] = useState('');
+  // Start/end of the relationship itself (e.g. a marriage), in the user's display format
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -97,6 +109,8 @@ export default function AddRelationshipDialog({
       setGender(relationship.gender || '');
       // Format birthday from ISO to display format based on user's date preferences
       setBirthday(relationship.birthday ? formatBirthdayForInput(relationship.birthday) : '');
+      setStartDate(formatDate(relationship.start_date || ''));
+      setEndDate(formatDate(relationship.end_date || ''));
       if (relationship.related_contact_id) {
         setEntryMode('linked');
         // We'll need to find the contact
@@ -114,7 +128,7 @@ export default function AddRelationshipDialog({
     } else {
       resetForm();
     }
-  }, [relationship, open, formatBirthdayForInput]);
+  }, [relationship, open, formatBirthdayForInput, formatDate]);
 
   const resetForm = () => {
     setEntryMode('manual');
@@ -125,6 +139,8 @@ export default function AddRelationshipDialog({
     setCustomType('');
     setGender('');
     setBirthday('');
+    setStartDate('');
+    setEndDate('');
     setSelectedContact(null);
     // Leaving linked mode clears the contact search (useContactSearch).
     setError('');
@@ -194,6 +210,23 @@ export default function AddRelationshipDialog({
       birthdayISO = parsed || undefined;
     }
 
+    const parsedStartDate = parsePartialDateInput(startDate);
+    const parsedEndDate = parsePartialDateInput(endDate);
+    if (parsedStartDate === null || parsedEndDate === null) {
+      setError(t('relationships.dateFormatError', { formats: dateFormats }));
+      return;
+    }
+    // Checked before anything is saved: in "new contact" mode a server-side rejection
+    // would come only after the contact had already been created.
+    if (isPartialDateInFuture(parsedEndDate)) {
+      setError(t('relationships.endInFuture'));
+      return;
+    }
+    if (isEndBeforeStart(parsedStartDate, parsedEndDate)) {
+      setError(t('relationships.endBeforeStart'));
+      return;
+    }
+
     setSaving(true);
     // Reused on retry so a failed link step doesn't create the contact twice
     let newContact: Contact | null = createdContact;
@@ -222,6 +255,10 @@ export default function AddRelationshipDialog({
         // Only include gender/birthday for manual mode
         gender: entryMode === 'manual' ? (gender || undefined) : undefined,
         birthday: entryMode === 'manual' ? birthdayISO : undefined,
+        // Dates describe the relationship, not the person, so they apply in every mode.
+        // Empty strings are sent as-is so clearing a date on edit actually clears it.
+        start_date: parsedStartDate,
+        end_date: parsedEndDate,
         related_contact_id: linkedContact ? linkedContact.ID : null,
       };
       await onSave(data);
@@ -431,6 +468,26 @@ export default function AddRelationshipDialog({
               helperText={t('contacts.birthdayFormat')}
             />
           )}
+
+          {/* Start/end of the relationship (e.g. a marriage that ended) */}
+          <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
+            <TextField
+              label={t('relationships.startDate')}
+              placeholder={dateFormats}
+              helperText={dateFormats}
+              value={startDate}
+              onChange={(e) => { setStartDate(e.target.value); setError(''); }}
+              fullWidth
+            />
+            <TextField
+              label={t('relationships.endDate')}
+              placeholder={dateFormats}
+              helperText={`${t('relationships.endDateHelp')} · ${dateFormats}`}
+              value={endDate}
+              onChange={(e) => { setEndDate(e.target.value); setError(''); }}
+              fullWidth
+            />
+          </Box>
 
           {error && (
             <Box sx={{ color: 'error.main', fontSize: '0.875rem' }}>

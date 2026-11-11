@@ -149,8 +149,8 @@ func TestEndEmploymentHistory_RejectsAlreadyClosedEntry(t *testing.T) {
 
 func TestValidateEmploymentHistoryDates_RejectsFutureEndDate(t *testing.T) {
 	future := strconv.Itoa(time.Now().Year() + 1)
-	assert.NotNil(t, validateEmploymentHistoryDates("", future))
-	assert.Nil(t, validateEmploymentHistoryDates("", "2020-01"))
+	assert.NotNil(t, validatePeriodDates("", future))
+	assert.Nil(t, validatePeriodDates("", "2020-01"))
 }
 
 func TestEndEmploymentHistory_UsesClientDate(t *testing.T) {
@@ -184,9 +184,9 @@ func TestEndEmploymentHistory_UsesClientDate(t *testing.T) {
 // Today in the furthest-ahead timezone is tomorrow in UTC for part of the day.
 func TestValidateEmploymentHistoryDates_AllowsTodayAheadOfUTC(t *testing.T) {
 	localToday := time.Now().UTC().Add(maxUTCOffset).Format("2006-01-02")
-	assert.Nil(t, validateEmploymentHistoryDates("", localToday))
+	assert.Nil(t, validatePeriodDates("", localToday))
 	tooFar := time.Now().UTC().Add(maxUTCOffset + 24*time.Hour).Format("2006-01-02")
-	assert.NotNil(t, validateEmploymentHistoryDates("", tooFar))
+	assert.NotNil(t, validatePeriodDates("", tooFar))
 }
 
 func TestValidateEmploymentHistoryContent(t *testing.T) {
