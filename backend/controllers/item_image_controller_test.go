@@ -179,6 +179,20 @@ func TestItemImage_AnotherUsersItemIsNotFound(t *testing.T) {
 	assert.Equal(t, []string{"x_image.jpg"}, f.files(t))
 }
 
+func TestItemImage_DemoModeBlocksUploadAndDelete(t *testing.T) {
+	f := setupItemImageFixture(t)
+	require.NoError(t, f.db.Model(&f.note).Update("image", "seeded_image.jpg").Error)
+	cfg := &config.Config{ProfilePhotoDir: f.dir, DemoMode: true}
+	router := routerAs(f.db, f.user.ID, *cfg)
+	router.POST("/notes/:id/image", func(c *gin.Context) { UploadItemImage(c, cfg, NoteImages) })
+	router.DELETE("/notes/:id/image", func(c *gin.Context) { DeleteItemImage(c, cfg, NoteImages) })
+	path := fmt.Sprintf("/notes/%d/image", f.note.ID)
+
+	assert.Equal(t, http.StatusForbidden, doUpload(t, router, path, "image", "a.png", encodePNG(t, sidesAndCenterImage(10, 10))).Code)
+	assert.Equal(t, http.StatusForbidden, doRequest(router, http.MethodDelete, path, nil, "").Code)
+	assert.Equal(t, "seeded_image.jpg", f.noteImage(t))
+}
+
 func TestItemImage_RefusesPathsOutsideTheDir(t *testing.T) {
 	f := setupItemImageFixture(t)
 	require.NoError(t, f.db.Model(&f.note).Update("image", "../secret.jpg").Error)

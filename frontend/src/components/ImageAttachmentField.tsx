@@ -59,8 +59,10 @@ export default function ImageAttachmentField({ type, id, image, value, onChange 
             }}
           />
         </Button>
+        {/* Remove first drops a newly picked file (back to the saved image, if any);
+            only a shown saved image is staged for deletion. */}
         {hasImage && (
-          <Button size="small" color="error" startIcon={<DeleteIcon />} onClick={() => onChange(image ? null : undefined)}>
+          <Button size="small" color="error" startIcon={<DeleteIcon />} onClick={() => onChange(value ? undefined : null)}>
             {t('itemImage.remove')}
           </Button>
         )}

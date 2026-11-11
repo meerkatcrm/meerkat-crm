@@ -203,6 +203,11 @@ func UploadItemImage(c *gin.Context, cfg *config.Config, it ImageItem) {
 
 // DeleteItemImage removes the image of a note or activity.
 func DeleteItemImage(c *gin.Context, cfg *config.Config, it ImageItem) {
+	// Uploads are off in demo mode, so a removed image could not be put back.
+	if cfg.DemoMode {
+		apperrors.AbortWithError(c, apperrors.ErrForbidden("Image changes are disabled in demo mode"))
+		return
+	}
 	db := c.MustGet("db").(*gorm.DB)
 	image, ok := it.ownedImage(c, db)
 	if !ok {

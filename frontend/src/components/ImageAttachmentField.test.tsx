@@ -64,3 +64,9 @@ test('the saved image opens full size from the keyboard', () => {
   fireEvent.keyDown(screen.getByRole('button', { name: 'Attached image' }), { key: 'Enter' });
   expect(screen.getByRole('dialog')).toBeInTheDocument();
 });
+
+test('removing a replacement brings back the saved image instead of deleting it', () => {
+  const onChange = renderField({ id: 4, image: 'abc_image.jpg', value: file });
+  fireEvent.click(screen.getByRole('button', { name: 'Remove image' }));
+  expect(onChange).toHaveBeenCalledWith(undefined);
+});
