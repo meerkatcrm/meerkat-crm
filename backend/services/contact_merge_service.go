@@ -63,6 +63,7 @@ var mergeScalarFields = []struct {
 	{"how_we_met", func(c *models.Contact) *string { return &c.HowWeMet }},
 	{"food_preference", func(c *models.Contact) *string { return &c.FoodPreference }},
 	{"contact_information", func(c *models.Contact) *string { return &c.ContactInformation }},
+	{"about", func(c *models.Contact) *string { return &c.About }},
 }
 
 // FindDuplicateContacts returns pairs of the user's contacts that share a full

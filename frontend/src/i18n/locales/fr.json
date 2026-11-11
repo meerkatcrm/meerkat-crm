@@ -118,6 +118,8 @@
     "foodPreference": "Préférences alimentaires",
     "workInformation": "Informations professionnelles",
     "contactInformation": "Informations de contact supplémentaires",
+    "about": "À propos",
+    "aboutHint": "Synchronisé avec le champ Notes du carnet d'adresses de votre téléphone",
     "circles": "Cercles",
     "selectCircle": "Sélectionnez un cercle existant...",
     "newCircle": "Ou créez-en un nouveau...",

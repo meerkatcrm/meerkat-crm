@@ -1130,3 +1130,41 @@ func TestContactHandlers_TreatANonNumericIDAsAValue(t *testing.T) {
 	assert.Equal(t, int64(1), contacts)
 	assert.Equal(t, int64(1), relationships)
 }
+
+// About (vCard NOTE, issue #290) is written by update and can be requested on its own,
+// which is how the contact page loads it.
+func TestUpdateContact_AboutPersistsAndIsSelectable(t *testing.T) {
+	db, router := setupRouter()
+
+	var user models.User
+	db.First(&user)
+
+	router.PUT("/contacts/:id", withValidated(func() any { return &models.ContactInput{} }), UpdateContact)
+	router.GET("/contacts", GetContacts)
+
+	contact := models.Contact{UserID: user.ID, Firstname: "Jane", Lastname: "Doe"}
+	require.NoError(t, db.Create(&contact).Error)
+
+	body := `{"firstname":"Jane","lastname":"Doe","about":"Met at a wedding.\nPrefers tea."}`
+	req, _ := http.NewRequest("PUT", "/contacts/"+strconv.Itoa(int(contact.ID)), bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	var updated models.Contact
+	require.NoError(t, db.First(&updated, contact.ID).Error)
+	assert.Equal(t, "Met at a wedding.\nPrefers tea.", updated.About)
+
+	req, _ = http.NewRequest("GET", "/contacts?fields=firstname,about", nil)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var resp struct {
+		Contacts []map[string]any `json:"contacts"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	require.Len(t, resp.Contacts, 1)
+	assert.Equal(t, "Met at a wedding.\nPrefers tea.", resp.Contacts[0]["about"])
+}

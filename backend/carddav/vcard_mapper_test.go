@@ -1,6 +1,7 @@
 package carddav
 
 import (
+	"bytes"
 	"meerkat/models"
 	"strings"
 	"testing"
@@ -400,7 +401,7 @@ func TestVCardToContact_UpdateClearsRemovedProperties(t *testing.T) {
 		URLs:         []models.ContactURL{{Type: "home", Value: "https://example.com"}},
 		Organization: "Analytical Engines", JobTitle: "Programmer",
 		Circles: []string{"Family"}, Gender: "female", Anniversary: "1835-07-08",
-		HowWeMet: "At a lecture",
+		HowWeMet: "At a lecture", About: "Met at the Royal Society",
 	}
 
 	card := vcard.Card{}
@@ -420,6 +421,7 @@ func TestVCardToContact_UpdateClearsRemovedProperties(t *testing.T) {
 	assert.Empty(t, contact.URLs)
 	assert.Empty(t, contact.Organization)
 	assert.Empty(t, contact.JobTitle)
+	assert.Empty(t, contact.About, "a note removed on the phone is removed here too")
 
 	// Not every client can round-trip these, and Meerkat-only fields are not in a card at all.
 	assert.Equal(t, []string{"Family"}, contact.Circles)
@@ -434,4 +436,95 @@ func TestContactToVCard_ExportsGender(t *testing.T) {
 
 	back, _, _, _ := VCardToContact(card, nil)
 	assert.Equal(t, "female", back.Gender)
+}
+
+// decodeVCF parses raw vCard text the way CardDAV PUTs and VCF imports do, so the
+// tests below exercise go-vcard's real unescaping rather than hand-built fields.
+func decodeVCF(t *testing.T, raw string) vcard.Card {
+	t.Helper()
+	card, err := vcard.NewDecoder(strings.NewReader(strings.ReplaceAll(raw, "\n", "\r\n"))).Decode()
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	return card
+}
+
+// Issue #290: NOTE was unmapped, so it never reached Meerkat and edits made in
+// Meerkat could not reach the phone.
+func TestVCardToContact_MapsNoteToAbout(t *testing.T) {
+	card := decodeVCF(t, `BEGIN:VCARD
+VERSION:3.0
+FN:Jane Doe
+N:Doe;Jane;;;
+NOTE:Met at a wedding\, Lisbon 2019.\nAllergic to nuts\; prefers tea.
+END:VCARD
+`)
+
+	got, _, _, _ := VCardToContact(card, nil)
+
+	assert.Equal(t, "Met at a wedding, Lisbon 2019.\nAllergic to nuts; prefers tea.", got.About)
+	assert.NotContains(t, got.VCardExtra, "NOTE", "a mapped property must not also be kept in vcard_extra")
+}
+
+func TestVCardToContact_JoinsSeveralNotes(t *testing.T) {
+	card := decodeVCF(t, `BEGIN:VCARD
+VERSION:4.0
+FN:Jane Doe
+NOTE:First
+NOTE:
+NOTE:Second
+END:VCARD
+`)
+
+	got, _, _, _ := VCardToContact(card, nil)
+
+	assert.Equal(t, "First\n\nSecond", got.About)
+}
+
+func TestVCardToContact_CapsAboutAtColumnLimit(t *testing.T) {
+	card := vcard.Card{}
+	card.SetValue(vcard.FieldFormattedName, "Jane Doe")
+	card.SetValue(vcard.FieldNote, strings.Repeat("ä", maxAboutLength+10))
+
+	got, _, _, _ := VCardToContact(card, nil)
+
+	assert.Equal(t, maxAboutLength, len([]rune(got.About)))
+}
+
+func TestContactToVCard_AboutRoundTripsThroughText(t *testing.T) {
+	original := &models.Contact{Firstname: "Jane", Lastname: "Doe", About: "Line one, with a comma.\nLine two; with a semicolon."}
+
+	var buf bytes.Buffer
+	if err := vcard.NewEncoder(&buf).Encode(ContactToVCard(original, "")); err != nil {
+		t.Fatalf("encode: %v", err)
+	}
+	assert.Len(t, ContactToVCard(original, "")[vcard.FieldNote], 1)
+
+	card, err := vcard.NewDecoder(&buf).Decode()
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	back, _, _, _ := VCardToContact(card, nil)
+	assert.Equal(t, original.About, back.About)
+}
+
+func TestContactToVCard_NoNoteWhenAboutEmpty(t *testing.T) {
+	card := ContactToVCard(&models.Contact{Firstname: "Jane"}, "")
+	assert.Nil(t, card[vcard.FieldNote])
+}
+
+// A NOTE still stored in vcard_extra (before migration 000034 moved it) must not be
+// exported next to the column value.
+func TestContactToVCard_IgnoresStaleNoteInExtra(t *testing.T) {
+	c := &models.Contact{
+		Firstname:  "Jane",
+		About:      "current",
+		VCardExtra: `{"properties":{"NOTE":[{"Value":"stale","Params":{},"Group":""}]}}`,
+	}
+
+	card := ContactToVCard(c, "")
+
+	if assert.Len(t, card[vcard.FieldNote], 1) {
+		assert.Equal(t, "current", card[vcard.FieldNote][0].Value)
+	}
 }

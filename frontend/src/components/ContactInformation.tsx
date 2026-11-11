@@ -11,6 +11,7 @@ import BadgeIcon from '@mui/icons-material/Badge';
 import LanguageIcon from '@mui/icons-material/Language';
 import ChatIcon from '@mui/icons-material/Chat';
 import NotesIcon from '@mui/icons-material/Notes';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import ClearAllIcon from '@mui/icons-material/ClearAll';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
 import PeopleIcon from '@mui/icons-material/People';
@@ -543,6 +544,23 @@ export default function ContactInformation({
           value={contact.contact_information || ''}
           multiline
           isEditing={editingField === 'contact_information'}
+          editValue={editValue}
+          validationError={validationError}
+          onEditStart={onEditStart}
+          onEditCancel={onEditCancel}
+          onEditSave={onEditSave}
+          onEditValueChange={onEditValueChange}
+        />
+      )}
+
+      {show('about') && (
+        <EditableField
+          icon={<InfoOutlinedIcon sx={{ ...iconSx, mt: 0.5 }} />}
+          label={t('contacts.about')}
+          field="about"
+          value={contact.about || ''}
+          multiline
+          isEditing={editingField === 'about'}
           editValue={editValue}
           validationError={validationError}
           onEditStart={onEditStart}

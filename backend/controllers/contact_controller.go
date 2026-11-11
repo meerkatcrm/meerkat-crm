@@ -26,7 +26,7 @@ import (
 var contactSelectableFields = []string{
 	"ID", "firstname", "lastname", "nickname", "gender",
 	"email", "phone", "birthday", "address", "how_we_met",
-	"food_preference", "work_information", "contact_information",
+	"food_preference", "work_information", "contact_information", "about",
 	"circles", "photo", "photo_thumbnail", "custom_fields", "archived",
 	"emails", "phones", "addresses", "urls", "impps",
 	"prefix", "middle_name", "suffix", "organization", "department",
@@ -59,6 +59,7 @@ func applyContactInput(contact *models.Contact, in *models.ContactInput) {
 	contact.FoodPreference = in.FoodPreference
 	contact.WorkInformation = in.WorkInformation
 	contact.ContactInformation = in.ContactInformation
+	contact.About = in.About
 	contact.Circles = in.Circles
 	contact.CustomFields = in.CustomFields
 	contact.Emails = in.Emails

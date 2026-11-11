@@ -27,7 +27,7 @@ func TestSuggestColumnMappings_GoogleStyle(t *testing.T) {
 		"Phone 1 - Label", "Phone 1 - Value",
 		"Address 1 - Street", "Address 1 - City", "Address 1 - Region",
 		"Address 1 - Postal Code", "Address 1 - Country", "Address 1 - Label",
-		"Website 1 - Value", "Labels",
+		"Website 1 - Value", "Labels", "Notes",
 	}
 
 	mappings := SuggestColumnMappings(headers)
@@ -59,6 +59,7 @@ func TestSuggestColumnMappings_GoogleStyle(t *testing.T) {
 		{"Address 1 - Label", "address_label", 0},
 		{"Website 1 - Value", "url", 0},
 		{"Labels", "circles", 0},
+		{"Notes", "about", 0},
 	}
 
 	for _, tc := range cases {

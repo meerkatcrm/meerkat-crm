@@ -202,10 +202,12 @@ var headerToField = map[string]string{
 	"department": "department", "organization department": "department",
 	"job title": "job_title", "title": "job_title", "organization title": "job_title", "position": "job_title",
 	"role": "role", "organization role": "role",
-	"how we met": "how_we_met", "how_we_met": "how_we_met", "notes": "how_we_met", "how i met": "how_we_met",
+	"how we met": "how_we_met", "how_we_met": "how_we_met", "how i met": "how_we_met",
 	"food": "food_preference", "food preference": "food_preference", "food_preference": "food_preference", "dietary": "food_preference", "diet": "food_preference",
 	"work": "work_information", "work_information": "work_information", "job": "work_information", "occupation": "work_information",
 	"contact information": "contact_information", "contact_information": "contact_information", "other contact": "contact_information",
+	// Google and Outlook CSV exports call the vCard NOTE column "Notes"
+	"about": "about", "notes": "about", "note": "about",
 	"circles": "circles", "groups": "circles", "tags": "circles", "category": "circles", "categories": "circles", "labels": "circles",
 	// German
 	"vorname":  "firstname",
@@ -380,6 +382,7 @@ func ContactToPreviewMap(contact *models.Contact) map[string]interface{} {
 	set("job_title", contact.JobTitle)
 	set("role", contact.Role)
 	set("work_information", contact.WorkInformation)
+	set("about", contact.About)
 	if len(contact.Circles) > 0 {
 		preview["circles"] = strings.Join(contact.Circles, ", ")
 	}
@@ -808,6 +811,8 @@ func BuildContactFromRow(userID uint, headers []string, row []string, mappings [
 			contact.WorkInformation = v
 		case "contact_information":
 			contact.ContactInformation = v
+		case "about":
+			contact.About = v
 		case "circles":
 			if v != "" {
 				contact.Circles = ParseCircles(v)
@@ -943,6 +948,9 @@ func MergeImportedContact(existing *models.Contact, incoming *models.Contact) {
 	if incoming.ContactInformation != "" {
 		existing.ContactInformation = incoming.ContactInformation
 	}
+	if incoming.About != "" {
+		existing.About = incoming.About
+	}
 	if len(incoming.Circles) > 0 {
 		existing.Circles = incoming.Circles
 	}
@@ -1031,6 +1039,7 @@ func CreateMergeNote(db *gorm.DB, userID uint, contactID uint, original *models.
 		"food_preference":     {"Food Preferences", original.FoodPreference},
 		"work_information":    {"Work Information", original.WorkInformation},
 		"contact_information": {"Contact Information", original.ContactInformation},
+		"about":               {"About", original.About},
 	}
 
 	for field, info := range fieldLabels {

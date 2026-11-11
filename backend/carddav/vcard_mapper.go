@@ -163,6 +163,11 @@ func ContactToVCard(contact *models.Contact, photoDir string) vcard.Card {
 		card.SetValue(vcard.FieldGender, code)
 	}
 
+	// NOTE (about). One property: clients show a single notes box.
+	if contact.About != "" {
+		card.SetValue(vcard.FieldNote, contact.About)
+	}
+
 	// CATEGORIES (circles)
 	if len(contact.Circles) > 0 {
 		card.SetValue(vcard.FieldCategories, strings.Join(contact.Circles, ","))
@@ -433,6 +438,9 @@ func VCardToContact(card vcard.Card, existing *models.Contact) (*models.Contact,
 		contact.Anniversary = normalizeBirthday(anniv)
 	}
 
+	// NOTE -> About
+	contact.About = noteFromCard(card)
+
 	// Extract photo data for separate processing
 	var photoData []byte
 	var photoMediaType string
@@ -472,6 +480,7 @@ func clearVCardOwnedFields(contact *models.Contact) {
 	// the employment history when the card carries no ORG, TITLE or ROLE.
 	contact.Organization, contact.Department = "", ""
 	contact.JobTitle, contact.Role = "", ""
+	contact.About = ""
 	contact.VCardExtra = ""
 }
 
@@ -981,6 +990,7 @@ func mappedVCardFields() map[string]bool {
 		vcard.FieldTitle:         true,
 		vcard.FieldRole:          true,
 		vcard.FieldAnniversary:   true,
+		vcard.FieldNote:          true,
 		fieldABLabel:             true,
 	}
 }
@@ -1002,4 +1012,30 @@ func extractUnmappedProperties(card vcard.Card) VCardExtra {
 	}
 
 	return extra
+}
+
+// maxAboutLength matches the validation limit on Contact.About.
+const maxAboutLength = 5000
+
+// noteEscapes undoes the escapes go-vcard leaves in place. It decodes "\n", "\,"
+// and "\\" itself, but not "\;", which RFC 2426 requires for a semicolon in a
+// text value, nor the uppercase "\N" the RFC also allows.
+var noteEscapes = strings.NewReplacer(`\;`, ";", `\N`, "\n")
+
+// noteFromCard reads the NOTE properties into one string. vCard allows several but
+// every common client writes, and shows, a single one, so they are joined with a
+// blank line rather than losing all but the first. Longer text is cut at the
+// column limit: rejecting the card instead would fail the whole sync or import.
+func noteFromCard(card vcard.Card) string {
+	var notes []string
+	for _, f := range card[vcard.FieldNote] {
+		if v := strings.TrimSpace(noteEscapes.Replace(f.Value)); v != "" {
+			notes = append(notes, v)
+		}
+	}
+	about := strings.Join(notes, "\n\n")
+	if r := []rune(about); len(r) > maxAboutLength {
+		about = strings.TrimSpace(string(r[:maxAboutLength]))
+	}
+	return about
 }

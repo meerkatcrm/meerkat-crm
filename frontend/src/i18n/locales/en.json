@@ -118,6 +118,8 @@
     "foodPreference": "Food Preferences",
     "workInformation": "Work Information",
     "contactInformation": "Additional Contact Information",
+    "about": "About",
+    "aboutHint": "Synced with the notes field of your phone's address book",
     "circles": "Circles",
     "selectCircle": "Select existing circle...",
     "newCircle": "Or create new...",

@@ -23,7 +23,8 @@ export type ContactFieldKey =
   | 'how_we_met'
   | 'food_preference'
   | 'work_information'
-  | 'contact_information';
+  | 'contact_information'
+  | 'about';
 
 export interface ContactFieldDef {
   key: ContactFieldKey;
@@ -59,6 +60,7 @@ export const CONTACT_FIELDS: ContactFieldDef[] = [
   { key: 'how_we_met', labelKey: 'contacts.howWeMet', group: 'meerkat' },
   { key: 'food_preference', labelKey: 'contacts.foodPreference', group: 'meerkat' },
   { key: 'contact_information', labelKey: 'contacts.contactInformation', group: 'meerkat' },
+  { key: 'about', labelKey: 'contacts.about', group: 'meerkat' },
 ];
 
 export const CONTACT_FIELD_GROUPS: ContactFieldDef['group'][] = [

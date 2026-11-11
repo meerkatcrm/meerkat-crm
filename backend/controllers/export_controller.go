@@ -96,7 +96,7 @@ func ExportData(c *gin.Context) {
 	contactHeaders := []string{
 		"ID", "Firstname", "Lastname", "Nickname", "Gender", "Email", "Phone",
 		"Birthday", "Address", "How We Met", "Food Preference", "Work Information",
-		"Contact Information", "Circles",
+		"Contact Information", "About", "Circles",
 		"Prefix", "Middle Name", "Suffix", "Organization", "Department", "Job Title", "Role",
 		"Anniversary", "Deceased", "Deceased Date", "Archived",
 		"Emails", "Phones", "Addresses", "URLs", "Messaging",
@@ -125,6 +125,7 @@ func ExportData(c *gin.Context) {
 			contact.FoodPreference,
 			contact.WorkInformation,
 			contact.ContactInformation,
+			contact.About,
 			strings.Join(contact.Circles, "; "),
 			contact.Prefix,
 			contact.MiddleName,
