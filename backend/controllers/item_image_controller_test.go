@@ -227,3 +227,17 @@ func TestItemImage_WebhookPayloadCarriesTheNewImage(t *testing.T) {
 		assert.NotEmpty(t, tc.item.Event)
 	}
 }
+
+func TestItemImage_StaleChangeIsRejectedAndKeepsTheOtherImage(t *testing.T) {
+	f := setupItemImageFixture(t)
+	// Another request stored its image after this one read the old (empty) filename.
+	require.NoError(t, f.db.Model(&f.note).Update("image", "other_image.jpg").Error)
+	var err error
+	router := routerAs(f.db, f.user.ID, config.Config{})
+	router.POST("/notes/:id/stale", func(c *gin.Context) { err = NoteImages.setImage(c, f.db, "", "mine_image.jpg") })
+
+	doRequest(router, http.MethodPost, fmt.Sprintf("/notes/%d/stale", f.note.ID), nil, "")
+
+	assert.ErrorIs(t, err, errImageChanged)
+	assert.Equal(t, "other_image.jpg", f.noteImage(t), "the other request's image stays referenced")
+}

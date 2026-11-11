@@ -86,20 +86,36 @@ func (it ImageItem) ownedImage(c *gin.Context, db *gorm.DB) (string, bool) {
 	return images[0], true
 }
 
-// setImage stores the image filename; gorm.ErrRecordNotFound means the item
-// was deleted since it was looked up.
-func (it ImageItem) setImage(c *gin.Context, db *gorm.DB, image string) error {
+// errImageChanged means another request changed the image in the meantime.
+var errImageChanged = errors.New("image changed concurrently")
+
+// setImage replaces the image filename only if it is still oldImage, so of two
+// concurrent changes one fails instead of leaving the other's file orphaned.
+// gorm.ErrRecordNotFound means the item was deleted since it was looked up.
+func (it ImageItem) setImage(c *gin.Context, db *gorm.DB, oldImage, image string) error {
 	userID, _ := currentUserID(c)
-	result := it.owned(db, c, userID).Updates(map[string]any{"image": image, "updated_at": time.Now()})
-	if result.Error == nil && result.RowsAffected == 0 {
+	result := it.owned(db, c, userID).Where("image = ?", oldImage).
+		Updates(map[string]any{"image": image, "updated_at": time.Now()})
+	if result.Error != nil || result.RowsAffected > 0 {
+		return result.Error
+	}
+	var count int64
+	if err := it.owned(db, c, userID).Count(&count).Error; err != nil {
+		return err
+	}
+	if count == 0 {
 		return gorm.ErrRecordNotFound
 	}
-	return result.Error
+	return errImageChanged
 }
 
 func abortSetImage(c *gin.Context, it ImageItem, err error) {
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		apperrors.AbortWithError(c, apperrors.ErrNotFound(it.Name))
+		return
+	}
+	if errors.Is(err, errImageChanged) {
+		apperrors.AbortWithError(c, apperrors.ErrConflict("The image was changed by another request. Reload and try again"))
 		return
 	}
 	apperrors.AbortWithError(c, apperrors.ErrDatabase("update").WithError(err))
@@ -175,7 +191,7 @@ func UploadItemImage(c *gin.Context, cfg *config.Config, it ImageItem) {
 		return
 	}
 
-	if err := it.setImage(c, db, image); err != nil {
+	if err := it.setImage(c, db, oldImage, image); err != nil {
 		carddav.RemoveContactPhotoFile(cfg.ProfilePhotoDir, image)
 		abortSetImage(c, it, err)
 		return
@@ -192,7 +208,7 @@ func DeleteItemImage(c *gin.Context, cfg *config.Config, it ImageItem) {
 	if !ok {
 		return
 	}
-	if err := it.setImage(c, db, ""); err != nil {
+	if err := it.setImage(c, db, image, ""); err != nil {
 		abortSetImage(c, it, err)
 		return
 	}
