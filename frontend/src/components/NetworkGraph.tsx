@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { GraphData, GraphNode, GraphEdge } from '../types/graph';
 import { isEndedRelationshipEdge } from '../networkFilters';
 import { useDateFormat } from '../DateFormatProvider';
+import { isPartialDateInFuture } from '../api/relationships';
 
 interface NetworkGraphProps {
   data: GraphData;
@@ -405,6 +406,8 @@ export default function NetworkGraph({
                 {getEdgeTypeLabel(hoveredEdge.type)}
                 {isEndedRelationshipEdge(hoveredEdge) && hoveredEdge.end_date &&
                   ` · ${t('relationships.endedOn', { date: formatDate(hoveredEdge.end_date) })}`}
+                {hoveredEdge.type === 'relationship' && !hoveredEdge.end_date && isPartialDateInFuture(hoveredEdge.start_date) &&
+                  ` · ${t('relationships.startingOn', { date: formatDate(hoveredEdge.start_date!) })}`}
               </Typography>
             </>
           ) : null}

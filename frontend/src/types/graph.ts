@@ -20,6 +20,7 @@ export interface GraphEdge {
   type: 'relationship' | 'activity' | 'circle';
   label: string;
   end_date?: string;    // Set on relationship edges whose relationship has ended
+  start_date?: string;  // Set on relationship edges with a start date
 }
 
 export interface GraphData {

@@ -144,6 +144,8 @@ func TestGetGraph_RelationshipEdgesCarryEndDate(t *testing.T) {
 	}
 	assert.Equal(t, "2015-06", edges[fmt.Sprintf("r-%d", ended.ID)].EndDate)
 	assert.Equal(t, "", edges[fmt.Sprintf("r-%d", current.ID)].EndDate)
+	assert.Equal(t, "2005", edges[fmt.Sprintf("r-%d", ended.ID)].StartDate)
+	assert.Equal(t, "2016", edges[fmt.Sprintf("r-%d", current.ID)].StartDate)
 	// Ongoing relationships omit the field entirely.
 	assert.Contains(t, w.Body.String(), `"end_date":"2015-06"`)
 	assert.Equal(t, 1, strings.Count(w.Body.String(), `"end_date"`))

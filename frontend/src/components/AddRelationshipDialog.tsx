@@ -482,7 +482,7 @@ export default function AddRelationshipDialog({
             <TextField
               label={t('relationships.endDate')}
               placeholder={dateFormats}
-              helperText={t('relationships.endDateHelp')}
+              helperText={`${t('relationships.endDateHelp')} · ${dateFormats}`}
               value={endDate}
               onChange={(e) => { setEndDate(e.target.value); setError(''); }}
               fullWidth

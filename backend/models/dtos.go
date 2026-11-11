@@ -274,6 +274,9 @@ type GraphEdge struct {
 	// EndDate is set on relationship edges whose relationship has ended
 	// (YYYY, YYYY-MM or YYYY-MM-DD), so the graph can draw them as ended.
 	EndDate string `json:"end_date,omitempty"`
+	// StartDate is set on relationship edges with a start date, so the graph can
+	// tell a relationship that has not begun yet (e.g. an upcoming wedding).
+	StartDate string `json:"start_date,omitempty"`
 }
 
 // GraphResponse is the API response for the network graph
