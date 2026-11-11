@@ -199,3 +199,31 @@ func TestItemImage_UpdatingTheNoteKeepsTheImage(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	assert.Equal(t, "kept_image.jpg", f.noteImage(t))
 }
+
+func TestItemImage_WebhookPayloadCarriesTheNewImage(t *testing.T) {
+	f := setupItemImageFixture(t)
+	for _, tc := range []struct {
+		item ImageItem
+		id   uint
+		path string
+	}{
+		{NoteImages, f.note.ID, "/notes/%d/image"},
+		{ActivityImages, f.activity.ID, "/activities/%d/image"},
+	} {
+		w := doUpload(t, f.router, fmt.Sprintf(tc.path, tc.id), "image", "a.png", encodePNG(t, sidesAndCenterImage(10, 10)))
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		image := decodeJSON[map[string]string](t, w)["image"]
+
+		payload, err := tc.item.load(f.db, fmt.Sprint(tc.id), f.user.ID)
+		require.NoError(t, err)
+		switch p := payload.(type) {
+		case models.Note:
+			assert.Equal(t, image, p.Image)
+		case models.Activity:
+			assert.Equal(t, image, p.Image)
+		default:
+			t.Fatalf("unexpected payload %T", payload)
+		}
+		assert.NotEmpty(t, tc.item.Event)
+	}
+}

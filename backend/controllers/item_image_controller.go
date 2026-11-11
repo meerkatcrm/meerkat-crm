@@ -5,6 +5,9 @@ import (
 	"meerkat/carddav"
 	"meerkat/config"
 	apperrors "meerkat/errors"
+	"meerkat/logger"
+	"meerkat/models"
+	"meerkat/services"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -28,12 +31,38 @@ const maxItemImageSize = 1600
 type ImageItem struct {
 	Table string
 	Name  string
+	// Event is the webhook fired when the image changes, with load's result as
+	// payload: the same item an update through the regular endpoint would send.
+	Event string
+	load  func(db *gorm.DB, id string, userID uint) (any, error)
 }
 
 var (
-	NoteImages     = ImageItem{Table: "notes", Name: "Note"}
-	ActivityImages = ImageItem{Table: "activities", Name: "Activity"}
+	NoteImages = ImageItem{Table: "notes", Name: "Note", Event: "note.updated",
+		load: func(db *gorm.DB, id string, userID uint) (any, error) {
+			var note models.Note
+			err := db.Where("user_id = ?", userID).First(&note, "id = ?", id).Error
+			return note, err
+		}}
+	ActivityImages = ImageItem{Table: "activities", Name: "Activity", Event: "activity.updated",
+		load: func(db *gorm.DB, id string, userID uint) (any, error) {
+			var activity models.Activity
+			err := db.Preload("Contacts", "contacts.user_id = ?", userID).Where("user_id = ?", userID).First(&activity, "id = ?", id).Error
+			return activity, err
+		}}
 )
+
+// notifyImageChanged fires the item's update webhook, so consumers learn the
+// new filename (a PUT that preceded the image change carried the old one).
+func (it ImageItem) notifyImageChanged(c *gin.Context, db *gorm.DB) {
+	userID, _ := currentUserID(c)
+	item, err := it.load(db, c.Param("id"), userID)
+	if err != nil {
+		logger.FromContext(c).Warn().Err(err).Str("item", it.Name).Msg("Failed to load item for webhook after image change")
+		return
+	}
+	go services.TriggerWebhooks(db, currentConfig(c), userID, it.Event, item)
+}
 
 func (it ImageItem) owned(db *gorm.DB, c *gin.Context, userID uint) *gorm.DB {
 	return db.Table(it.Table).Where("id = ? AND user_id = ? AND deleted_at IS NULL", c.Param("id"), userID)
@@ -152,6 +181,7 @@ func UploadItemImage(c *gin.Context, cfg *config.Config, it ImageItem) {
 		return
 	}
 	carddav.RemoveContactPhotoFile(cfg.ProfilePhotoDir, oldImage)
+	it.notifyImageChanged(c, db)
 	c.JSON(http.StatusOK, gin.H{"image": image})
 }
 
@@ -167,5 +197,6 @@ func DeleteItemImage(c *gin.Context, cfg *config.Config, it ImageItem) {
 		return
 	}
 	carddav.RemoveContactPhotoFile(cfg.ProfilePhotoDir, image)
+	it.notifyImageChanged(c, db)
 	c.JSON(http.StatusOK, gin.H{"image": ""})
 }

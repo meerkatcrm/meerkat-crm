@@ -88,10 +88,11 @@ export async function updateNote(
   id: string | number,
   data: { content: string; date: string; contact_id?: number }
 ): Promise<Note> {
-  return apiJson(`/notes/${id}`, {
+  const res = await apiJson<{ note: Note }>(`/notes/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   });
+  return res.note;
 }
 
 // Delete note
