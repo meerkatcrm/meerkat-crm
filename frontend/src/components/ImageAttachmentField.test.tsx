@@ -70,3 +70,13 @@ test('removing a replacement brings back the saved image instead of deleting it'
   fireEvent.click(screen.getByRole('button', { name: 'Remove image' }));
   expect(onChange).toHaveBeenCalledWith(undefined);
 });
+
+test('a file the browser cannot preview is named instead of shown as a broken image', () => {
+  const heic = new File(['x'], 'party.heic', { type: 'image/heic' });
+  renderField({ value: heic });
+  fireEvent.error(screen.getByRole('img'));
+
+  expect(screen.queryByRole('img')).toBeNull();
+  expect(screen.getByText(/party\.heic \(no preview in this browser/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Remove image' })).toBeInTheDocument();
+});

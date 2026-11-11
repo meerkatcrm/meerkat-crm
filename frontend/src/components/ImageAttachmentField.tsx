@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Box, Button } from '@mui/material';
+import { Box, Button, Typography } from '@mui/material';
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import DeleteIcon from '@mui/icons-material/Delete';
+import ImageIcon from '@mui/icons-material/Image';
 import { useTranslation } from 'react-i18next';
 import { ImageChange, ImageItemType } from '../api/itemImages';
 import ItemImage from './ItemImage';
@@ -20,8 +21,11 @@ interface ImageAttachmentFieldProps {
 export default function ImageAttachmentField({ type, id, image, value, onChange }: ImageAttachmentFieldProps) {
   const { t } = useTranslation();
   const [previewUrl, setPreviewUrl] = useState<string>();
+  // Some formats the server accepts cannot be shown here (HEIC outside Safari).
+  const [previewFailed, setPreviewFailed] = useState(false);
 
   useEffect(() => {
+    setPreviewFailed(false);
     if (!value) {
       setPreviewUrl(undefined);
       return;
@@ -35,11 +39,17 @@ export default function ImageAttachmentField({ type, id, image, value, onChange 
 
   return (
     <Box>
-      {previewUrl ? (
+      {value && previewFailed ? (
+        <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'text.secondary' }}>
+          <ImageIcon fontSize="small" />
+          {t('itemImage.noPreview', { name: value.name })}
+        </Typography>
+      ) : previewUrl ? (
         <Box
           component="img"
           src={previewUrl}
           alt={t('itemImage.alt')}
+          onError={() => setPreviewFailed(true)}
           sx={{ display: 'block', mb: 1, maxWidth: '100%', maxHeight: 200, borderRadius: 1 }}
         />
       ) : (

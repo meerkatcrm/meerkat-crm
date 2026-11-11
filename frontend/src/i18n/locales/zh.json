@@ -470,7 +470,8 @@
     "alt": "附加的图片",
     "attach": "附加图片",
     "replace": "替换图片",
-    "remove": "移除图片"
+    "remove": "移除图片",
+    "noPreview": "{{name}}（此浏览器无法预览，保存时会自动转换）"
   },
   "settings": {
     "title": "设置",

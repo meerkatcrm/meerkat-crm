@@ -470,7 +470,8 @@
     "alt": "Imagen adjunta",
     "attach": "Adjuntar imagen",
     "replace": "Reemplazar imagen",
-    "remove": "Quitar imagen"
+    "remove": "Quitar imagen",
+    "noPreview": "{{name}} (sin vista previa en este navegador, se convierte al guardar)"
   },
   "settings": {
     "title": "Configuración",

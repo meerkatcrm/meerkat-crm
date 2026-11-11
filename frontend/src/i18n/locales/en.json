@@ -470,7 +470,8 @@
     "alt": "Attached image",
     "attach": "Attach image",
     "replace": "Replace image",
-    "remove": "Remove image"
+    "remove": "Remove image",
+    "noPreview": "{{name}} (no preview in this browser, it is converted on save)"
   },
   "settings": {
     "title": "Settings",

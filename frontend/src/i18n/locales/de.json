@@ -470,7 +470,8 @@
     "alt": "Angehängtes Bild",
     "attach": "Bild anhängen",
     "replace": "Bild ersetzen",
-    "remove": "Bild entfernen"
+    "remove": "Bild entfernen",
+    "noPreview": "{{name}} (keine Vorschau in diesem Browser, wird beim Speichern umgewandelt)"
   },
   "settings": {
     "title": "Einstellungen",

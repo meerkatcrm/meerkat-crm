@@ -470,7 +470,8 @@
     "alt": "Image jointe",
     "attach": "Joindre une image",
     "replace": "Remplacer l'image",
-    "remove": "Supprimer l'image"
+    "remove": "Supprimer l'image",
+    "noPreview": "{{name}} (aperçu indisponible dans ce navigateur, converti à l'enregistrement)"
   },
   "settings": {
     "title": "Paramètres",
