@@ -68,7 +68,7 @@ func validateEmploymentHistoryContent(in *models.EmploymentHistoryInput) *apperr
 const maxUTCOffset = 14 * time.Hour
 
 // validatePeriodDates rejects a dated period (employment entry, relationship) whose EndDate is in the future or
-// before its StartDate. Either field may be empty (an open-ended or undated entry), in
+// before its StartDate. Either field may be empty (open-ended or undated), in
 // which case there is nothing to compare.
 func validatePeriodDates(startDate, endDate string) *apperrors.AppError {
 	if endDate == "" {
@@ -89,7 +89,7 @@ func validatePeriodDates(startDate, endDate string) *apperrors.AppError {
 
 	if end.Before(start) {
 		if start.After(time.Now().UTC()) {
-			return apperrors.ErrInvalidInput("end_date", "Start date is in the future; an entry that has not started cannot be ended")
+			return apperrors.ErrInvalidInput("end_date", "Start date is in the future; something that has not started cannot have ended")
 		}
 		return apperrors.ErrInvalidInput("end_date", "End date must not be before start date")
 	}
