@@ -8,20 +8,22 @@
 -- blank line, the same as VCardToContact does. Values are capped at the column's
 -- 5000-character limit, or every later edit of the contact would fail validation. A
 -- card whose NOTEs are all blank yields NULL from group_concat, hence the COALESCE.
+-- Whitespace is trimmed like strings.TrimSpace in noteFromCard (tabs and line breaks
+-- too; SQLite's trim() alone strips only spaces), also after the cut.
 -- vcard_extra holds the value as go-vcard decoded it, which still contains the "\;"
 -- escape; it is undone here exactly as noteFromCard does for new cards.
 ALTER TABLE contacts ADD COLUMN note TEXT DEFAULT '' NOT NULL;
 
 UPDATE contacts
-SET note = COALESCE(substr((
+SET note = COALESCE(trim(substr((
   SELECT group_concat(value_text, char(10) || char(10))
   FROM (
-    SELECT trim(replace(json_extract(value, '$.Value'), '\;', ';')) AS value_text
+    SELECT trim(replace(json_extract(value, '$.Value'), '\;', ';'), ' ' || char(9) || char(10) || char(13)) AS value_text
     FROM json_each(vcard_extra, '$.properties.NOTE')
-    WHERE trim(COALESCE(json_extract(value, '$.Value'), '')) != ''
+    WHERE trim(COALESCE(json_extract(value, '$.Value'), ''), ' ' || char(9) || char(10) || char(13)) != ''
     ORDER BY key
   )
-), 1, 5000), '')
+), 1, 5000), ' ' || char(9) || char(10) || char(13)), '')
 WHERE vcard_extra IS NOT NULL AND vcard_extra != '' AND json_valid(vcard_extra)
   AND json_type(vcard_extra, '$.properties.NOTE') = 'array';
 

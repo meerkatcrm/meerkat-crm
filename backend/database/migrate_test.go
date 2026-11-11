@@ -250,7 +250,8 @@ func TestMigration34_MovesVCardNoteIntoColumn(t *testing.T) {
 		(3, 3, 'no_note', '{"properties":{"X-KEEP":[{"Value":"k","Params":{},"Group":""}]}}'),
 		(4, 3, 'no_extra', NULL),
 		(5, 3, 'broken_extra', 'not json'),
-		(6, 3, 'blank_notes', '{"properties":{"NOTE":[{"Value":"","Params":{},"Group":""}]}}')`)
+		(6, 3, 'blank_notes', '{"properties":{"NOTE":[{"Value":"","Params":{},"Group":""},{"Value":"\n\t ","Params":{},"Group":""}]}}'),
+		(7, 3, 'padded_note', '{"properties":{"NOTE":[{"Value":"\n  Padded\t\r\n","Params":{},"Group":""}]}}')`)
 	require.NoError(t, err)
 
 	noteOf := func(id int) string {
@@ -278,7 +279,8 @@ func TestMigration34_MovesVCardNoteIntoColumn(t *testing.T) {
 	assert.Equal(t, "", noteOf(4))
 	assert.False(t, extra(4).Valid)
 	assert.Equal(t, "not json", extra(5).String)
-	assert.Equal(t, "", noteOf(6), "only blank notes must not trip the NOT NULL column")
+	assert.Equal(t, "", noteOf(6), "blank and whitespace-only notes must not trip the NOT NULL column")
+	assert.Equal(t, "Padded", noteOf(7), "tabs and line breaks are trimmed like strings.TrimSpace")
 	assert.NotContains(t, extra(6).String, "NOTE")
 
 	assert.Equal(t, `["emails","note"]`, fields(1).String, "a saved selection gains the field")
