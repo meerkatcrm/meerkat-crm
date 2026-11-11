@@ -270,6 +270,9 @@ type GraphEdge struct {
 	Target string `json:"target"` // Target node ID
 	Type   string `json:"type"`   // "relationship" or "activity"
 	Label  string `json:"label"`  // Relationship type or activity title
+	// EndDate is set on relationship edges whose relationship has ended
+	// (YYYY, YYYY-MM or YYYY-MM-DD), so the graph can draw them as ended.
+	EndDate string `json:"end_date,omitempty"`
 }
 
 // GraphResponse is the API response for the network graph

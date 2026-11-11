@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { resolveNetworkFilters, DEFAULT_NETWORK_FILTERS } from './networkFilters';
+import { resolveNetworkFilters, DEFAULT_NETWORK_FILTERS, isEndedRelationshipEdge } from './networkFilters';
 
 describe('resolveNetworkFilters', () => {
   test('returns defaults when nothing is stored', () => {
@@ -12,12 +12,14 @@ describe('resolveNetworkFilters', () => {
     const stored = JSON.stringify({
       selectedCircle: 'Family',
       showRelationships: true,
+      showEndedRelationships: false,
       showActivities: false,
       showCircles: true,
     });
     expect(resolveNetworkFilters(stored)).toEqual({
       selectedCircle: 'Family',
       showRelationships: true,
+      showEndedRelationships: false,
       showActivities: false,
       showCircles: true,
     });
@@ -40,5 +42,19 @@ describe('resolveNetworkFilters', () => {
     const first = resolveNetworkFilters(null);
     first.showCircles = true;
     expect(resolveNetworkFilters(null).showCircles).toBe(false);
+  });
+});
+
+describe('ended relationships', () => {
+  test('filters saved before the toggle existed still show ended relationships', () => {
+    const stored = JSON.stringify({ selectedCircle: '', showRelationships: true, showActivities: true, showCircles: false });
+    expect(resolveNetworkFilters(stored).showEndedRelationships).toBe(true);
+  });
+
+  test('isEndedRelationshipEdge only matches relationship edges with an end date', () => {
+    expect(isEndedRelationshipEdge({ type: 'relationship', end_date: '2018' })).toBe(true);
+    expect(isEndedRelationshipEdge({ type: 'relationship' })).toBe(false);
+    expect(isEndedRelationshipEdge({ type: 'relationship', end_date: '' })).toBe(false);
+    expect(isEndedRelationshipEdge({ type: 'activity', end_date: '2018' })).toBe(false);
   });
 });

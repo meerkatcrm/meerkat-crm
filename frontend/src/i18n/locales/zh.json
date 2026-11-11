@@ -840,10 +840,12 @@
     "filterByCircle": "按圈子筛选",
     "allCircles": "所有圈子",
     "showRelationships": "关系",
+    "showEndedRelationships": "已结束的关系",
     "showActivities": "活动",
     "noData": "没有可显示的联系人。请先添加一些联系人。",
     "legend": {
       "relationships": "关系",
+      "endedRelationship": "已结束的关系",
       "activities": "共同活动",
       "contact": "联系人",
       "activity": "活动",

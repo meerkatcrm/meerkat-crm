@@ -41,7 +41,7 @@ export default function NetworkPage() {
   const { showError } = useSnackbar();
 
   const [filters, setFilters] = useState<NetworkFilters>(loadNetworkFilters);
-  const { selectedCircle, showRelationships, showActivities, showCircles } = filters;
+  const { selectedCircle, showRelationships, showEndedRelationships, showActivities, showCircles } = filters;
   const [centeredNodeId, setCenteredNodeId] = useState<string | null>(() => {
     return localStorage.getItem('network-centered-node-id');
   });
@@ -275,6 +275,18 @@ export default function NetworkPage() {
         <FormControlLabel
           control={
             <Switch
+              checked={showEndedRelationships}
+              onChange={(e) => updateFilters({ showEndedRelationships: e.target.checked })}
+              color="primary"
+              disabled={!showRelationships}
+            />
+          }
+          label={t('network.showEndedRelationships')}
+        />
+
+        <FormControlLabel
+          control={
+            <Switch
               checked={showActivities}
               onChange={(e) => updateFilters({ showActivities: e.target.checked })}
               color="secondary"
@@ -296,14 +308,14 @@ export default function NetworkPage() {
 
         {!isMobile && (
           <Box sx={{ flexBasis: '100%' }}>
-            <NetworkLegend showCircles={showCircles} showActivities={showActivities} showRelationships={showRelationships} />
+            <NetworkLegend showCircles={showCircles} showActivities={showActivities} showRelationships={showRelationships} showEndedRelationships={showEndedRelationships} />
           </Box>
         )}
       </Card>
 
       {isMobile && (
         <Card sx={{ p: 1.5, mb: 2, flexShrink: 0 }}>
-          <NetworkLegend showCircles={showCircles} showActivities={showActivities} showRelationships={showRelationships} />
+          <NetworkLegend showCircles={showCircles} showActivities={showActivities} showRelationships={showRelationships} showEndedRelationships={showEndedRelationships} />
         </Card>
       )}
 
@@ -315,6 +327,7 @@ export default function NetworkPage() {
           onActivityClick={handleActivityNodeClick}
           selectedCircle={selectedCircle || undefined}
           showRelationships={showRelationships}
+          showEndedRelationships={showEndedRelationships}
           showActivities={showActivities}
           showCircles={showCircles}
           centeredNodeId={centeredNodeId ?? undefined}

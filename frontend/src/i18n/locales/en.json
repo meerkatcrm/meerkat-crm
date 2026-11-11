@@ -840,10 +840,12 @@
     "filterByCircle": "Filter by Circle",
     "allCircles": "All Circles",
     "showRelationships": "Relationships",
+    "showEndedRelationships": "Ended relationships",
     "showActivities": "Activities",
     "noData": "No contacts to display. Add some contacts first.",
     "legend": {
       "relationships": "Relationship",
+      "endedRelationship": "Ended relationship",
       "activities": "Shared Activity",
       "contact": "Contact",
       "activity": "Activity",

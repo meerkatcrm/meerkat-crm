@@ -19,6 +19,7 @@ export interface GraphEdge {
   target: string | GraphNode;
   type: 'relationship' | 'activity' | 'circle';
   label: string;
+  end_date?: string;    // Set on relationship edges whose relationship has ended
 }
 
 export interface GraphData {

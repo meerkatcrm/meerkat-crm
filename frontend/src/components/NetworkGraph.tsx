@@ -4,6 +4,8 @@ import { forceX, forceY } from 'd3-force';
 import { useTheme, Box, Typography, useMediaQuery } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { GraphData, GraphNode, GraphEdge } from '../types/graph';
+import { isEndedRelationshipEdge } from '../networkFilters';
+import { useDateFormat } from '../DateFormatProvider';
 
 interface NetworkGraphProps {
   data: GraphData;
@@ -11,6 +13,8 @@ interface NetworkGraphProps {
   onActivityClick?: (node: GraphNode) => void;
   selectedCircle?: string;
   showRelationships: boolean;
+  /** Draw relationships that have ended; defaults to true */
+  showEndedRelationships?: boolean;
   showActivities: boolean;
   showCircles: boolean;
   centeredNodeId?: string;
@@ -33,11 +37,13 @@ export default function NetworkGraph({
   onActivityClick,
   selectedCircle,
   showRelationships,
+  showEndedRelationships = true,
   showActivities,
   showCircles,
   centeredNodeId,
 }: NetworkGraphProps) {
   const { t } = useTranslation();
+  const { formatDate } = useDateFormat();
   const theme = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<any>(null);
@@ -49,6 +55,7 @@ export default function NetworkGraph({
 
   // Colors from theme
   const relationshipColor = theme.palette.primary.main;
+  const endedRelationshipColor = theme.palette.text.disabled;
   const activityColor = theme.palette.secondary.main;
   const circleEdgeColor = theme.palette.warning.main;
   const nodeColor = theme.palette.primary.main;
@@ -123,6 +130,7 @@ export default function NetworkGraph({
 
       if (!nodeIds.has(sourceId) || !nodeIds.has(targetId)) return false;
       if (e.type === 'relationship' && !showRelationships) return false;
+      if (isEndedRelationshipEdge(e) && !showEndedRelationships) return false;
       return true;
     });
 
@@ -190,7 +198,7 @@ export default function NetworkGraph({
       nodes: filteredNodes,
       links: filteredEdges,
     };
-  }, [data, selectedCircle, showRelationships, showActivities, showCircles, centeredNodeId]);
+  }, [data, selectedCircle, showRelationships, showEndedRelationships, showActivities, showCircles, centeredNodeId]);
 
   // Center and zoom to selected node when centeredNodeId changes
   useEffect(() => {
@@ -269,10 +277,17 @@ export default function NetworkGraph({
 
   // Custom link rendering
   const linkColor = useCallback((link: GraphEdge) => {
+    if (isEndedRelationshipEdge(link)) return endedRelationshipColor;
     if (link.type === 'relationship') return relationshipColor;
     if (link.type === 'activity') return activityColor;
     return circleEdgeColor;
-  }, [relationshipColor, activityColor, circleEdgeColor]);
+  }, [relationshipColor, endedRelationshipColor, activityColor, circleEdgeColor]);
+
+  // Ended relationships are drawn dashed (null = solid line)
+  const linkLineDash = useCallback(
+    (link: GraphEdge) => (isEndedRelationshipEdge(link) ? [4, 3] : null),
+    []
+  );
 
   // Handle node hover
   const handleNodeHover = useCallback((node: GraphNode | null) => {
@@ -334,6 +349,7 @@ export default function NetworkGraph({
           ctx.fill();
         }}
         linkColor={linkColor}
+        linkLineDash={linkLineDash}
         linkWidth={2}
         linkDirectionalArrowLength={0}
         onNodeClick={handleNodeClick}
@@ -387,6 +403,8 @@ export default function NetworkGraph({
                 color: "text.secondary"
               }}>
                 {getEdgeTypeLabel(hoveredEdge.type)}
+                {isEndedRelationshipEdge(hoveredEdge) && hoveredEdge.end_date &&
+                  ` · ${t('relationships.endedOn', { date: formatDate(hoveredEdge.end_date) })}`}
               </Typography>
             </>
           ) : null}

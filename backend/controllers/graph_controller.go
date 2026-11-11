@@ -84,11 +84,12 @@ func GetGraph(c *gin.Context) {
 	for _, rel := range relationships {
 		if rel.RelatedContactID != nil {
 			edges = append(edges, models.GraphEdge{
-				ID:     fmt.Sprintf("r-%d", rel.ID),
-				Source: fmt.Sprintf("c-%d", rel.ContactID),
-				Target: fmt.Sprintf("c-%d", *rel.RelatedContactID),
-				Type:   "relationship",
-				Label:  rel.Type,
+				ID:      fmt.Sprintf("r-%d", rel.ID),
+				Source:  fmt.Sprintf("c-%d", rel.ContactID),
+				Target:  fmt.Sprintf("c-%d", *rel.RelatedContactID),
+				Type:    "relationship",
+				Label:   rel.Type,
+				EndDate: rel.EndDate,
 			})
 		}
 	}
