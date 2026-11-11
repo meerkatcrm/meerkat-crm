@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"encoding/base64"
 	"fmt"
 	"image"
 	"image/jpeg"
@@ -267,4 +268,29 @@ func TestItemImage_StaleChangeIsRejectedAndKeepsTheOtherImage(t *testing.T) {
 
 	assert.ErrorIs(t, err, errImageChanged)
 	assert.Equal(t, "other_image.jpg", f.noteImage(t), "the other request's image stays referenced")
+}
+
+// rotatedHEICBase64 is a 40x60 upright picture with a red band at the top,
+// stored sideways (60x40 pixels) with a "rotate 90" transform, as iPhones do.
+// Made with sips from a JPEG with EXIF orientation 6.
+const rotatedHEICBase64 = "AAAAJGZ0eXBoZWljAAAAAG1pZjFNaVBybWlhZk1pSEJoZWljAAABw21ldGEAAAAAAAAAIWhkbHIAAAAAAAAAAHBpY3QAAAAAAAAAAAAAAAAAAAAAJGRpbmYAAAAcZHJlZgAAAAAAAAABAAAADHVybCAAAAABAAAADnBpdG0AAAAAAAEAAAA4aWluZgAAAAAAAgAAABVpbmZlAgAAAAABAABodmMxAAAAABVpbmZlAgAAAQACAABFeGlmAAAAABppcmVmAAAAAAAAAA5jZHNjAAIAAQABAAAA5mlwcnAAAADFaXBjbwAAABNjb2xybmNseAACAAIABoAAAAAMY2xsaQDLAEAAAAAUaXNwZQAAAAAAAAA8AAAAKAAAAAlpcm90AwAAABBwaXhpAAAAAAMICAgAAABxaHZjQwEDcAAAALAAAAAAAB7wAPz9+PgAAAsDoAABABdAAQwB//8DcAAAAwCwAAADAAADAB5wJKEAAQAjQgEBA3AAAAMAsAAAAwAAAwAeoBQgQcGcbiHuRZVNwICBgCCiAAEACUQBwGFyyEBTJAAAABlpcG1hAAAAAAAAAAEAAQaBAgMFhoQAAAAsaWxvYwAAAABEAAACAAEAAAABAAACTwAAAPUAAgAAAAEAAAH3AAAAWAAAAAFtZGF0AAAAAAAAAV0AAAAGRXhpZgAATU0AKgAAAAgABAESAAMAAAABAAYAAAEaAAUAAAABAAAAPgEbAAUAAAABAAAARgEoAAMAAAABAAEAAAAAAAAAAAABAAAAAQAAAAEAAAABAAAA8SgBr6PUgBpiI/7L1N/N/kK3HkSUZ1tSa/0LZMPq1jPfEDWqBqqFQvy3DG/o8sT9+k08+F/TR/hKo5kaNAgZLjopcWex8SYjQ2L32ZpZWzmauRI2nEsBbbmBQfgfI7OMpV6mmFcMhFtvbNQ+l2dSSIaxRCuuLrMZpNHjKWaMjNX/RMG8AJ8vW5Uzvl1bKvsFAeOIh7fU8/atq4535WPegI5Oy83q8SHOCtECPiT/M+9ifV5IW9ZiqbGzCS37OXZZwKWTIMBJdvxlhjJpLKm0MX/2UcRhypuJxqtYaxNbsLYts73Gdk3KXimNrapAHp94CU0="
+
+// Browsers other than Safari cannot decode HEIC, so the original file is sent
+// as is: the server must apply the HEIC rotation itself.
+func TestItemImage_HEICRotationIsApplied(t *testing.T) {
+	f := setupItemImageFixture(t)
+	data, err := base64.StdEncoding.DecodeString(rotatedHEICBase64)
+	require.NoError(t, err)
+
+	w := doUpload(t, f.router, fmt.Sprintf("/notes/%d/image", f.note.ID), "image", "phone.heic", data)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	file, err := os.Open(filepath.Join(f.dir, f.noteImage(t)))
+	require.NoError(t, err)
+	defer file.Close()
+	saved, err := jpeg.Decode(file)
+	require.NoError(t, err)
+	assert.Equal(t, image.Pt(40, 60), saved.Bounds().Size(), "stored upright, not sideways")
+	r, g, _, _ := saved.At(20, 3).RGBA()
+	assert.Greater(t, r, g, "the red band is at the top")
 }

@@ -21,9 +21,10 @@ const MAX_SIDE = 1600;
 
 /**
  * Re-encodes the image in the browser so phone photos arrive upright (the
- * browser applies the EXIF orientation, the server does not) and small. Falls
- * back to the original file when the browser cannot decode it (HEIC outside
- * Safari); the server converts those.
+ * browser applies the EXIF orientation; the server's JPEG decoder does not)
+ * and small. Falls back to the original file when the browser cannot decode
+ * it (HEIC outside Safari): the server converts those, and its HEIC decoder
+ * applies the HEIC rotation itself (TestItemImage_HEICRotationIsApplied).
  */
 async function prepareImage(file: File): Promise<Blob> {
   try {
