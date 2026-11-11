@@ -60,7 +60,7 @@ func TestSuggestColumnMappings_GoogleStyle(t *testing.T) {
 		{"Address 1 - Label", "address_label", 0},
 		{"Website 1 - Value", "url", 0},
 		{"Labels", "circles", 0},
-		{"Notes", "about", 0},
+		{"Notes", "note", 0},
 	}
 
 	for _, tc := range cases {
@@ -189,18 +189,18 @@ func TestValidateImportedContact(t *testing.T) {
 	assert.Empty(t, ValidateImportedContact(&ok))
 }
 
-// A CSV cell longer than the About limit is cut like a vCard NOTE: storing it whole
+// A CSV cell longer than the Note limit is cut like a vCard NOTE: storing it whole
 // would make every later save of the contact fail validation.
-func TestBuildContactFromRow_CapsAbout(t *testing.T) {
+func TestBuildContactFromRow_CapsNote(t *testing.T) {
 	headers := []string{"First Name", "Notes"}
-	row := []string{"Dana", strings.Repeat("ä", models.MaxAboutLength+10)}
+	row := []string{"Dana", strings.Repeat("ä", models.MaxNoteLength+10)}
 	mappings := []models.ColumnMapping{
 		{CSVColumn: "First Name", ContactField: "firstname"},
-		{CSVColumn: "Notes", ContactField: "about"},
+		{CSVColumn: "Notes", ContactField: "note"},
 	}
 
 	c := BuildContactFromRow(1, headers, row, mappings)
 
-	assert.Equal(t, models.MaxAboutLength, len([]rune(c.About)))
+	assert.Equal(t, models.MaxNoteLength, len([]rune(c.Note)))
 	assert.Empty(t, ValidateImportedContact(&c))
 }

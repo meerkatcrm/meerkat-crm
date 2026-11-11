@@ -79,7 +79,7 @@ interface ContactWithRelations extends Contact {
 export const CONTACT_DETAIL_COLUMNS = [
   'ID', 'firstname', 'lastname', 'nickname', 'gender',
   'email', 'phone', 'birthday', 'address', 'how_we_met',
-  'food_preference', 'work_information', 'contact_information', 'about',
+  'food_preference', 'work_information', 'contact_information', 'note',
   'circles', 'photo', 'custom_fields', 'archived',
   'emails', 'phones', 'addresses', 'urls', 'impps',
   'prefix', 'middle_name', 'suffix', 'organization', 'department',

@@ -30,7 +30,7 @@ export interface Contact {
   food_preference?: string;
   work_information?: string;
   contact_information?: string;
-  about?: string;
+  note?: string;
   circles?: string[];
   photo_thumbnail?: string;
   custom_fields?: Record<string, string>;

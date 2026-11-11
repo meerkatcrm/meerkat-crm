@@ -163,9 +163,9 @@ func ContactToVCard(contact *models.Contact, photoDir string) vcard.Card {
 		card.SetValue(vcard.FieldGender, code)
 	}
 
-	// NOTE (about). One property: clients show a single notes box.
-	if contact.About != "" {
-		card.SetValue(vcard.FieldNote, contact.About)
+	// NOTE. One property: clients show a single notes box.
+	if contact.Note != "" {
+		card.SetValue(vcard.FieldNote, contact.Note)
 	}
 
 	// CATEGORIES (circles)
@@ -438,8 +438,8 @@ func VCardToContact(card vcard.Card, existing *models.Contact) (*models.Contact,
 		contact.Anniversary = normalizeBirthday(anniv)
 	}
 
-	// NOTE -> About
-	contact.About = noteFromCard(card)
+	// NOTE
+	contact.Note = noteFromCard(card)
 
 	// Extract photo data for separate processing
 	var photoData []byte
@@ -480,7 +480,7 @@ func clearVCardOwnedFields(contact *models.Contact) {
 	// the employment history when the card carries no ORG, TITLE or ROLE.
 	contact.Organization, contact.Department = "", ""
 	contact.JobTitle, contact.Role = "", ""
-	contact.About = ""
+	contact.Note = ""
 	contact.VCardExtra = ""
 }
 
@@ -1017,6 +1017,11 @@ func extractUnmappedProperties(card vcard.Card) VCardExtra {
 // noteEscapes undoes the "\;" escape that go-vcard leaves in place (it decodes
 // "\n", "\," and "\\" itself). RFC 2426 requires it for a semicolon in a text value.
 // It runs on already-decoded text, so it stays limited to this one sequence.
+//
+// Known limit: go-vcard decodes both "\\;" (a literal backslash before a semicolon)
+// and "\;" to the same text, so a note containing a literal backslash-semicolon
+// comes back as a plain semicolon. The distinction is lost before this code sees
+// the value, and go-vcard's encoder never escapes ';', so nothing here can restore it.
 var noteEscapes = strings.NewReplacer(`\;`, ";")
 
 // noteFromCard reads the NOTE properties into one string. vCard allows several but
@@ -1030,9 +1035,9 @@ func noteFromCard(card vcard.Card) string {
 			notes = append(notes, v)
 		}
 	}
-	about := strings.Join(notes, "\n\n")
-	if r := []rune(about); len(r) > models.MaxAboutLength {
-		about = strings.TrimSpace(string(r[:models.MaxAboutLength]))
+	note := strings.Join(notes, "\n\n")
+	if r := []rune(note); len(r) > models.MaxNoteLength {
+		note = strings.TrimSpace(string(r[:models.MaxNoteLength]))
 	}
-	return about
+	return note
 }

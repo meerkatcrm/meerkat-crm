@@ -171,25 +171,25 @@ test('shows the empty-state message when every offered field is empty', () => {
   expect(screen.getByRole('button', { name: /show all fields/i })).toBeInTheDocument();
 });
 
-test('shows About (the vCard note) when the field is enabled', () => {
+test('shows the vCard note when the field is enabled', () => {
   renderWithI18n(
     <ContactInformation
       {...baseProps}
-      enabledFields={resolveEnabledFields(['about'])}
-      contact={{ firstname: 'Jane', about: 'Met at a wedding in Lisbon' }}
+      enabledFields={resolveEnabledFields(['note'])}
+      contact={{ firstname: 'Jane', note: 'Met at a wedding in Lisbon' }}
       onUpdateContact={vi.fn()}
     />
   );
-  expect(screen.getByText('About')).toBeInTheDocument();
+  expect(screen.getByText('Note')).toBeInTheDocument();
   expect(screen.getByText('Met at a wedding in Lisbon')).toBeInTheDocument();
 });
 
-test('keeps About hidden for a user who switched it off', () => {
+test('keeps the note hidden for a user who switched it off', () => {
   renderWithI18n(
     <ContactInformation
       {...baseProps}
       enabledFields={resolveEnabledFields(['birthday'])}
-      contact={{ firstname: 'Jane', about: 'Met at a wedding in Lisbon' }}
+      contact={{ firstname: 'Jane', note: 'Met at a wedding in Lisbon' }}
       onUpdateContact={vi.fn()}
     />
   );

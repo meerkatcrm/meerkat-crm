@@ -125,7 +125,7 @@ type ContactInput struct {
 	FoodPreference     string            `json:"food_preference" validate:"max=500"`
 	WorkInformation    string            `json:"work_information" validate:"max=1000"`
 	ContactInformation string            `json:"contact_information" validate:"max=1000"`
-	About              string            `json:"about" validate:"max=5000"`
+	Note               string            `json:"note" validate:"max=5000"`
 	Circles            []string          `json:"circles" validate:"unique_circles"`
 	CustomFields       map[string]string `json:"custom_fields"`
 

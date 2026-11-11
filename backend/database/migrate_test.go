@@ -230,7 +230,7 @@ func TestMigration33_KeepsFieldsOfUsersWithWorkInformation(t *testing.T) {
 	assert.Equal(t, `[]`, fields(3).String)
 }
 
-func TestMigration34_MovesVCardNoteIntoAbout(t *testing.T) {
+func TestMigration34_MovesVCardNoteIntoColumn(t *testing.T) {
 	db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "test.db"))
 	require.NoError(t, err)
 	defer db.Close()
@@ -252,9 +252,9 @@ func TestMigration34_MovesVCardNoteIntoAbout(t *testing.T) {
 		(6, 3, 'blank_notes', '{"properties":{"NOTE":[{"Value":"","Params":{},"Group":""}]}}')`)
 	require.NoError(t, err)
 
-	about := func(id int) string {
+	noteOf := func(id int) string {
 		var v string
-		require.NoError(t, db.QueryRow(`SELECT about FROM contacts WHERE id = ?`, id).Scan(&v))
+		require.NoError(t, db.QueryRow(`SELECT note FROM contacts WHERE id = ?`, id).Scan(&v))
 		return v
 	}
 	extra := func(id int) sql.NullString {
@@ -269,24 +269,25 @@ func TestMigration34_MovesVCardNoteIntoAbout(t *testing.T) {
 	}
 
 	require.NoError(t, m.Migrate(34))
-	assert.Equal(t, "Met at a wedding; bring cake", about(1), "the \\; escape left by go-vcard is undone, as in noteFromCard")
+	assert.Equal(t, "Met at a wedding; bring cake", noteOf(1), "the \\; escape left by go-vcard is undone, as in noteFromCard")
 	assert.Equal(t, `{"properties":{"X-KEEP":[{"Value":"k","Params":{},"Group":""}]}}`, extra(1).String)
-	assert.Equal(t, "First\n\nSecond", about(2))
+	assert.Equal(t, "First\n\nSecond", noteOf(2))
 	assert.NotContains(t, extra(2).String, "NOTE")
-	assert.Equal(t, "", about(3))
-	assert.Equal(t, "", about(4))
+	assert.Equal(t, "", noteOf(3))
+	assert.Equal(t, "", noteOf(4))
 	assert.False(t, extra(4).Valid)
 	assert.Equal(t, "not json", extra(5).String)
-	assert.Equal(t, "", about(6), "only blank notes must not trip the NOT NULL column")
+	assert.Equal(t, "", noteOf(6), "only blank notes must not trip the NOT NULL column")
 	assert.NotContains(t, extra(6).String, "NOTE")
 
-	assert.Equal(t, `["emails","about"]`, fields(1).String, "a saved selection gains the field once a note arrives")
+	assert.Equal(t, `["emails","note"]`, fields(1).String, "a saved selection gains the field")
 	assert.False(t, fields(2).Valid, "the frontend defaults already include it")
-	assert.Equal(t, `["phones"]`, fields(3).String, "no note, selection left alone")
+	assert.Equal(t, `["phones","note"]`, fields(3).String, "also without a note yet: a later sync may bring one")
 
 	require.NoError(t, m.Migrate(33))
 	assert.JSONEq(t, `{"properties":{"X-KEEP":[{"Value":"k","Params":{},"Group":""}],"NOTE":[{"Value":"Met at a wedding; bring cake"}]}}`, extra(1).String)
 	assert.JSONEq(t, `{"properties":{"NOTE":[{"Value":"First\n\nSecond"}]}}`, extra(2).String)
 	assert.False(t, extra(4).Valid)
 	assert.Equal(t, `["emails"]`, fields(1).String)
+	assert.Equal(t, `["phones"]`, fields(3).String)
 }

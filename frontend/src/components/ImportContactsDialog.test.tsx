@@ -405,12 +405,12 @@ test('done closes the dialog after the result', async () => {
 
 test('mapping targets that exist on the contact form use its translated label', async () => {
   renderDialog();
-  await toMapping([mapping('Notes', 'about')]);
+  await toMapping([mapping('Notes', 'note')]);
   const combobox = within(rowOf(/^Notes/)).getByRole('combobox');
-  expect(combobox).toHaveTextContent('About');
+  expect(combobox).toHaveTextContent('Note');
   try {
     await act(() => i18n.changeLanguage('de'));
-    expect(combobox).toHaveTextContent('Über diese Person');
+    expect(combobox).toHaveTextContent('Notiz');
   } finally {
     await act(() => i18n.changeLanguage('en'));
   }

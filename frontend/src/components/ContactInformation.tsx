@@ -553,14 +553,14 @@ export default function ContactInformation({
         />
       )}
 
-      {show('about') && (
+      {show('note') && (
         <EditableField
           icon={<InfoOutlinedIcon sx={{ ...iconSx, mt: 0.5 }} />}
-          label={t('contacts.about')}
-          field="about"
-          value={contact.about || ''}
+          label={t('contacts.note')}
+          field="note"
+          value={contact.note || ''}
           multiline
-          isEditing={editingField === 'about'}
+          isEditing={editingField === 'note'}
           editValue={editValue}
           validationError={validationError}
           onEditStart={onEditStart}

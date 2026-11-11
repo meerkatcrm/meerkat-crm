@@ -44,9 +44,9 @@ type ContactAddress struct {
 	Country string `json:"country" validate:"max=100"`
 }
 
-// MaxAboutLength is the validation limit on Contact.About. Text arriving from a vCard
+// MaxNoteLength is the validation limit on Contact.Note. Text arriving from a vCard
 // or CSV import is cut to it, since rejecting it would fail the whole sync or import.
-const MaxAboutLength = 5000
+const MaxNoteLength = 5000
 
 type Contact struct {
 	gorm.Model
@@ -66,7 +66,7 @@ type Contact struct {
 	FoodPreference      string              `json:"food_preference" validate:"max=500"`        // Text field
 	WorkInformation     string              `json:"work_information" validate:"max=1000"`      // Text field
 	ContactInformation  string              `json:"contact_information" validate:"max=1000"`   // Additional contact information
-	About               string              `json:"about" validate:"max=5000"`                 // Free text, mapped to vCard NOTE
+	Note                string              `json:"note" validate:"max=5000"`                  // Free text, mapped to vCard NOTE
 	Circles             []string            `gorm:"type:text;serializer:json" json:"circles"`  // Serialize Circles properly
 	Activities          []Activity          `gorm:"many2many:activity_contacts;foreignKey:ID;joinForeignKey:ContactID;References:ID;joinReferences:ActivityID" json:"activities,omitempty"`
 	Notes               []Note              `json:"notes,omitempty"`                // One-to-many relationship with notes

@@ -401,7 +401,7 @@ func TestVCardToContact_UpdateClearsRemovedProperties(t *testing.T) {
 		URLs:         []models.ContactURL{{Type: "home", Value: "https://example.com"}},
 		Organization: "Analytical Engines", JobTitle: "Programmer",
 		Circles: []string{"Family"}, Gender: "female", Anniversary: "1835-07-08",
-		HowWeMet: "At a lecture", About: "Met at the Royal Society",
+		HowWeMet: "At a lecture", Note: "Met at the Royal Society",
 	}
 
 	card := vcard.Card{}
@@ -421,7 +421,7 @@ func TestVCardToContact_UpdateClearsRemovedProperties(t *testing.T) {
 	assert.Empty(t, contact.URLs)
 	assert.Empty(t, contact.Organization)
 	assert.Empty(t, contact.JobTitle)
-	assert.Empty(t, contact.About, "a note removed on the phone is removed here too")
+	assert.Empty(t, contact.Note, "a note removed on the phone is removed here too")
 
 	// Not every client can round-trip these, and Meerkat-only fields are not in a card at all.
 	assert.Equal(t, []string{"Family"}, contact.Circles)
@@ -451,7 +451,7 @@ func decodeVCF(t *testing.T, raw string) vcard.Card {
 
 // Issue #290: NOTE was unmapped, so it never reached Meerkat and edits made in
 // Meerkat could not reach the phone.
-func TestVCardToContact_MapsNoteToAbout(t *testing.T) {
+func TestVCardToContact_MapsNoteField(t *testing.T) {
 	card := decodeVCF(t, `BEGIN:VCARD
 VERSION:3.0
 FN:Jane Doe
@@ -462,7 +462,7 @@ END:VCARD
 
 	got, _, _, _ := VCardToContact(card, nil)
 
-	assert.Equal(t, "Met at a wedding, Lisbon 2019.\nAllergic to nuts; prefers tea.", got.About)
+	assert.Equal(t, "Met at a wedding, Lisbon 2019.\nAllergic to nuts; prefers tea.", got.Note)
 	assert.NotContains(t, got.VCardExtra, "NOTE", "a mapped property must not also be kept in vcard_extra")
 }
 
@@ -478,21 +478,21 @@ END:VCARD
 
 	got, _, _, _ := VCardToContact(card, nil)
 
-	assert.Equal(t, "First\n\nSecond", got.About)
+	assert.Equal(t, "First\n\nSecond", got.Note)
 }
 
-func TestVCardToContact_CapsAboutAtColumnLimit(t *testing.T) {
+func TestVCardToContact_CapsNoteAtColumnLimit(t *testing.T) {
 	card := vcard.Card{}
 	card.SetValue(vcard.FieldFormattedName, "Jane Doe")
-	card.SetValue(vcard.FieldNote, strings.Repeat("ä", models.MaxAboutLength+10))
+	card.SetValue(vcard.FieldNote, strings.Repeat("ä", models.MaxNoteLength+10))
 
 	got, _, _, _ := VCardToContact(card, nil)
 
-	assert.Equal(t, models.MaxAboutLength, len([]rune(got.About)))
+	assert.Equal(t, models.MaxNoteLength, len([]rune(got.Note)))
 }
 
-func TestContactToVCard_AboutRoundTripsThroughText(t *testing.T) {
-	original := &models.Contact{Firstname: "Jane", Lastname: "Doe", About: "Line one, with a comma.\nLine two; with a semicolon."}
+func TestContactToVCard_NoteRoundTripsThroughText(t *testing.T) {
+	original := &models.Contact{Firstname: "Jane", Lastname: "Doe", Note: "Line one, with a comma.\nLine two; with a semicolon."}
 
 	var buf bytes.Buffer
 	if err := vcard.NewEncoder(&buf).Encode(ContactToVCard(original, "")); err != nil {
@@ -505,10 +505,10 @@ func TestContactToVCard_AboutRoundTripsThroughText(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 	back, _, _, _ := VCardToContact(card, nil)
-	assert.Equal(t, original.About, back.About)
+	assert.Equal(t, original.Note, back.Note)
 }
 
-func TestContactToVCard_NoNoteWhenAboutEmpty(t *testing.T) {
+func TestContactToVCard_NoNoteWhenEmpty(t *testing.T) {
 	card := ContactToVCard(&models.Contact{Firstname: "Jane"}, "")
 	assert.Nil(t, card[vcard.FieldNote])
 }
@@ -518,7 +518,7 @@ func TestContactToVCard_NoNoteWhenAboutEmpty(t *testing.T) {
 func TestContactToVCard_IgnoresStaleNoteInExtra(t *testing.T) {
 	c := &models.Contact{
 		Firstname:  "Jane",
-		About:      "current",
+		Note:       "current",
 		VCardExtra: `{"properties":{"NOTE":[{"Value":"stale","Params":{},"Group":""}]}}`,
 	}
 

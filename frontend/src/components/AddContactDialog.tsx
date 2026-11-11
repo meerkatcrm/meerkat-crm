@@ -53,7 +53,7 @@ const emptyForm = {
   food_preference: '',
   work_information: '',
   contact_information: '',
-  about: ''
+  note: ''
 };
 
 export default function AddContactDialog({
@@ -174,7 +174,7 @@ export default function AddContactDialog({
         food_preference: formData.food_preference,
         work_information: formData.work_information,
         contact_information: formData.contact_information,
-        about: formData.about,
+        note: formData.note,
         emails: cleanEmails,
         phones: cleanPhones,
         addresses: cleanAddresses,
@@ -403,15 +403,15 @@ export default function AddContactDialog({
               onChange={handleChange('contact_information')}
             />
           )}
-          {isOn('about') && (
+          {isOn('note') && (
             <TextField
-              label={t('contacts.about')}
-              helperText={t('contacts.aboutHint')}
+              label={t('contacts.note')}
+              helperText={t('contacts.noteHint')}
               fullWidth
               multiline
               rows={3}
-              value={formData.about}
-              onChange={handleChange('about')}
+              value={formData.note}
+              onChange={handleChange('note')}
               slotProps={{ htmlInput: { maxLength: 5000 } }}
             />
           )}
