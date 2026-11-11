@@ -466,6 +466,15 @@ func moveContactData(tx *gorm.DB, userID, targetID, sourceID uint) error {
 	return moveRelationships(tx, userID, targetID, sourceID)
 }
 
+// relationshipEndBeforeStart reports whether end (taken at the end of its
+// period) lies before start (taken at the start of its period). Unparseable or
+// empty dates never conflict.
+func relationshipEndBeforeStart(start, end string) bool {
+	s, sOk := models.PartialDateStart(start)
+	e, eOk := models.PartialDateEnd(end)
+	return sOk && eOk && e.Before(s)
+}
+
 // mergedRelationshipKey identifies a relationship once both of its ends are
 // expressed in merged terms. RelatedID is 0 for a person without a contact of
 // their own, who is then told apart by name.
@@ -544,12 +553,23 @@ func moveRelationships(tx *gorm.DB, userID, targetID, sourceID uint) error {
 				existing.Gender = r.Gender
 				setUpdate(existing.ID, "gender", r.Gender)
 			}
-			// Dates travel as a pair so the kept row never ends up with
-			// one side's start and the other side's end.
-			if existing.StartDate == "" && existing.EndDate == "" && (r.StartDate != "" || r.EndDate != "") {
-				existing.StartDate, existing.EndDate = r.StartDate, r.EndDate
-				setUpdate(existing.ID, "start_date", r.StartDate)
-				setUpdate(existing.ID, "end_date", r.EndDate)
+			// Each empty date is filled from the dropped copy, as long as the
+			// combined pair stays consistent (end not before start).
+			start, end := existing.StartDate, existing.EndDate
+			if start == "" {
+				start = r.StartDate
+			}
+			if end == "" {
+				end = r.EndDate
+			}
+			if (start != existing.StartDate || end != existing.EndDate) && !relationshipEndBeforeStart(start, end) {
+				if start != existing.StartDate {
+					setUpdate(existing.ID, "start_date", start)
+				}
+				if end != existing.EndDate {
+					setUpdate(existing.ID, "end_date", end)
+				}
+				existing.StartDate, existing.EndDate = start, end
 			}
 			drop = append(drop, r.ID)
 			continue

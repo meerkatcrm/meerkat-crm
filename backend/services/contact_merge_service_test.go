@@ -324,3 +324,39 @@ func TestMergeContactsResultReflectsMovedEmployment(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "Acme", result.Contact.Organization)
 }
+
+func TestMergeRelationshipDatesFillPerField(t *testing.T) {
+	cases := []struct {
+		name                     string
+		keptStart, keptEnd       string
+		droppedStart, droppedEnd string
+		wantStart, wantEnd       string
+	}{
+		{"kept has start, dropped has end", "2012", "", "", "2020", "2012", "2020"},
+		{"kept has end, dropped has start", "", "2020-06", "2015", "", "2015", "2020-06"},
+		{"kept has neither", "", "", "2001", "2010", "2001", "2010"},
+		{"kept has both: untouched", "2001", "2005", "1999", "2010", "2001", "2005"},
+		{"filling would put end before start: untouched", "2015", "", "", "2010", "2015", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			db, userID := setupMergeDB(t)
+			target := createContact(t, db, models.Contact{UserID: userID, Firstname: "T"})
+			source := createContact(t, db, models.Contact{UserID: userID, Firstname: "S"})
+			rels := []models.Relationship{
+				{UserID: userID, Name: "Max", Type: "Child", ContactID: target.ID, StartDate: tc.keptStart, EndDate: tc.keptEnd},
+				{UserID: userID, Name: "Max", Type: "Child", ContactID: source.ID, StartDate: tc.droppedStart, EndDate: tc.droppedEnd},
+			}
+			require.NoError(t, db.Create(&rels).Error)
+
+			_, err := MergeContacts(db, userID, target.ID, source.ID, nil)
+			require.NoError(t, err)
+
+			var remaining []models.Relationship
+			require.NoError(t, db.Find(&remaining).Error)
+			require.Len(t, remaining, 1)
+			assert.Equal(t, tc.wantStart, remaining[0].StartDate)
+			assert.Equal(t, tc.wantEnd, remaining[0].EndDate)
+		})
+	}
+}
