@@ -812,7 +812,7 @@ func BuildContactFromRow(userID uint, headers []string, row []string, mappings [
 		case "contact_information":
 			contact.ContactInformation = v
 		case "about":
-			contact.About = v
+			contact.About = strings.TrimSpace(truncateRunes(v, models.MaxAboutLength))
 		case "circles":
 			if v != "" {
 				contact.Circles = ParseCircles(v)

@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { CONTACT_FIELDS } from '../contactFields';
 import {
   DialogTitle,
   DialogContent,
@@ -71,6 +72,12 @@ export default function ImportContactsDialog({
   onImportComplete,
 }: ImportContactsDialogProps) {
   const { t } = useTranslation();
+  // Fields that also exist on the contact form reuse its translated label; the rest
+  // fall back to the English import labels.
+  const fieldLabel = (field: string) => {
+    const def = CONTACT_FIELDS.find((f) => f.key === field);
+    return def ? t(def.labelKey) : CONTACT_FIELD_LABELS[field] || field;
+  };
   const { showSuccess } = useSnackbar();
 
   // Step state
@@ -368,7 +375,7 @@ export default function ImportContactsDialog({
       new Set(
         mappings
           .filter((m) => m.contact_field && conflictKeys.has(mappingKey(m)))
-          .map((m) => CONTACT_FIELD_LABELS[m.contact_field] || m.contact_field)
+          .map((m) => fieldLabel(m.contact_field))
       )
     );
 
@@ -439,7 +446,7 @@ export default function ImportContactsDialog({
                           </MenuItem>
                           {IMPORTABLE_CONTACT_FIELDS.map((field) => (
                             <MenuItem key={field} value={field}>
-                              {CONTACT_FIELD_LABELS[field] || field}
+                              {fieldLabel(field)}
                             </MenuItem>
                           ))}
                         </Select>

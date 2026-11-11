@@ -1,5 +1,6 @@
 import { test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { configure, render, screen, fireEvent, waitFor, cleanup, within } from '@testing-library/react';
+import { act } from 'react';
 import { I18nextProvider } from 'react-i18next';
 import i18n from '../i18n/config';
 import ImportContactsDialog from './ImportContactsDialog';
@@ -400,4 +401,17 @@ test('done closes the dialog after the result', async () => {
   await screen.findByText('Import Complete');
   click('Done');
   expect(p.onClose).toHaveBeenCalled();
+});
+
+test('mapping targets that exist on the contact form use its translated label', async () => {
+  renderDialog();
+  await toMapping([mapping('Notes', 'about')]);
+  const combobox = within(rowOf(/^Notes/)).getByRole('combobox');
+  expect(combobox).toHaveTextContent('About');
+  try {
+    await act(() => i18n.changeLanguage('de'));
+    expect(combobox).toHaveTextContent('Über diese Person');
+  } finally {
+    await act(() => i18n.changeLanguage('en'));
+  }
 });

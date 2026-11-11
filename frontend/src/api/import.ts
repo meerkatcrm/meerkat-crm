@@ -142,7 +142,7 @@ export const CONTACT_FIELD_LABELS: Record<string, string> = {
   food_preference: 'Food Preferences',
   work_information: 'Work Information',
   contact_information: 'Contact Information',
-  about: 'About (vCard note)',
+  about: 'About',
   circles: 'Circles',
 };
 

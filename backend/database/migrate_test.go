@@ -244,7 +244,7 @@ func TestMigration34_MovesVCardNoteIntoAbout(t *testing.T) {
 		(3, 'configured_no_note', 'hash', 'c@example.com', '["phones"]')`)
 	require.NoError(t, err)
 	_, err = db.Exec(`INSERT INTO contacts (id, user_id, firstname, vcard_extra) VALUES
-		(1, 1, 'one_note', '{"properties":{"NOTE":[{"Value":"Met at a wedding","Params":{},"Group":""}],"X-KEEP":[{"Value":"k","Params":{},"Group":""}]}}'),
+		(1, 1, 'one_note', '{"properties":{"NOTE":[{"Value":"Met at a wedding\\; bring cake","Params":{},"Group":""}],"X-KEEP":[{"Value":"k","Params":{},"Group":""}]}}'),
 		(2, 2, 'two_notes', '{"properties":{"NOTE":[{"Value":"First","Params":{},"Group":""},{"Value":" ","Params":{},"Group":""},{"Value":"Second","Params":{},"Group":""}]}}'),
 		(3, 3, 'no_note', '{"properties":{"X-KEEP":[{"Value":"k","Params":{},"Group":""}]}}'),
 		(4, 3, 'no_extra', NULL),
@@ -269,7 +269,7 @@ func TestMigration34_MovesVCardNoteIntoAbout(t *testing.T) {
 	}
 
 	require.NoError(t, m.Migrate(34))
-	assert.Equal(t, "Met at a wedding", about(1))
+	assert.Equal(t, "Met at a wedding; bring cake", about(1), "the \\; escape left by go-vcard is undone, as in noteFromCard")
 	assert.Equal(t, `{"properties":{"X-KEEP":[{"Value":"k","Params":{},"Group":""}]}}`, extra(1).String)
 	assert.Equal(t, "First\n\nSecond", about(2))
 	assert.NotContains(t, extra(2).String, "NOTE")
@@ -285,7 +285,7 @@ func TestMigration34_MovesVCardNoteIntoAbout(t *testing.T) {
 	assert.Equal(t, `["phones"]`, fields(3).String, "no note, selection left alone")
 
 	require.NoError(t, m.Migrate(33))
-	assert.JSONEq(t, `{"properties":{"X-KEEP":[{"Value":"k","Params":{},"Group":""}],"NOTE":[{"Value":"Met at a wedding"}]}}`, extra(1).String)
+	assert.JSONEq(t, `{"properties":{"X-KEEP":[{"Value":"k","Params":{},"Group":""}],"NOTE":[{"Value":"Met at a wedding; bring cake"}]}}`, extra(1).String)
 	assert.JSONEq(t, `{"properties":{"NOTE":[{"Value":"First\n\nSecond"}]}}`, extra(2).String)
 	assert.False(t, extra(4).Valid)
 	assert.Equal(t, `["emails"]`, fields(1).String)

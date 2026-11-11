@@ -2,6 +2,7 @@ package services
 
 import (
 	"meerkat/models"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -186,4 +187,20 @@ func TestValidateImportedContact(t *testing.T) {
 		Birthday:  "1958-06-29",
 	}
 	assert.Empty(t, ValidateImportedContact(&ok))
+}
+
+// A CSV cell longer than the About limit is cut like a vCard NOTE: storing it whole
+// would make every later save of the contact fail validation.
+func TestBuildContactFromRow_CapsAbout(t *testing.T) {
+	headers := []string{"First Name", "Notes"}
+	row := []string{"Dana", strings.Repeat("ä", models.MaxAboutLength+10)}
+	mappings := []models.ColumnMapping{
+		{CSVColumn: "First Name", ContactField: "firstname"},
+		{CSVColumn: "Notes", ContactField: "about"},
+	}
+
+	c := BuildContactFromRow(1, headers, row, mappings)
+
+	assert.Equal(t, models.MaxAboutLength, len([]rune(c.About)))
+	assert.Empty(t, ValidateImportedContact(&c))
 }

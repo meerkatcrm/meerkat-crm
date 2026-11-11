@@ -484,11 +484,11 @@ END:VCARD
 func TestVCardToContact_CapsAboutAtColumnLimit(t *testing.T) {
 	card := vcard.Card{}
 	card.SetValue(vcard.FieldFormattedName, "Jane Doe")
-	card.SetValue(vcard.FieldNote, strings.Repeat("ä", maxAboutLength+10))
+	card.SetValue(vcard.FieldNote, strings.Repeat("ä", models.MaxAboutLength+10))
 
 	got, _, _, _ := VCardToContact(card, nil)
 
-	assert.Equal(t, maxAboutLength, len([]rune(got.About)))
+	assert.Equal(t, models.MaxAboutLength, len([]rune(got.About)))
 }
 
 func TestContactToVCard_AboutRoundTripsThroughText(t *testing.T) {

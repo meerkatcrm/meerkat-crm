@@ -8,13 +8,15 @@
 -- blank line, the same as VCardToContact does. Values are capped at the column's
 -- 5000-character limit, or every later edit of the contact would fail validation. A
 -- card whose NOTEs are all blank yields NULL from group_concat, hence the COALESCE.
+-- vcard_extra holds the value as go-vcard decoded it, which still contains the "\;"
+-- escape; it is undone here exactly as noteFromCard does for new cards.
 ALTER TABLE contacts ADD COLUMN about TEXT DEFAULT '' NOT NULL;
 
 UPDATE contacts
 SET about = COALESCE(substr((
   SELECT group_concat(note, char(10) || char(10))
   FROM (
-    SELECT trim(json_extract(value, '$.Value')) AS note
+    SELECT trim(replace(json_extract(value, '$.Value'), '\;', ';')) AS note
     FROM json_each(vcard_extra, '$.properties.NOTE')
     WHERE trim(COALESCE(json_extract(value, '$.Value'), '')) != ''
     ORDER BY key

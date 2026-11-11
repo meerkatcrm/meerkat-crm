@@ -44,6 +44,10 @@ type ContactAddress struct {
 	Country string `json:"country" validate:"max=100"`
 }
 
+// MaxAboutLength is the validation limit on Contact.About. Text arriving from a vCard
+// or CSV import is cut to it, since rejecting it would fail the whole sync or import.
+const MaxAboutLength = 5000
+
 type Contact struct {
 	gorm.Model
 	UserID              uint                `gorm:"not null;index" json:"-"`

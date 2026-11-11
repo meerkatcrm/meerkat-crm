@@ -1014,9 +1014,6 @@ func extractUnmappedProperties(card vcard.Card) VCardExtra {
 	return extra
 }
 
-// maxAboutLength matches the validation limit on Contact.About.
-const maxAboutLength = 5000
-
 // noteEscapes undoes the "\;" escape that go-vcard leaves in place (it decodes
 // "\n", "\," and "\\" itself). RFC 2426 requires it for a semicolon in a text value.
 // It runs on already-decoded text, so it stays limited to this one sequence.
@@ -1034,8 +1031,8 @@ func noteFromCard(card vcard.Card) string {
 		}
 	}
 	about := strings.Join(notes, "\n\n")
-	if r := []rune(about); len(r) > maxAboutLength {
-		about = strings.TrimSpace(string(r[:maxAboutLength]))
+	if r := []rune(about); len(r) > models.MaxAboutLength {
+		about = strings.TrimSpace(string(r[:models.MaxAboutLength]))
 	}
 	return about
 }
