@@ -915,6 +915,7 @@
     "endedOn": "结束于 {{date}}",
     "dateRange": "{{start}} – {{end}}",
     "endBeforeStart": "结束日期不能早于开始日期",
+    "endInFuture": "结束日期不能晚于今天",
     "types": {
       "child": "子女",
       "parent": "父母",

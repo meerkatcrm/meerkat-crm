@@ -120,3 +120,19 @@ test('rejects malformed dates', () => {
   expect(screen.getByText('Dates must be YYYY, MM.YYYY, or DD.MM.YYYY')).toBeInTheDocument();
   expect(p.onSave).not.toHaveBeenCalled();
 });
+
+test('rejects an end date in the future before saving anything', () => {
+  window.localStorage.setItem('dateFormat', 'iso');
+  const p = renderDialog({ relationship: relationship() });
+  type('End Date', `${new Date().getFullYear() + 1}-01`);
+  fireEvent.click(screen.getByText('Save'));
+  expect(screen.getByText('End date must not be in the future')).toBeInTheDocument();
+  expect(p.onSave).not.toHaveBeenCalled();
+});
+
+test('accepts the current year as an end date', async () => {
+  const p = renderDialog({ relationship: relationship() });
+  type('End Date', String(new Date().getFullYear()));
+  fireEvent.click(screen.getByText('Save'));
+  await waitFor(() => expect(p.onClose).toHaveBeenCalled());
+});

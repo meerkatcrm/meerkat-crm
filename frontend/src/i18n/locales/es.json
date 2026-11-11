@@ -915,6 +915,7 @@
     "endedOn": "terminó {{date}}",
     "dateRange": "{{start}} – {{end}}",
     "endBeforeStart": "La fecha de fin no puede ser anterior a la de inicio",
+    "endInFuture": "La fecha de fin no puede estar en el futuro",
     "types": {
       "child": "Hijo/a",
       "parent": "Padre/Madre",
