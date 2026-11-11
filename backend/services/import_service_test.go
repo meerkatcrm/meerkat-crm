@@ -2,6 +2,7 @@ package services
 
 import (
 	"meerkat/models"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -27,7 +28,7 @@ func TestSuggestColumnMappings_GoogleStyle(t *testing.T) {
 		"Phone 1 - Label", "Phone 1 - Value",
 		"Address 1 - Street", "Address 1 - City", "Address 1 - Region",
 		"Address 1 - Postal Code", "Address 1 - Country", "Address 1 - Label",
-		"Website 1 - Value", "Labels",
+		"Website 1 - Value", "Labels", "Notes",
 	}
 
 	mappings := SuggestColumnMappings(headers)
@@ -59,6 +60,7 @@ func TestSuggestColumnMappings_GoogleStyle(t *testing.T) {
 		{"Address 1 - Label", "address_label", 0},
 		{"Website 1 - Value", "url", 0},
 		{"Labels", "circles", 0},
+		{"Notes", "note", 0},
 	}
 
 	for _, tc := range cases {
@@ -185,4 +187,20 @@ func TestValidateImportedContact(t *testing.T) {
 		Birthday:  "1958-06-29",
 	}
 	assert.Empty(t, ValidateImportedContact(&ok))
+}
+
+// A CSV cell longer than the Note limit is cut like a vCard NOTE: storing it whole
+// would make every later save of the contact fail validation.
+func TestBuildContactFromRow_CapsNote(t *testing.T) {
+	headers := []string{"First Name", "Notes"}
+	row := []string{"Dana", strings.Repeat("ä", models.MaxNoteLength+10)}
+	mappings := []models.ColumnMapping{
+		{CSVColumn: "First Name", ContactField: "firstname"},
+		{CSVColumn: "Notes", ContactField: "note"},
+	}
+
+	c := BuildContactFromRow(1, headers, row, mappings)
+
+	assert.Equal(t, models.MaxNoteLength, len([]rune(c.Note)))
+	assert.Empty(t, ValidateImportedContact(&c))
 }

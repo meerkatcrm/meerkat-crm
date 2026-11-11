@@ -118,6 +118,8 @@
     "foodPreference": "Essensvorlieben",
     "workInformation": "Arbeitsinformationen",
     "contactInformation": "Zusätzliche Kontaktinformationen",
+    "note": "Notiz",
+    "noteHint": "Wird mit dem Notizfeld im Adressbuch deines Telefons synchronisiert",
     "circles": "Kreise",
     "selectCircle": "Vorhandenen Kreis auswählen...",
     "newCircle": "Oder neu erstellen...",

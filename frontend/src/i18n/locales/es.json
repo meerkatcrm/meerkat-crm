@@ -118,6 +118,8 @@
     "foodPreference": "Preferencias Alimentarias",
     "workInformation": "Información Laboral",
     "contactInformation": "Información de Contacto Adicional",
+    "note": "Nota",
+    "noteHint": "Se sincroniza con el campo de notas de la agenda de tu teléfono",
     "circles": "Círculos",
     "selectCircle": "Seleccionar círculo existente...",
     "newCircle": "O crear nuevo...",

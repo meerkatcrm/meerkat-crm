@@ -170,3 +170,28 @@ test('shows the empty-state message when every offered field is empty', () => {
   expect(screen.getByText(/no details filled in yet/i)).toBeInTheDocument();
   expect(screen.getByRole('button', { name: /show all fields/i })).toBeInTheDocument();
 });
+
+test('shows the vCard note when the field is enabled', () => {
+  renderWithI18n(
+    <ContactInformation
+      {...baseProps}
+      enabledFields={resolveEnabledFields(['note'])}
+      contact={{ firstname: 'Jane', note: 'Met at a wedding in Lisbon' }}
+      onUpdateContact={vi.fn()}
+    />
+  );
+  expect(screen.getByText('Note')).toBeInTheDocument();
+  expect(screen.getByText('Met at a wedding in Lisbon')).toBeInTheDocument();
+});
+
+test('keeps the note hidden for a user who switched it off', () => {
+  renderWithI18n(
+    <ContactInformation
+      {...baseProps}
+      enabledFields={resolveEnabledFields(['birthday'])}
+      contact={{ firstname: 'Jane', note: 'Met at a wedding in Lisbon' }}
+      onUpdateContact={vi.fn()}
+    />
+  );
+  expect(screen.queryByText('Met at a wedding in Lisbon')).not.toBeInTheDocument();
+});

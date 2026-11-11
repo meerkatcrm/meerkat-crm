@@ -103,6 +103,7 @@ export const IMPORTABLE_CONTACT_FIELDS = [
   'food_preference',
   'work_information',
   'contact_information',
+  'note',
   'circles',
 ] as const;
 
@@ -141,6 +142,7 @@ export const CONTACT_FIELD_LABELS: Record<string, string> = {
   food_preference: 'Food Preferences',
   work_information: 'Work Information',
   contact_information: 'Contact Information',
+  note: 'Note',
   circles: 'Circles',
 };
 
