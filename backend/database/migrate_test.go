@@ -248,7 +248,8 @@ func TestMigration34_MovesVCardNoteIntoAbout(t *testing.T) {
 		(2, 2, 'two_notes', '{"properties":{"NOTE":[{"Value":"First","Params":{},"Group":""},{"Value":" ","Params":{},"Group":""},{"Value":"Second","Params":{},"Group":""}]}}'),
 		(3, 3, 'no_note', '{"properties":{"X-KEEP":[{"Value":"k","Params":{},"Group":""}]}}'),
 		(4, 3, 'no_extra', NULL),
-		(5, 3, 'broken_extra', 'not json')`)
+		(5, 3, 'broken_extra', 'not json'),
+		(6, 3, 'blank_notes', '{"properties":{"NOTE":[{"Value":"","Params":{},"Group":""}]}}')`)
 	require.NoError(t, err)
 
 	about := func(id int) string {
@@ -276,6 +277,8 @@ func TestMigration34_MovesVCardNoteIntoAbout(t *testing.T) {
 	assert.Equal(t, "", about(4))
 	assert.False(t, extra(4).Valid)
 	assert.Equal(t, "not json", extra(5).String)
+	assert.Equal(t, "", about(6), "only blank notes must not trip the NOT NULL column")
+	assert.NotContains(t, extra(6).String, "NOTE")
 
 	assert.Equal(t, `["emails","about"]`, fields(1).String, "a saved selection gains the field once a note arrives")
 	assert.False(t, fields(2).Valid, "the frontend defaults already include it")

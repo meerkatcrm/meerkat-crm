@@ -1017,10 +1017,10 @@ func extractUnmappedProperties(card vcard.Card) VCardExtra {
 // maxAboutLength matches the validation limit on Contact.About.
 const maxAboutLength = 5000
 
-// noteEscapes undoes the escapes go-vcard leaves in place. It decodes "\n", "\,"
-// and "\\" itself, but not "\;", which RFC 2426 requires for a semicolon in a
-// text value, nor the uppercase "\N" the RFC also allows.
-var noteEscapes = strings.NewReplacer(`\;`, ";", `\N`, "\n")
+// noteEscapes undoes the "\;" escape that go-vcard leaves in place (it decodes
+// "\n", "\," and "\\" itself). RFC 2426 requires it for a semicolon in a text value.
+// It runs on already-decoded text, so it stays limited to this one sequence.
+var noteEscapes = strings.NewReplacer(`\;`, ";")
 
 // noteFromCard reads the NOTE properties into one string. vCard allows several but
 // every common client writes, and shows, a single one, so they are joined with a

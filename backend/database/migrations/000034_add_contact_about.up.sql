@@ -6,11 +6,12 @@
 --
 -- Several NOTE properties (vCard allows it, clients rarely write it) are joined with a
 -- blank line, the same as VCardToContact does. Values are capped at the column's
--- 5000-character limit, or every later edit of the contact would fail validation.
+-- 5000-character limit, or every later edit of the contact would fail validation. A
+-- card whose NOTEs are all blank yields NULL from group_concat, hence the COALESCE.
 ALTER TABLE contacts ADD COLUMN about TEXT DEFAULT '' NOT NULL;
 
 UPDATE contacts
-SET about = substr((
+SET about = COALESCE(substr((
   SELECT group_concat(note, char(10) || char(10))
   FROM (
     SELECT trim(json_extract(value, '$.Value')) AS note
@@ -18,11 +19,9 @@ SET about = substr((
     WHERE trim(COALESCE(json_extract(value, '$.Value'), '')) != ''
     ORDER BY key
   )
-), 1, 5000)
+), 1, 5000), '')
 WHERE vcard_extra IS NOT NULL AND vcard_extra != '' AND json_valid(vcard_extra)
   AND json_type(vcard_extra, '$.properties.NOTE') = 'array';
-
-UPDATE contacts SET about = '' WHERE about IS NULL;
 
 UPDATE contacts
 SET vcard_extra = json_remove(vcard_extra, '$.properties.NOTE')
