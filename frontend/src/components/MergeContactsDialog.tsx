@@ -34,6 +34,7 @@ import { useDateFormat } from '../DateFormatProvider';
 import { useContactSearch } from '../hooks/useContactSearch';
 import { getErrorMessage } from '../utils/errorHandler';
 import { contactDisplayName } from '../utils/contactName';
+import { thumbnailSrc } from '../utils/thumbnail';
 
 interface MergeContactsDialogProps {
   open: boolean;
@@ -160,7 +161,7 @@ export default function MergeContactsDialog({
   const renderValue = (conflict: MergeConflict, side: MergeResolution) => {
     if (conflict.field === 'photo' && preview) {
       const contact = side === 'target' ? preview.target : preview.source;
-      return <Avatar src={contact.photo_thumbnail} sx={{ width: 40, height: 40 }} />;
+      return <Avatar src={thumbnailSrc(contact.photo_thumbnail)} sx={{ width: 40, height: 40 }} />;
     }
     const value = side === 'target' ? conflict.target_value : conflict.source_value;
     let display = value;
@@ -196,7 +197,7 @@ export default function MergeContactsDialog({
       <Stack direction="row" spacing={1.5} sx={{
         alignItems: "center"
       }}>
-        <Avatar src={contact.photo_thumbnail}>{contact.firstname?.[0]}</Avatar>
+        <Avatar src={thumbnailSrc(contact.photo_thumbnail)}>{contact.firstname?.[0]}</Avatar>
         <Typography variant="subtitle1" noWrap>
           {contactDisplayName(contact)}
         </Typography>

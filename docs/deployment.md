@@ -241,6 +241,15 @@ Alert ideas (adapt the thresholds):
 
 Counters start at zero on every restart and the metrics are per instance. Job run counters of a job that never ran do not exist yet; use `absent()` with care.
 
+## Photo files
+
+Profile photos and their 48 px thumbnails are files in `PROFILE_PHOTO_DIR`
+(`<id>_photo.jpg` and `<id>_thumb.jpg`); back the directory up with the database. Before
+migration 000040 the thumbnails were base64 in the `contacts` table. At startup Meerkat writes each
+of those into a file (safe to repeat; it logs how many it moved). The old column stays untouched,
+so rolling back loses nothing; a later release drops it. Contact lists carry a thumbnail URL with
+the file name as version, which the browser caches.
+
 ## Upgrades
 
 ```sh

@@ -23,6 +23,7 @@ import { useDuplicateContacts } from './hooks/useDuplicateContacts';
 import { useSnackbar } from './context/SnackbarContext';
 import { getErrorMessage } from './utils/errorHandler';
 import { contactDisplayName } from './utils/contactName';
+import { thumbnailSrc } from './utils/thumbnail';
 
 function ContactSummary({ contact }: { contact: DuplicateContactSummary }) {
   const { t } = useTranslation();
@@ -36,7 +37,7 @@ function ContactSummary({ contact }: { contact: DuplicateContactSummary }) {
         flex: 1,
         minWidth: 0
       }}>
-      <Avatar src={contact.photo_thumbnail}>{contact.firstname?.[0]}</Avatar>
+      <Avatar src={thumbnailSrc(contact.photo_thumbnail)}>{contact.firstname?.[0]}</Avatar>
       <Box sx={{ minWidth: 0 }}>
         <Stack direction="row" spacing={1} sx={{
           alignItems: "center"

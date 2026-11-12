@@ -295,7 +295,8 @@ func (m *ImportSessionManager) Confirm(db *gorm.DB, userID uint, req models.Impo
 				existing.DeletedAt = gorm.DeletedAt{}
 				if wasDeleted {
 					existing.Photo = ""
-					existing.PhotoThumbnail = ""
+					existing.PhotoThumbnailFile = ""
+					existing.LegacyThumbnail = ""
 				}
 
 				saveTx := tx
@@ -431,7 +432,8 @@ func (m *ImportSessionManager) ConfirmVCF(db *gorm.DB, userID uint, req models.I
 				existing.DeletedAt = gorm.DeletedAt{}
 				if wasDeleted {
 					existing.Photo = ""
-					existing.PhotoThumbnail = ""
+					existing.PhotoThumbnailFile = ""
+					existing.LegacyThumbnail = ""
 				}
 
 				saveTx := tx
@@ -492,19 +494,14 @@ func (m *ImportSessionManager) ConfirmVCF(db *gorm.DB, userID uint, req models.I
 			continue
 		}
 
-		photoPath, thumbnailData, err := carddav.SaveContactPhoto(photoData, mediaType, cfg.ProfilePhotoDir)
+		photoPath, thumbnailPath, err := carddav.SaveContactPhoto(photoData, mediaType, cfg.ProfilePhotoDir)
 		if err != nil {
 			log.Warn().Err(err).Uint("contact_id", task.contactID).Msg("Failed to save imported photo")
 			result.Errors = append(result.Errors, fmt.Sprintf("Row %d: The contact was imported, but its photo could not be saved", task.rowIndex+1))
 			continue
 		}
 
-		// primary key must be set on model (not only in Where clause) so contact save hooks can stamp  ETag for row being updated.
-		contact := models.Contact{Model: gorm.Model{ID: task.contactID}}
-		if err := db.Model(&contact).Updates(map[string]interface{}{
-			"photo":           photoPath,
-			"photo_thumbnail": thumbnailData,
-		}).Error; err != nil {
+		if err := replaceContactPhoto(db, cfg.ProfilePhotoDir, task.contactID, photoPath, thumbnailPath); err != nil {
 			log.Warn().Err(err).Uint("contact_id", task.contactID).Msg("Failed to update contact with photo")
 		}
 	}

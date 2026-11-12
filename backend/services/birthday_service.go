@@ -51,7 +51,7 @@ func GetUpcomingBirthdays(db *gorm.DB, userID uint, now time.Time) ([]models.Bir
 			Type:           "contact",
 			Name:           name,
 			Birthday:       contact.Birthday,
-			PhotoThumbnail: contact.PhotoThumbnail,
+			PhotoThumbnail: models.ThumbnailURL(contact.ID, contact.PhotoThumbnailFile),
 			ContactID:      contact.ID,
 		})
 	}
@@ -111,7 +111,7 @@ func GetUpcomingBirthdays(db *gorm.DB, userID uint, now time.Time) ([]models.Bir
 			Type:                  "relationship",
 			Name:                  rel.Name,
 			Birthday:              rel.Birthday,
-			PhotoThumbnail:        parentContact.PhotoThumbnail,
+			PhotoThumbnail:        models.ThumbnailURL(parentContact.ID, parentContact.PhotoThumbnailFile),
 			ContactID:             rel.ContactID,
 			RelationshipType:      rel.Type,
 			AssociatedContactName: parentName,

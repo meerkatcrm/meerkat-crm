@@ -485,20 +485,66 @@ func clearVCardOwnedFields(contact *models.Contact) {
 	contact.VCardExtra = ""
 }
 
-// RemoveContactPhotoFile deletes a contact's photo from disk, after the contact
-// itself was deleted. The thumbnail lives in the database row. A missing file is
-// not an error.
-func RemoveContactPhotoFile(photoDir, photo string) {
-	if photoDir == "" || photo == "" || strings.Contains(photo, "..") || filepath.IsAbs(photo) {
-		return
-	}
-	if err := os.Remove(filepath.Join(photoDir, photo)); err != nil && !os.IsNotExist(err) {
-		logger.Warn().Err(err).Str("photo", photo).Msg("Failed to delete photo file")
+// RemoveContactPhotoFile deletes photo files (a photo and its thumbnail) from disk, after
+// the database no longer points at them. Empty names, legacy base64 data URLs and names
+// that would leave photoDir are skipped. A missing file is not an error.
+func RemoveContactPhotoFile(photoDir string, names ...string) {
+	for _, name := range names {
+		if photoDir == "" || name == "" || strings.HasPrefix(name, "data:") || strings.Contains(name, "..") ||
+			filepath.IsAbs(name) || strings.ContainsAny(name, `/\`) {
+			continue
+		}
+		if err := os.Remove(filepath.Join(photoDir, name)); err != nil && !os.IsNotExist(err) {
+			logger.Warn().Err(err).Str("photo", name).Msg("Failed to delete photo file")
+		}
 	}
 }
 
-// SaveContactPhoto saves photo data to disk and generates thumbnail
-// Returns the photo filename and base64 thumbnail data URL
+// PhotoSwap tracks a contact's photo being replaced: the files it had (Old...) and the files
+// just written (New...). Commit after the database change succeeded, Rollback when it failed,
+// so neither the old nor the new files are left behind.
+type PhotoSwap struct {
+	OldPhoto, OldThumbnail, OldLegacy string
+	NewPhoto, NewThumbnail            string
+}
+
+// NewPhotoSwap starts a swap from the photo files the contact has now.
+func NewPhotoSwap(c *models.Contact) PhotoSwap {
+	return PhotoSwap{OldPhoto: c.Photo, OldThumbnail: c.PhotoThumbnailFile, OldLegacy: c.LegacyThumbnail}
+}
+
+// Replaced reports whether new files were written.
+func (s PhotoSwap) Replaced() bool { return s.NewPhoto != "" }
+
+// Apply points the contact at the new files and drops the legacy copy of the old picture.
+func (s *PhotoSwap) Apply(c *models.Contact, photo, thumbnail string) {
+	s.NewPhoto, s.NewThumbnail = photo, thumbnail
+	c.Photo, c.PhotoThumbnailFile, c.LegacyThumbnail = photo, thumbnail, ""
+}
+
+// Commit deletes the old files.
+func (s PhotoSwap) Commit(dir string) {
+	if s.Replaced() {
+		RemoveContactPhotoFile(dir, s.OldPhoto, s.OldThumbnail)
+	}
+}
+
+// Rollback deletes the new files and restores the old values on the contact.
+func (s PhotoSwap) Rollback(dir string, c *models.Contact) {
+	if !s.Replaced() {
+		return
+	}
+	RemoveContactPhotoFile(dir, s.NewPhoto, s.NewThumbnail)
+	c.Photo, c.PhotoThumbnailFile, c.LegacyThumbnail = s.OldPhoto, s.OldThumbnail, s.OldLegacy
+}
+
+// RemoveContactPhotoFiles deletes the photo and thumbnail files of a contact.
+func RemoveContactPhotoFiles(photoDir string, contact models.Contact) {
+	RemoveContactPhotoFile(photoDir, contact.Photo, contact.PhotoThumbnailFile)
+}
+
+// SaveContactPhoto saves photo data to disk and generates a 48px thumbnail next to it.
+// Returns the photo and thumbnail file names.
 func SaveContactPhoto(photoData []byte, mediaType string, photoDir string) (string, string, error) {
 	if len(photoData) == 0 {
 		return "", "", nil
@@ -539,15 +585,14 @@ func SaveContactPhoto(photoData []byte, mediaType string, photoDir string) (stri
 		return "", "", err
 	}
 
-	// Create thumbnail and encode as base64 data URL (48x48)
-	thumbnail := resize.Resize(48, 48, img, resize.Lanczos3)
-	var thumbnailBuf bytes.Buffer
-	if err := jpeg.Encode(&thumbnailBuf, thumbnail, &jpeg.Options{Quality: 85}); err != nil {
+	// Thumbnail (48x48) as a file next to the photo
+	thumbnailPath := baseFilename + "_thumb.jpg"
+	if err := writeJPEG(filepath.Join(photoDir, thumbnailPath), resize.Resize(48, 48, img, resize.Lanczos3)); err != nil {
+		RemoveContactPhotoFile(photoDir, photoPath)
 		return "", "", err
 	}
-	thumbnailBase64 := "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(thumbnailBuf.Bytes())
 
-	return photoPath, thumbnailBase64, nil
+	return photoPath, thumbnailPath, nil
 }
 
 // decodePhoto decodes a photo from a client or a remote server. The media type may be
@@ -628,6 +673,24 @@ func ReencodePhoto(photoData []byte, mediaType string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// writeJPEG encodes img into a new file, removing the partial file when any step fails
+// (including Close).
+func writeJPEG(path string, img image.Image) (err error) {
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644) //nolint:gosec // path built from the configured photo directory
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if cerr := f.Close(); err == nil {
+			err = cerr
+		}
+		if err != nil {
+			_ = os.Remove(path)
+		}
+	}()
+	return jpeg.Encode(f, img, &jpeg.Options{Quality: 85})
+}
+
 // cropToSquare crops an image to a centered square
 // If the image is already square, it returns the original image unchanged
 func cropToSquare(img image.Image) image.Image {
@@ -681,10 +744,17 @@ func readContactPhoto(contact *models.Contact, photoDir string) (string, string)
 		}
 	}
 
-	// Fall back to thumbnail (already base64)
-	if contact.PhotoThumbnail != "" && strings.HasPrefix(contact.PhotoThumbnail, "data:") {
+	// Fall back to the thumbnail file
+	if contact.PhotoThumbnailFile != "" && photoDir != "" && !strings.ContainsAny(contact.PhotoThumbnailFile, `/\`) {
+		if data, err := os.ReadFile(filepath.Join(photoDir, contact.PhotoThumbnailFile)); err == nil {
+			return base64.StdEncoding.EncodeToString(data), "image/jpeg"
+		}
+	}
+
+	// Fall back to a legacy thumbnail still in the database (base64)
+	if contact.LegacyThumbnail != "" && strings.HasPrefix(contact.LegacyThumbnail, "data:") {
 		// Parse data URL: data:image/jpeg;base64,<data>
-		parts := strings.SplitN(contact.PhotoThumbnail, ",", 2)
+		parts := strings.SplitN(contact.LegacyThumbnail, ",", 2)
 		if len(parts) == 2 {
 			// Extract media type from first part
 			mediaType := "image/jpeg"

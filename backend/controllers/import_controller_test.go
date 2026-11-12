@@ -184,7 +184,7 @@ func TestVCFImport_EmbeddedPhotoIsSaved(t *testing.T) {
 	contacts := f.contactsOf(t, f.user.ID)
 	require.Len(t, contacts, 1)
 	require.NotEmpty(t, contacts[0].Photo)
-	assert.True(t, strings.HasPrefix(contacts[0].PhotoThumbnail, "data:image/"))
+	assert.True(t, strings.HasSuffix(contacts[0].PhotoThumbnailFile, "_thumb.jpg"))
 	_, err := os.Stat(filepath.Join(f.dir, contacts[0].Photo))
 	assert.NoError(t, err, "the photo must land in the configured directory")
 }

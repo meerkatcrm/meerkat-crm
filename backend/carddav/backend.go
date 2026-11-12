@@ -315,8 +315,9 @@ func (b *Backend) PutAddressObject(ctx context.Context, urlPath string, card vca
 	}
 
 	// Handle photo if provided (embedded base64)
+	oldPhoto, oldThumbnail := updatedContact.Photo, updatedContact.PhotoThumbnailFile
 	if len(photoData) > 0 {
-		photoPath, thumbnailBase64, err := SaveContactPhoto(photoData, photoMediaType, b.getPhotoDir(ctx))
+		photoPath, thumbnailPath, err := SaveContactPhoto(photoData, photoMediaType, b.getPhotoDir(ctx))
 		if err != nil {
 			logger.Warn().
 				Err(err).
@@ -326,7 +327,8 @@ func (b *Backend) PutAddressObject(ctx context.Context, urlPath string, card vca
 				Msg("CardDAV: failed to save contact photo")
 		} else {
 			updatedContact.Photo = photoPath
-			updatedContact.PhotoThumbnail = thumbnailBase64
+			updatedContact.PhotoThumbnailFile = thumbnailPath
+			updatedContact.LegacyThumbnail = "" // the old picture's copy must not outlive it
 		}
 	} else if photoURL != "" {
 		// Handle URL-based photo - fetch and save
@@ -338,7 +340,7 @@ func (b *Backend) PutAddressObject(ctx context.Context, urlPath string, card vca
 				Str("photo_url", photoURL).
 				Msg("CardDAV: failed to fetch photo from URL")
 		} else if len(fetchedData) > 0 {
-			photoPath, thumbnailBase64, err := SaveContactPhoto(fetchedData, fetchedMediaType, b.getPhotoDir(ctx))
+			photoPath, thumbnailPath, err := SaveContactPhoto(fetchedData, fetchedMediaType, b.getPhotoDir(ctx))
 			if err != nil {
 				logger.Warn().
 					Err(err).
@@ -347,7 +349,8 @@ func (b *Backend) PutAddressObject(ctx context.Context, urlPath string, card vca
 					Msg("CardDAV: failed to save fetched photo")
 			} else {
 				updatedContact.Photo = photoPath
-				updatedContact.PhotoThumbnail = thumbnailBase64
+				updatedContact.PhotoThumbnailFile = thumbnailPath
+				updatedContact.LegacyThumbnail = ""
 			}
 		}
 	}
@@ -360,7 +363,14 @@ func (b *Backend) PutAddressObject(ctx context.Context, urlPath string, card vca
 		}
 	}
 	if err := db.Save(updatedContact).Error; err != nil {
+		if updatedContact.Photo != oldPhoto {
+			RemoveContactPhotoFile(b.getPhotoDir(ctx), updatedContact.Photo, updatedContact.PhotoThumbnailFile)
+		}
 		return nil, err
+	}
+	if updatedContact.Photo != oldPhoto {
+		// The new picture is stored: the old picture's files are unused now.
+		RemoveContactPhotoFile(b.getPhotoDir(ctx), oldPhoto, oldThumbnail)
 	}
 
 	return b.contactToAddressObject(ctx, updatedContact), nil
@@ -409,7 +419,7 @@ func (b *Backend) DeleteAddressObject(ctx context.Context, urlPath string) error
 		return err
 	}
 	// File deletion cannot be rolled back, so it waits for the commit.
-	RemoveContactPhotoFile(b.getPhotoDir(ctx), contact.Photo)
+	RemoveContactPhotoFiles(b.getPhotoDir(ctx), contact)
 	return nil
 }
 

@@ -764,11 +764,11 @@ func TestDeleteContactCleansUpPhotos(t *testing.T) {
 
 	// Create a contact with photo references
 	contact := models.Contact{
-		UserID:         user.ID,
-		Firstname:      "Alice",
-		Lastname:       "Johnson",
-		Photo:          photoName,
-		PhotoThumbnail: thumbnailName,
+		UserID:             user.ID,
+		Firstname:          "Alice",
+		Lastname:           "Johnson",
+		Photo:              photoName,
+		PhotoThumbnailFile: thumbnailName,
 	}
 	db.Create(&contact)
 
@@ -800,11 +800,11 @@ func TestDeleteContactWithNoPhotos(t *testing.T) {
 
 	// Create a contact without photos
 	contact := models.Contact{
-		UserID:         user.ID,
-		Firstname:      "Bob",
-		Lastname:       "Smith",
-		Photo:          "",
-		PhotoThumbnail: "",
+		UserID:             user.ID,
+		Firstname:          "Bob",
+		Lastname:           "Smith",
+		Photo:              "",
+		PhotoThumbnailFile: "",
 	}
 	db.Create(&contact)
 

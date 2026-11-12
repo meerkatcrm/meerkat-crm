@@ -199,7 +199,7 @@ func GetContacts(c *gin.Context) {
 	}
 
 	if len(selectedFields) > 0 {
-		query = query.Select(selectedFields)
+		query = query.Select(thumbnailColumns(selectedFields))
 	}
 
 	// Preload requested relationships
@@ -226,7 +226,7 @@ func GetContacts(c *gin.Context) {
 	for i, contact := range contacts {
 		contactResponses[i] = models.ContactResponse{
 			Contact:        contact,
-			PhotoThumbnail: contact.PhotoThumbnail,
+			PhotoThumbnail: models.ThumbnailURL(contact.ID, contact.PhotoThumbnailFile),
 		}
 	}
 
@@ -247,13 +247,13 @@ func GetContactsRandom(c *gin.Context) {
 		return
 	}
 
-	var selectedFields = []string{"ID", "firstname", "lastname", "nickname", "circles", "photo_thumbnail"}
+	var selectedFields = []string{"ID", "firstname", "lastname", "nickname", "circles", "photo_thumbnail_file"}
 
 	var contacts []models.Contact
 	query := db.Model(&models.Contact{}).Where("user_id = ?", userID).Where("archived = ?", false)
 
 	if len(selectedFields) > 0 {
-		query = query.Select(selectedFields)
+		query = query.Select(thumbnailColumns(selectedFields))
 	}
 
 	// Get 5 random contacts
@@ -270,7 +270,7 @@ func GetContactsRandom(c *gin.Context) {
 	for i, contact := range contacts {
 		contactResponses[i] = models.ContactResponse{
 			Contact:        contact,
-			PhotoThumbnail: contact.PhotoThumbnail,
+			PhotoThumbnail: models.ThumbnailURL(contact.ID, contact.PhotoThumbnailFile),
 		}
 	}
 
@@ -325,7 +325,7 @@ func GetContact(c *gin.Context) {
 
 	if len(selectedFields) > 0 {
 		// Partial fetch: only select requested fields, skip preloading associations
-		query = query.Select(selectedFields)
+		query = query.Select(thumbnailColumns(selectedFields))
 	} else {
 		// Full fetch: preload all associations
 		for _, preload := range contactIncludes {
@@ -464,15 +464,34 @@ func deleteContactPhotos(c *gin.Context, contact models.Contact) {
 		}
 	}
 
-	// Delete legacy file-based thumbnail if it exists (not base64 data URL)
-	if contact.PhotoThumbnail != "" && !strings.HasPrefix(contact.PhotoThumbnail, "data:") {
-		thumbnailPath := filepath.Join(uploadDir, contact.PhotoThumbnail)
+	// Delete the thumbnail file if it exists
+	if contact.PhotoThumbnailFile != "" && !strings.ContainsAny(contact.PhotoThumbnailFile, `/\`) {
+		thumbnailPath := filepath.Join(uploadDir, contact.PhotoThumbnailFile)
 		if err := os.Remove(thumbnailPath); err != nil && !os.IsNotExist(err) {
 			log.Warn().Err(err).Str("path", thumbnailPath).Msg("Failed to delete contact thumbnail")
 		} else if err == nil {
 			log.Debug().Str("path", thumbnailPath).Msg("Deleted contact thumbnail")
 		}
 	}
+}
+
+// thumbnailColumns maps the API field "photo_thumbnail" to the column that holds the
+// thumbnail's file name; the legacy base64 column is never selected by list queries.
+// The thumbnail URL needs the contact's ID, so ID is added when it was not requested.
+func thumbnailColumns(fields []string) []string {
+	out := make([]string, len(fields))
+	hasThumbnail := false
+	for i, f := range fields {
+		if f == "photo_thumbnail" {
+			f = "photo_thumbnail_file"
+			hasThumbnail = true
+		}
+		out[i] = f
+	}
+	if hasThumbnail && !slices.Contains(out, "ID") {
+		out = append(out, "ID")
+	}
+	return out
 }
 
 // GetCircles returns all unique circles associated with contacts.

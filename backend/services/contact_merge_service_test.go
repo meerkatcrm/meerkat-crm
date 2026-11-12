@@ -35,7 +35,7 @@ func pairIDs(p models.DuplicatePair) [2]uint {
 func TestFindDuplicateContacts(t *testing.T) {
 	db, userID := setupMergeDB(t)
 
-	anna1 := createContact(t, db, models.Contact{UserID: userID, Firstname: "Anna", Lastname: "Schmidt", PhotoThumbnail: "data:anna",
+	anna1 := createContact(t, db, models.Contact{UserID: userID, Firstname: "Anna", Lastname: "Schmidt", PhotoThumbnailFile: "anna_thumb.jpg",
 		Emails: []models.ContactEmail{{Value: "anna@example.com"}}, Phones: []models.ContactPhone{{Value: "+49 171 1234567"}}})
 	anna2 := createContact(t, db, models.Contact{UserID: userID, Firstname: " anna ", Lastname: "SCHMIDT",
 		Emails: []models.ContactEmail{{Value: "Anna@Example.com"}}, Phones: []models.ContactPhone{{Value: "0171 1234567"}}})
@@ -55,7 +55,7 @@ func TestFindDuplicateContacts(t *testing.T) {
 
 	assert.Equal(t, [2]uint{anna1.ID, anna2.ID}, pairIDs(pairs[0]))
 	assert.ElementsMatch(t, []string{DuplicateReasonName, DuplicateReasonEmail, DuplicateReasonPhone}, pairs[0].Reasons)
-	assert.Equal(t, "data:anna", pairs[0].Contacts[0].PhotoThumbnail)
+	assert.Equal(t, models.ThumbnailURL(anna1.ID, "anna_thumb.jpg"), pairs[0].Contacts[0].PhotoThumbnail)
 	assert.Empty(t, pairs[0].Contacts[1].PhotoThumbnail)
 	assert.Equal(t, [2]uint{byEmail.ID, byEmail2.ID}, pairIDs(pairs[1]))
 	assert.Equal(t, []string{DuplicateReasonEmail}, pairs[1].Reasons)
@@ -123,12 +123,12 @@ func TestMergeContacts(t *testing.T) {
 	db, userID := setupMergeDB(t)
 
 	target := createContact(t, db, models.Contact{UserID: userID, Firstname: "Anna", Lastname: "Schmidt",
-		Birthday: "1990-01-02", JobTitle: "Engineer", Photo: "target.jpg", PhotoThumbnail: "data:target",
+		Birthday: "1990-01-02", JobTitle: "Engineer", Photo: "target.jpg", PhotoThumbnailFile: "target_thumb.jpg",
 		Circles:      []string{"Friends"},
 		Emails:       []models.ContactEmail{{Type: "home", Value: "anna@example.com"}},
 		CustomFields: map[string]string{"Shoe size": "38"}})
 	source := createContact(t, db, models.Contact{UserID: userID, Firstname: "Anna", Lastname: "Schmidt-Weber",
-		Nickname: "Annie", JobTitle: "Manager", Photo: "source.jpg", PhotoThumbnail: "data:source",
+		Nickname: "Annie", JobTitle: "Manager", Photo: "source.jpg", PhotoThumbnailFile: "source_thumb.jpg",
 		Circles: []string{"Work", "Friends"},
 		Emails: []models.ContactEmail{
 			{Type: "work", Value: "ANNA@example.com"},
@@ -183,8 +183,8 @@ func TestMergeContacts(t *testing.T) {
 	assert.Equal(t, "Engineer", result.Contact.JobTitle, "the response reflects the recomputed fields")
 	assert.Equal(t, "1990-01-02", merged.Birthday)
 	assert.Equal(t, "source.jpg", merged.Photo)
-	assert.Equal(t, "data:source", merged.PhotoThumbnail)
-	assert.Equal(t, models.Contact{Photo: "target.jpg", PhotoThumbnail: "data:target"}, result.DiscardedPhoto)
+	assert.Equal(t, "source_thumb.jpg", merged.PhotoThumbnailFile)
+	assert.Equal(t, models.Contact{Photo: "target.jpg", PhotoThumbnailFile: "target_thumb.jpg"}, result.DiscardedPhoto)
 	assert.Equal(t, []string{"Friends", "Work"}, merged.Circles)
 	assert.Equal(t, map[string]string{"Shoe size": "38", "Team": "Blue"}, merged.CustomFields)
 	assert.Equal(t, []models.ContactEmail{
@@ -270,8 +270,8 @@ func TestMergeContactsDeceasedAndArchivedFollowResolutions(t *testing.T) {
 }
 
 func TestMergeConflictsThumbnailOnlyPhotos(t *testing.T) {
-	target := &models.Contact{Firstname: "A", PhotoThumbnail: "data:a"}
-	source := &models.Contact{Firstname: "A", PhotoThumbnail: "data:b"}
+	target := &models.Contact{Firstname: "A", PhotoThumbnailFile: "a"}
+	source := &models.Contact{Firstname: "A", PhotoThumbnailFile: "b"}
 	conflicts := MergeConflicts(target, source)
 	require.Len(t, conflicts, 1)
 	assert.Equal(t, "photo", conflicts[0].Field)
