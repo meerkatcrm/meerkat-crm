@@ -214,7 +214,13 @@ func (s *ContactSyncService) Discover(ctx context.Context, baseURL, username, pa
 		if book, ok := s.probeAddressBook(ctx, client, parsed); ok {
 			return []models.DiscoveredAddressBook{book}, nil
 		}
-		return nil, fmt.Errorf("%w: principal discovery failed: %v", ErrContactSyncUnreachable, principalErr)
+		// A server that answered with an error or an unreadable response is not "unreachable".
+		err := remoteError(principalErr)
+		if errors.Is(err, errContactSyncUnsupported) {
+			// No WebDAV at all: the URL is not a CardDAV server.
+			err = fmt.Errorf("%w: %v", ErrContactSyncInvalidData, principalErr)
+		}
+		return nil, fmt.Errorf("principal discovery failed: %w", err)
 	}
 
 	homeSet, err := client.FindAddressBookHomeSet(ctx, principal)
