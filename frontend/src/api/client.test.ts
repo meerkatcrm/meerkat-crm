@@ -19,6 +19,22 @@ describe('ApiError.getDisplayMessage', () => {
     const err = new ApiError('Validation failed', 'VALIDATION', 400, {});
     expect(err.getDisplayMessage()).toBe('Validation failed');
   });
+
+  test('shows the message of an external service error, not the service name', () => {
+    const err = new ApiError('CardDAV service error: server answered with an error', 'EXTERNAL_SERVICE_ERROR', 503, {
+      service: 'CardDAV',
+    });
+    expect(err.getDisplayMessage()).toBe('CardDAV service error: server answered with an error');
+  });
+
+  test('parseErrorResponse with a fallback reads the message of an external service error', async () => {
+    const response = new Response(
+      JSON.stringify({ error: { code: 'EXTERNAL_SERVICE_ERROR', message: 'CardDAV service error: server answered with an error', details: { service: 'CardDAV' } } }),
+      { status: 503 },
+    );
+    const err = await parseErrorResponse(response, 'Unable to discover address books.');
+    expect(err.message).toBe('CardDAV service error: server answered with an error');
+  });
 });
 
 describe('parseErrorResponse', () => {

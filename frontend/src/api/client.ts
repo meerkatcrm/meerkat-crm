@@ -43,11 +43,9 @@ export class ApiError extends Error {
 
   // Get a user-friendly error message including field details
   getDisplayMessage(): string {
-    if (this.details && Object.keys(this.details).length > 0) {
-      const fieldErrors = Object.entries(this.details)
-        .map(([, msg]) => `${msg}`)
-        .join('. ');
-      return fieldErrors;
+    const fieldEntries = Object.entries(this.details ?? {}).filter(([key]) => key !== 'service');
+    if (fieldEntries.length > 0) {
+      return fieldEntries.map(([, msg]) => `${msg}`).join('. ');
     }
     return this.message;
   }

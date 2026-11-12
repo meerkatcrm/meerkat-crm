@@ -28,4 +28,9 @@ describe('extractDetailMessage', () => {
   test('ignores empty strings and non-string values', () => {
     expect(extractDetailMessage({ a: '', b: 42, c: { nested: true } })).toBeNull();
   });
+
+  test('ignores the service name of an external service error', () => {
+    expect(extractDetailMessage({ service: 'CardDAV' })).toBeNull();
+    expect(extractDetailMessage({ service: 'CardDAV', base_url: 'Invalid URL' })).toBe('Invalid URL');
+  });
 });
