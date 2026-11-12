@@ -10,7 +10,9 @@ import (
 	"meerkat/config"
 	"meerkat/i18n"
 	"meerkat/logger"
+	"meerkat/metrics"
 	"meerkat/models"
+	"meerkat/netguard"
 	"net/http"
 	"net/url"
 	"sort"
@@ -83,7 +85,7 @@ type CalendarSyncService struct {
 func NewCalendarSyncService(blockPrivateURLs bool) *CalendarSyncService {
 	transport := &http.Transport{}
 	if blockPrivateURLs {
-		transport.DialContext = newPrivateBlockingDialContext(ErrCalendarUnreachable, ErrCalendarPrivateAddress)
+		transport = netguard.NewTransport(ErrCalendarUnreachable, ErrCalendarPrivateAddress)
 	}
 	return &CalendarSyncService{
 		client: &http.Client{
@@ -205,7 +207,7 @@ func (s *CalendarSyncService) syncSubscription(ctx context.Context, db *gorm.DB,
 		return CalendarSyncStats{}, err
 	}
 
-	password, err := DecryptCredential(cfg.JWTSecretKey, sub.PasswordEncrypted)
+	password, err := DecryptCredential(CredentialKeysOf(cfg), sub.PasswordEncrypted)
 	if err != nil {
 		return CalendarSyncStats{}, fmt.Errorf("%w: %v", ErrCalendarUnauthorized, err)
 	}
@@ -755,9 +757,11 @@ func SyncCalendarsWithRateLimit(db *gorm.DB, cfg config.Config) {
 	acquired, err := acquireJobLock(db, models.JobNameCalendarSync, minInterval)
 	if err != nil {
 		logger.Error().Err(err).Msg("Error checking calendar sync job lock")
+		metrics.JobResult(JobCalendarSync, metrics.ResultFailure)
 		return
 	}
 	if !acquired {
+		metrics.JobResult(JobCalendarSync, metrics.ResultSkipped)
 		logger.Info().Msg("Skipping calendar sync job - rate limited")
 		return
 	}
@@ -767,4 +771,5 @@ func SyncCalendarsWithRateLimit(db *gorm.DB, cfg config.Config) {
 	if err := releaseJobLock(db, models.JobNameCalendarSync, true); err != nil {
 		logger.Error().Err(err).Msg("Error releasing calendar sync job lock")
 	}
+	metrics.JobResult(JobCalendarSync, metrics.ResultSuccess)
 }

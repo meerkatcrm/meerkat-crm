@@ -329,12 +329,12 @@ func newMeerkatRemote(t *testing.T) *davRemote {
 }
 
 // stampMeerkatContact moves a contact's modification time, keeping the ETag
-// (e-<id>-<unix seconds>) consistent with it.
+// (e-<id>-<unix nanoseconds>) consistent with it.
 func stampMeerkatContact(t *testing.T, db *gorm.DB, contactID uint, ts time.Time) {
 	t.Helper()
 	require.NoError(t, db.Model(&models.Contact{}).Where("id = ?", contactID).UpdateColumns(map[string]interface{}{
 		"updated_at": ts,
-		"etag":       fmt.Sprintf("e-%d-%d", contactID, ts.Unix()),
+		"etag":       fmt.Sprintf("e-%d-%d", contactID, ts.UnixNano()),
 	}).Error)
 }
 

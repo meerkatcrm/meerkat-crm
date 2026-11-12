@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"mime"
 	"net"
+	"net/http"
 	"net/smtp"
 	"strconv"
 	"strings"
@@ -12,6 +13,7 @@ import (
 
 	"meerkat/config"
 	"meerkat/logger"
+	"meerkat/metrics"
 
 	"github.com/resend/resend-go/v2"
 )
@@ -64,6 +66,7 @@ func SendEmail(cfg config.Config, msg EmailMessage) error {
 		}
 	}
 
+	metrics.EmailSent(succeeded > 0)
 	if succeeded == 0 {
 		return fmt.Errorf("all email channels failed (%d attempted): %s", attempted, strings.Join(errs, "; "))
 	}
@@ -77,7 +80,7 @@ func SendEmail(cfg config.Config, msg EmailMessage) error {
 
 // delivers the message through the Resend API.
 func sendViaResend(cfg config.Config, msg EmailMessage) error {
-	client := resend.NewClient(cfg.ResendAPIKey)
+	client := resend.NewCustomClient(&http.Client{Timeout: resendTimeout}, cfg.ResendAPIKey)
 
 	params := &resend.SendEmailRequest{
 		From:    cfg.ResendFromEmail,
@@ -113,9 +116,14 @@ func sendViaSMTP(cfg config.Config, msg EmailMessage) error {
 	return nil
 }
 
-// smtpTimeout bounds one whole delivery. Without it a mail host that accepts the
-// connection and then goes silent would hang the reminder job for good.
-const smtpTimeout = 30 * time.Second
+// smtpTimeout bounds the dial and then the whole SMTP conversation; resendTimeout bounds
+// one Resend API call. Without them a mail host that accepts the connection and then goes
+// silent would hang the sender for good. The outbox lock (outboxLockTimeout) must outlast
+// both channels together, or a live send would lose its claim and be sent twice.
+const (
+	smtpTimeout   = 30 * time.Second
+	resendTimeout = 30 * time.Second
+)
 
 // sendSMTP delivers one message. With SMTP_USE_TLS the connection is wrapped in
 // TLS from the start (implicit TLS, typically port 465); otherwise it upgrades

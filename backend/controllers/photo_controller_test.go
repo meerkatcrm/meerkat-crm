@@ -116,8 +116,8 @@ func TestAddPhoto_PNGIsCroppedResizedAndStoredAsJPEG(t *testing.T) {
 
 	contact := f.reload(t)
 	assert.True(t, strings.HasSuffix(contact.Photo, "_photo.jpg"), contact.Photo)
-	assert.Equal(t, []string{contact.Photo}, f.files(t))
-	assert.True(t, strings.HasPrefix(contact.PhotoThumbnail, "data:image/jpeg;base64,"))
+	assert.True(t, strings.HasSuffix(contact.PhotoThumbnailFile, "_thumb.jpg"), contact.PhotoThumbnailFile)
+	assert.ElementsMatch(t, []string{contact.Photo, contact.PhotoThumbnailFile}, f.files(t))
 
 	file, err := os.Open(filepath.Join(f.dir, contact.Photo))
 	require.NoError(t, err)
@@ -152,10 +152,10 @@ func TestAddPhoto_ReplacingRemovesTheOldFile(t *testing.T) {
 	require.Equal(t, http.StatusOK, doUpload(t, f.router, path, "photo", "a.png", encodePNG(t, sidesAndCenterImage(50, 50))).Code)
 	first := f.reload(t).Photo
 	require.Equal(t, http.StatusOK, doUpload(t, f.router, path, "photo", "b.png", encodePNG(t, sidesAndCenterImage(50, 50))).Code)
-	second := f.reload(t).Photo
+	second := f.reload(t)
 
-	assert.NotEqual(t, first, second)
-	assert.Equal(t, []string{second}, f.files(t), "the replaced photo must not stay on disk")
+	assert.NotEqual(t, first, second.Photo)
+	assert.ElementsMatch(t, []string{second.Photo, second.PhotoThumbnailFile}, f.files(t), "the replaced photo and its thumbnail must not stay on disk")
 }
 
 func TestAddPhoto_HEICIsConvertedToJPEG(t *testing.T) {
@@ -193,7 +193,7 @@ func TestAddPhoto_RejectsContentThatIsNotASupportedImage(t *testing.T) {
 
 			assert.GreaterOrEqual(t, w.Code, 400, w.Body.String())
 			assert.Empty(t, f.reload(t).Photo)
-			assert.Empty(t, f.reload(t).PhotoThumbnail)
+			assert.Empty(t, f.reload(t).PhotoThumbnailFile)
 			assert.Empty(t, f.files(t), "nothing may be written for a rejected upload")
 		})
 	}

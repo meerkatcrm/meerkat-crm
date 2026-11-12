@@ -464,7 +464,8 @@
     "or": "o",
     "urlPlaceholder": "Incolla URL immagine...",
     "fetch": "Recupera",
-    "urlFetchError": "Impossibile recuperare l'immagine dall'URL"
+    "urlFetchError": "Impossibile recuperare l'immagine dall'URL",
+    "urlRateLimited": "Troppe immagini recuperate da URL. Attendi un minuto e riprova."
   },
   "itemImage": {
     "alt": "Immagine allegata",
@@ -754,6 +755,10 @@
       "test": "Testa",
       "testSuccess": "Test consegnato ({{statusCode}})",
       "testFailed": "Test fallito: {{error}}",
+      "deliveryRetrying": "Nuovo tentativo",
+      "deliverySending": "Invio in corso",
+      "deliveryGaveUp": "Rinunciato",
+      "deliveryNextRetry": "Prossimo tentativo: {{time}}",
       "deliveryErrors": {
         "invalidUrl": "L'URL del webhook non è valido",
         "connectionFailed": "Impossibile connettersi all'URL del webhook",

@@ -315,6 +315,11 @@ func DeleteUser(c *gin.Context) {
 			return err
 		}
 
+		// Delete queued emails: they hold the user's address and may hold a reset link
+		if err := tx.Where("user_id = ?", userID).Delete(&models.EmailOutbox{}).Error; err != nil {
+			return err
+		}
+
 		// Delete webhook deliveries, which only reference the webhook
 		if err := tx.Unscoped().Where("webhook_id IN (SELECT id FROM webhooks WHERE user_id = ?)", userID).Delete(&models.WebhookDelivery{}).Error; err != nil {
 			return err

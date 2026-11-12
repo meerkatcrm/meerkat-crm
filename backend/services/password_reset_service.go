@@ -10,6 +10,8 @@ import (
 	"meerkat/i18n"
 	"meerkat/logger"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 const (
@@ -40,9 +42,10 @@ func PasswordResetExpiry() time.Time {
 	return time.Now().Add(passwordResetTTL)
 }
 
-// SendPasswordResetEmail dispatches a reset email when Resend is configured.
+// SendPasswordResetEmail queues a reset email (sent in the background, retried by the
+// outbox until the link expires) when an email channel is configured.
 // The lang parameter specifies the user's preferred language for the email content.
-func SendPasswordResetEmail(email, token, lang string, cfg *config.Config) error {
+func SendPasswordResetEmail(db *gorm.DB, userID uint, email, token, lang string, cfg *config.Config) error {
 	if cfg == nil {
 		return fmt.Errorf("config is required")
 	}
@@ -68,14 +71,15 @@ func SendPasswordResetEmail(email, token, lang string, cfg *config.Config) error
 		return fmt.Errorf("failed to render password reset email: %w", err)
 	}
 
-	if err := SendEmail(*cfg, EmailMessage{
+	// Retries stop when the link is dead anyway.
+	if err := QueueEmailUntil(db, *cfg, &userID, EmailMessage{
 		To:      email,
 		Subject: i18n.T(lang, "email.passwordReset.subject"),
 		HTML:    htmlBody,
-	}); err != nil {
+	}, PasswordResetExpiry()); err != nil {
 		return err
 	}
 
-	logger.Info().Str("email", email).Str("language", lang).Msg("Password reset email sent")
+	logger.Info().Str("email", email).Str("language", lang).Msg("Password reset email queued")
 	return nil
 }

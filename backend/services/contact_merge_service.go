@@ -164,13 +164,13 @@ func fillDuplicateThumbnails(db *gorm.DB, userID uint, pairs []models.DuplicateP
 		return nil
 	}
 	var rows []models.Contact
-	if err := db.Select("id", "photo_thumbnail").Where("user_id = ? AND id IN ? AND photo_thumbnail <> ''", userID, slices.Collect(maps.Keys(ids))).
+	if err := db.Select("id", "photo_thumbnail_file").Where("user_id = ? AND id IN ? AND photo_thumbnail_file <> ''", userID, slices.Collect(maps.Keys(ids))).
 		Find(&rows).Error; err != nil {
 		return err
 	}
 	thumbnails := make(map[uint]string, len(rows))
 	for _, r := range rows {
-		thumbnails[r.ID] = r.PhotoThumbnail
+		thumbnails[r.ID] = models.ThumbnailURL(r.ID, r.PhotoThumbnailFile)
 	}
 	for i := range pairs {
 		for j := range pairs[i].Contacts {
@@ -219,8 +219,8 @@ func PreviewContactMerge(db *gorm.DB, userID, targetID, sourceID uint) (*models.
 	}
 
 	preview := &models.MergePreview{
-		Target:    models.ContactResponse{Contact: *target, PhotoThumbnail: target.PhotoThumbnail},
-		Source:    models.ContactResponse{Contact: *source, PhotoThumbnail: source.PhotoThumbnail},
+		Target:    models.ContactResponse{Contact: *target, PhotoThumbnail: models.ThumbnailURL(target.ID, target.PhotoThumbnailFile)},
+		Source:    models.ContactResponse{Contact: *source, PhotoThumbnail: models.ThumbnailURL(source.ID, source.PhotoThumbnailFile)},
 		Conflicts: MergeConflicts(target, source),
 	}
 	counts := []struct {
@@ -251,7 +251,7 @@ func MergeConflicts(target, source *models.Contact) []models.MergeConflict {
 			conflicts = append(conflicts, models.MergeConflict{Field: f.key, TargetValue: tv, SourceValue: sv})
 		}
 	}
-	if hasPhoto(target) && hasPhoto(source) && (target.Photo != source.Photo || target.PhotoThumbnail != source.PhotoThumbnail) {
+	if hasPhoto(target) && hasPhoto(source) && (target.Photo != source.Photo || target.PhotoThumbnailFile != source.PhotoThumbnailFile || target.LegacyThumbnail != source.LegacyThumbnail) {
 		conflicts = append(conflicts, models.MergeConflict{Field: mergeFieldPhoto, TargetValue: target.Photo, SourceValue: source.Photo})
 	}
 	if target.IsDeceased != source.IsDeceased {
@@ -397,17 +397,17 @@ func applyMergedFields(target, source *models.Contact, resolutions map[string]st
 	switch {
 	case !hasPhoto(source):
 	case !hasPhoto(target) || pickSource(mergeFieldPhoto):
-		discarded.Photo, discarded.PhotoThumbnail = target.Photo, target.PhotoThumbnail
-		target.Photo, target.PhotoThumbnail = source.Photo, source.PhotoThumbnail
+		discarded.Photo, discarded.PhotoThumbnailFile = target.Photo, target.PhotoThumbnailFile
+		target.Photo, target.PhotoThumbnailFile, target.LegacyThumbnail = source.Photo, source.PhotoThumbnailFile, source.LegacyThumbnail
 	default:
-		discarded.Photo, discarded.PhotoThumbnail = source.Photo, source.PhotoThumbnail
+		discarded.Photo, discarded.PhotoThumbnailFile = source.Photo, source.PhotoThumbnailFile
 	}
 	// Never hand back a file the merged contact still points at.
 	if discarded.Photo == target.Photo {
 		discarded.Photo = ""
 	}
-	if discarded.PhotoThumbnail == target.PhotoThumbnail {
-		discarded.PhotoThumbnail = ""
+	if discarded.PhotoThumbnailFile == target.PhotoThumbnailFile {
+		discarded.PhotoThumbnailFile = ""
 	}
 	return discarded
 }
@@ -606,7 +606,7 @@ func duplicateSummary(c *models.Contact) models.DuplicateContactSummary {
 		Email:          c.Email,
 		Phone:          c.Phone,
 		Organization:   c.Organization,
-		PhotoThumbnail: c.PhotoThumbnail,
+		PhotoThumbnail: models.ThumbnailURL(c.ID, c.PhotoThumbnailFile),
 		Archived:       c.Archived,
 	}
 }
@@ -635,7 +635,7 @@ func contactAddresses(c *models.Contact) []models.ContactAddress {
 }
 
 func hasPhoto(c *models.Contact) bool {
-	return c.Photo != "" || c.PhotoThumbnail != ""
+	return c.Photo != "" || c.PhotoThumbnailFile != "" || c.LegacyThumbnail != ""
 }
 
 // unionBy appends the items of b whose key is not already in a, keeping order.

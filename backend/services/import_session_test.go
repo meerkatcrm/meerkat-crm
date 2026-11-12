@@ -587,7 +587,7 @@ func TestImportSession_ConfirmRestoresSoftDeletedMatch(t *testing.T) {
 	log := zerolog.Nop()
 	mgr := NewImportSessionManager()
 
-	deleted := models.Contact{UserID: importOwner, Firstname: "Jane", Lastname: "Doe", Photo: "stale.jpg", PhotoThumbnail: "stale"}
+	deleted := models.Contact{UserID: importOwner, Firstname: "Jane", Lastname: "Doe", Photo: "stale.jpg", PhotoThumbnailFile: "stale_thumb.jpg"}
 	require.NoError(t, db.Create(&deleted).Error)
 	require.NoError(t, db.Delete(&deleted).Error)
 
@@ -607,7 +607,7 @@ func TestImportSession_ConfirmRestoresSoftDeletedMatch(t *testing.T) {
 	require.NoError(t, db.First(&restored, deleted.ID).Error)
 	assert.Equal(t, "Janet", restored.Firstname)
 	assert.Empty(t, restored.Photo, "the file behind a deleted contact's photo may be gone")
-	assert.Empty(t, restored.PhotoThumbnail)
+	assert.Empty(t, restored.PhotoThumbnailFile)
 	assert.Equal(t, deleted.ID, contacts[0].Contact.ID, "later photo processing needs the row's contact ID")
 }
 
@@ -714,7 +714,7 @@ func TestImportSession_ConfirmVCFPhotos(t *testing.T) {
 		var stored models.Contact
 		require.NoError(t, db.Where("firstname = ?", "Jane").First(&stored).Error)
 		require.NotEmpty(t, stored.Photo)
-		assert.NotEmpty(t, stored.PhotoThumbnail)
+		assert.NotEmpty(t, stored.PhotoThumbnailFile)
 		_, err := os.Stat(filepath.Join(photoDir, stored.Photo))
 		assert.NoError(t, err)
 	})

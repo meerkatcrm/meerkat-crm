@@ -464,7 +464,8 @@
     "or": "o",
     "urlPlaceholder": "Pegar URL de imagen...",
     "fetch": "Obtener",
-    "urlFetchError": "Error al obtener la imagen desde la URL"
+    "urlFetchError": "Error al obtener la imagen desde la URL",
+    "urlRateLimited": "Demasiadas imágenes obtenidas desde URL. Espera un minuto e inténtalo de nuevo."
   },
   "itemImage": {
     "alt": "Imagen adjunta",
@@ -754,6 +755,10 @@
       "test": "Probar",
       "testSuccess": "Prueba entregada ({{statusCode}})",
       "testFailed": "Prueba fallida: {{error}}",
+      "deliveryRetrying": "Reintentando",
+      "deliverySending": "Enviando",
+      "deliveryGaveUp": "Abandonado",
+      "deliveryNextRetry": "Próximo intento: {{time}}",
       "deliveryErrors": {
         "invalidUrl": "La URL del webhook no es válida",
         "connectionFailed": "No se pudo conectar con la URL del webhook",

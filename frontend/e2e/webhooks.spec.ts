@@ -32,12 +32,17 @@ test.describe('Webhooks', () => {
     const webhook = (webhooks.webhooks ?? webhooks)[0];
     const deliveries = await (await page.request.get(`${API_BASE_URL}/webhooks/${webhook.id}/deliveries`)).json();
     expect(deliveries.deliveries).toHaveLength(1);
+    // A refused connection is a temporary failure: the outbox keeps the delivery and retries it.
+    expect(deliveries.deliveries[0].status).toBe('pending');
+    expect(deliveries.deliveries[0].attempts).toBe(1);
 
-    // The refused connection has no status code, so the delivery shows as "err".
-    await expect(page.getByText('err', { exact: true })).toBeVisible();
+    // The delivery shows as retrying, with the time of the next try.
+    await expect(page.getByText('Retrying', { exact: true })).toBeVisible();
+    await expect(page.getByText(/^Next try:/)).toBeVisible();
 
     await page.reload();
     await page.getByRole('button', { name: 'Recent Deliveries' }).click();
-    await expect(page.getByText('err', { exact: true })).toBeVisible();
+    await expect(page.getByText('Retrying', { exact: true })).toBeVisible();
+    await expect(page.getByText(/^Next try:/)).toBeVisible();
   });
 });

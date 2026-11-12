@@ -28,6 +28,7 @@ import FileUploadIcon from '@mui/icons-material/FileUpload';
 import CallMergeIcon from '@mui/icons-material/CallMerge';
 import { ContactListSkeleton } from './components/LoadingSkeletons';
 import { contactDisplayName } from './utils/contactName';
+import { thumbnailSrc } from './utils/thumbnail';
 
 export default function ContactsPage() {
   const { t } = useTranslation();
@@ -271,7 +272,7 @@ export default function ContactsPage() {
                   }
                 }}
               >
-                <Avatar src={contact.photo_thumbnail || undefined} sx={{ width: 48, height: 48, mr: 1.5, bgcolor: 'primary.main' }}>
+                <Avatar src={thumbnailSrc(contact.photo_thumbnail)} sx={{ width: 48, height: 48, mr: 1.5, bgcolor: 'primary.main' }}>
                   {contact.firstname.charAt(0)}
                 </Avatar>
                 <Box sx={{ flex: 1 }}>

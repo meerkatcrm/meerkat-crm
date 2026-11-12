@@ -42,6 +42,8 @@ type Config struct {
 	SMTPFromEmail            string
 	SMTPUseTLS               bool // implicit TLS (e.g. port 465); otherwise STARTTLS is used when available
 	JWTSecretKey             string
+	EncryptionKey            string // ENCRYPTION_KEY: base64 of 32 random bytes for the secrets stored in the database
+	EncryptionKeyReset       bool   // ENCRYPTION_KEY_RESET: a new key replaces a lost one; what the lost key encrypted is deleted
 	JWTExpiryHours           int
 	JWTMaxSessionHours       int    // absolute cap on a session, however active (sliding refresh stops here)
 	ReadTimeout              int    // HTTP server read timeout in seconds
@@ -59,6 +61,9 @@ type Config struct {
 	CardDAVSyncIntervalHours int    // Interval in hours for the scheduled CardDAV contact sync job
 	CardDAVBlockPrivateURLs  bool   // Block contact sync requests to private/loopback addresses (defaults to CALDAV_BLOCK_PRIVATE_URLS)
 	MonicaBlockPrivateURLs   bool   // Block Monica import requests to private/loopback addresses (useful for cloud deployments)
+	MetricsEnabled           bool   // Serve Prometheus metrics (off by default)
+	MetricsToken             string // Optional bearer token required to read /metrics
+	MetricsAddr              string // Optional separate listen address (e.g. 127.0.0.1:9090); empty = /metrics on the main port
 	OIDC                     OIDCConfig
 }
 
@@ -99,6 +104,8 @@ func LoadConfig() *Config {
 		SMTPFromEmail:           getEnv("SMTP_FROM_EMAIL", ""),
 		SMTPUseTLS:              getBoolEnv("SMTP_USE_TLS", false),
 		JWTSecretKey:            getEnv("JWT_SECRET_KEY", ""),
+		EncryptionKey:           getEnv("ENCRYPTION_KEY", ""),
+		EncryptionKeyReset:      getBoolEnv("ENCRYPTION_KEY_RESET", false),
 		JWTExpiryHours:          jwtExpiryHours,
 		JWTMaxSessionHours:      jwtMaxSessionHours,
 		TrustedProxies:          getProxies(getEnv("TRUSTED_PROXIES", "")),
@@ -128,6 +135,10 @@ func LoadConfig() *Config {
 		cfg.CardDAVSyncIntervalHours = 1
 	}
 	cfg.CardDAVBlockPrivateURLs = getBoolEnv("CARDDAV_BLOCK_PRIVATE_URLS", cfg.CalDAVBlockPrivateURLs)
+	applyBlockPrivateURLs(cfg)
+	cfg.MetricsEnabled = getBoolEnv("METRICS_ENABLED", false)
+	cfg.MetricsToken = getEnv("METRICS_TOKEN", "")
+	cfg.MetricsAddr = getEnv("METRICS_ADDR", "")
 
 	// An email channel is enabled only when it is fully configured
 	cfg.UseResend = cfg.ResendAPIKey != "" && cfg.ResendFromEmail != ""
@@ -166,6 +177,59 @@ func getIntEnv(key string, fallback int) int {
 		return intValue
 	}
 	return fallback
+}
+
+// applyBlockPrivateURLs applies BLOCK_PRIVATE_URLS. When it is set it decides for every
+// outbound feature (webhooks, CalDAV, CardDAV, Monica) and overrides the older per-feature
+// flags. When it is unset the per-feature flags keep working as before. The default stays
+// off: LAN servers are a common legitimate setup. It is a security switch, so a value that
+// is not a recognised boolean fails closed: blocking is turned on and an error is logged.
+func applyBlockPrivateURLs(cfg *Config) {
+	value, set := os.LookupEnv("BLOCK_PRIVATE_URLS")
+	if !set {
+		return
+	}
+	block, ok := parseSwitch(value)
+	if !ok {
+		log.Printf("ERROR: Invalid value for BLOCK_PRIVATE_URLS: %q (use true or false). Blocking private URLs to be safe", value)
+		block = true
+	}
+	cfg.WebhookBlockPrivateURLs = block
+	cfg.CalDAVBlockPrivateURLs = block
+	cfg.CardDAVBlockPrivateURLs = block
+	cfg.MonicaBlockPrivateURLs = block
+}
+
+// parseSwitch accepts true/false, 1/0, yes/no and on/off in any case.
+func parseSwitch(value string) (on, ok bool) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "true", "1", "yes", "on":
+		return true, true
+	case "false", "0", "no", "off":
+		return false, true
+	}
+	return false, false
+}
+
+// PrivateURLFeatures lists the outbound features that may still reach private,
+// loopback or link-local addresses. It is empty when every feature is blocked.
+func (c Config) PrivateURLFeatures() []string {
+	features := []string{}
+	for _, f := range []struct {
+		name    string
+		blocked bool
+	}{{"webhooks", c.WebhookBlockPrivateURLs}, {"caldav", c.CalDAVBlockPrivateURLs}, {"carddav", c.CardDAVBlockPrivateURLs}, {"monica", c.MonicaBlockPrivateURLs}} {
+		if !f.blocked {
+			features = append(features, f.name)
+		}
+	}
+	return features
+}
+
+// PrivateURLsAllowed reports whether any outbound feature may still reach private,
+// loopback or link-local addresses.
+func (c Config) PrivateURLsAllowed() bool {
+	return len(c.PrivateURLFeatures()) > 0
 }
 
 func getBoolEnv(key string, fallback bool) bool {
@@ -217,6 +281,10 @@ func (c *Config) Validate() []ValidationError {
 			Field:   "JWT_SECRET_KEY",
 			Message: fmt.Sprintf("JWT secret key is too short (%d characters). Must be at least 32 characters for security.", len(c.JWTSecretKey)),
 		})
+	}
+
+	if msg := c.encryptionKeyProblem(); msg != "" {
+		errors = append(errors, ValidationError{Field: "ENCRYPTION_KEY", Message: msg})
 	}
 
 	// Validate Database Path

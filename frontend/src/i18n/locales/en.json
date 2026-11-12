@@ -464,7 +464,8 @@
     "or": "or",
     "urlPlaceholder": "Paste image URL...",
     "fetch": "Fetch",
-    "urlFetchError": "Failed to fetch image from URL"
+    "urlFetchError": "Failed to fetch image from URL",
+    "urlRateLimited": "Too many images fetched from URLs. Please wait a minute and try again."
   },
   "itemImage": {
     "alt": "Attached image",
@@ -754,6 +755,10 @@
       "test": "Test",
       "testSuccess": "Test delivered ({{statusCode}})",
       "testFailed": "Test failed: {{error}}",
+      "deliveryRetrying": "Retrying",
+      "deliverySending": "Sending",
+      "deliveryGaveUp": "Gave up",
+      "deliveryNextRetry": "Next try: {{time}}",
       "deliveryErrors": {
         "invalidUrl": "Webhook URL is invalid",
         "connectionFailed": "Could not connect to the webhook URL",

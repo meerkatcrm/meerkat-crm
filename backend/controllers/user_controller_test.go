@@ -290,6 +290,33 @@ func TestLoginUser_InvalidInput(t *testing.T) {
 	assert.Equal(t, "MISSING_FIELD", errorDetail["code"])
 }
 
+func TestRequestPasswordReset_QueuesEmail(t *testing.T) {
+	defer services.StubEmailDelivery(func(func()) {})() // no real background send
+	cfg := config.Config{FrontendURL: "http://localhost:3000", UseSMTP: true, SMTPHost: "127.0.0.1", SMTPPort: 1, SMTPFromEmail: "from@example.com"}
+	db, router := setupRouter()
+	hashed, _ := services.HashPassword(strongPassword)
+	user := models.User{Username: "resetq", Email: "resetq@example.com", Password: hashed}
+	db.Create(&user)
+	router.POST("/password-reset/request", func(c *gin.Context) {
+		c.Set("validated", &models.PasswordResetRequestInput{Email: "resetq@example.com"})
+		RequestPasswordReset(c, &cfg)
+	})
+	req, _ := http.NewRequest("POST", "/password-reset/request", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code, "a down mail server must not fail the request: the outbox retries")
+	// The request is answered first and processed in the background.
+	var row models.EmailOutbox
+	if assert.Eventually(t, func() bool {
+		return db.Where("to_addr = ?", "resetq@example.com").First(&row).Error == nil
+	}, 5*time.Second, 10*time.Millisecond) {
+		assert.Equal(t, &user.ID, row.UserID)
+		assert.NotEmpty(t, row.HTML)
+		assert.NotNil(t, row.ExpiresAt, "a reset link is not sent after it expired")
+	}
+}
+
 func TestRequestPasswordReset_Succeeds(t *testing.T) {
 	cfg := config.Config{
 		FrontendURL: "http://localhost:3000",

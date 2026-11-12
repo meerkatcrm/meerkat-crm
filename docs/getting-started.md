@@ -24,6 +24,7 @@ After adjusting the environment variables as needed you can run:
 | Variable | Description |
 |---|---|
 | `JWT_SECRET_KEY` | Random string used for JWT signing (minimum 32 characters) |
+| `ENCRYPTION_KEY` | Encrypts the stored CardDAV and calendar passwords. Generate with `openssl rand -base64 32`, keep it with your backups and never change it. Optional for now: without it an error is logged at startup. See [Encryption key](deployment.md#encryption-key) |
 | `FRONTEND_URL` | Used for CORS headers. Wildcard (`*`) is allowed but not recommended for production use |
 | `RESEND_API_KEY` | API key for [Resend](https://resend.com), used to send e-mail notifications. The generous free tier is more than enough for any personal setup |
 | `RESEND_FROM_EMAIL` | Sender e-mail address for Resend, needs to be configured in Resend |
@@ -46,6 +47,7 @@ After adjusting the environment variables as needed you can run:
 | `OIDC_TRUST_EMAIL` | When `true`, skips the `email_verified`  requirement when linking an OIDC identity to an existing account by email. Safe to enable for self-hosted providers (e.g. Authentik) where you control all user accounts. Default is `false` |
 | `REMINDER_TIME` | Time of day at which reminder emails are sent, in `HH:MM` format (24-hour). Default is `12:00` |
 | `REMINDER_TIMEZONE` | Timezone used for scheduling reminder emails. Must be a valid [IANA timezone name](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) (e.g. `Europe/Berlin`). Default is `UTC` |
+| `BLOCK_PRIVATE_URLS` | When set, decides for webhooks, calendar and contact sync and the Monica import whether URLs that resolve to private, loopback or link-local addresses are refused (SSRF protection), and overrides the per-feature `*_BLOCK_PRIVATE_URLS` flags. Recommended for any instance with more than one user. A value that is not true/false/1/0/yes/no/on/off counts as `true`. Default: unset (the per-feature flags apply, all `false`) |
 | `MONICA_BLOCK_PRIVATE_URLS` | When set to `true`, Monica imports refuse URLs that resolve to private or loopback addresses (SSRF protection for cloud or multi-tenant setups). Default is `false` |
 | `AUTH_RATE_LIMIT_BURST` | Per-IP burst limit for the login, registration, password reset and SSO endpoints. Leave unset in production, as raising it weakens brute-force protection. Default is `50` |
 | `API_RATE_LIMIT_BURST` | Per-IP burst limit for the authenticated API. Leave unset in production. Default is `500` |

@@ -89,7 +89,7 @@ Incoming `REV` timestamps are accepted in any of the encodings clients use in pr
 ### Environment variables
 
 - `CARDDAV_SYNC_INTERVAL_HOURS` — scheduled sync interval (default `6`, minimum `1`).
-- `CARDDAV_BLOCK_PRIVATE_URLS` — refuse connections to private/loopback addresses (SSRF protection for cloud deployments). Defaults to the value of `CALDAV_BLOCK_PRIVATE_URLS`.
+- `CARDDAV_BLOCK_PRIVATE_URLS` — refuse connections to private/loopback addresses (SSRF protection for cloud deployments). Defaults to the value of `CALDAV_BLOCK_PRIVATE_URLS`. `BLOCK_PRIVATE_URLS`, when set, overrides it.
 
 ### Notes and caveats
 

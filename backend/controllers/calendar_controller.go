@@ -60,7 +60,7 @@ func CreateCalendarSubscription(c *gin.Context) {
 		return
 	}
 
-	passwordEncrypted, err := services.EncryptCredential(currentConfig(c).JWTSecretKey, input.Password)
+	passwordEncrypted, err := services.EncryptCredential(services.CredentialKeysOf(currentConfig(c)), input.Password)
 	if err != nil {
 		apperrors.AbortWithError(c, apperrors.ErrInternal("failed to store credentials"))
 		return
@@ -136,7 +136,7 @@ func UpdateCalendarSubscription(c *gin.Context) {
 	if input.ClearPassword || (originChanged && input.Password == "") {
 		subscription.PasswordEncrypted = ""
 	} else if input.Password != "" {
-		passwordEncrypted, err := services.EncryptCredential(currentConfig(c).JWTSecretKey, input.Password)
+		passwordEncrypted, err := services.EncryptCredential(services.CredentialKeysOf(currentConfig(c)), input.Password)
 		if err != nil {
 			apperrors.AbortWithError(c, apperrors.ErrInternal("failed to store credentials"))
 			return

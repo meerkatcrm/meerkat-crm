@@ -113,76 +113,7 @@ func buildDNSResponse(query []byte, ips []net.IP) []byte {
 	return resp
 }
 
-func TestIsPrivateIP(t *testing.T) {
-	tests := []struct {
-		ip      string
-		private bool
-	}{
-		{"127.0.0.1", true},
-		{"127.5.5.5", true},
-		{"::1", true},
-		{"::ffff:127.0.0.1", true}, // IPv4-mapped form must not slip past the IPv4 checks
-		{"10.0.0.1", true},
-		{"172.16.0.1", true},
-		{"172.31.255.255", true},
-		{"192.168.1.1", true},
-		{"::ffff:192.168.1.1", true},
-		{"fc00::1", true},
-		{"fd00:ec2::254", true}, // AWS IPv6 metadata endpoint
-		{"169.254.169.254", true},
-		{"::ffff:169.254.169.254", true},
-		{"fe80::1", true},
-		{"224.0.0.1", true},
-		{"ff02::1", true},
-		{"0.0.0.0", true},
-		{"::", true},
-		{"100.64.0.1", true},
-		{"100.100.100.200", true}, // Alibaba metadata endpoint
-		{"100.127.255.255", true},
-
-		{"8.8.8.8", false},
-		{"1.1.1.1", false},
-		{"172.15.255.255", false},
-		{"172.32.0.1", false},
-		{"100.63.255.255", false},
-		{"100.128.0.1", false},
-		{"2606:4700:4700::1111", false},
-		{"64:ff9b::808:808", false}, // NAT64 embedding 8.8.8.8, which DNS64 networks resolve to
-		{"2002:808:808::", false},   // 6to4 embedding 8.8.8.8
-	}
-	for _, tt := range tests {
-		t.Run(tt.ip, func(t *testing.T) {
-			ip := net.ParseIP(tt.ip)
-			require.NotNil(t, ip)
-			assert.Equal(t, tt.private, IsPrivateIP(ip))
-		})
-	}
-
-	t.Run("nil is treated as private", func(t *testing.T) {
-		assert.True(t, IsPrivateIP(nil))
-	})
-}
-
-func TestIsPrivateIP_ReservedRangesThatReachInternalHosts(t *testing.T) {
-	for _, s := range []string{
-		"64:ff9b::a9fe:a9fe", // NAT64 embedding 169.254.169.254
-		"64:ff9b::7f00:1",    // NAT64 embedding 127.0.0.1
-		"2002:7f00:1::",      // 6to4 embedding 127.0.0.1
-		"::7f00:1",           // IPv4-compatible embedding 127.0.0.1
-		"::ffff:0:a00:1",     // IPv4-translated embedding 10.0.0.1
-		"fec0::1",            // site-local
-		"0.0.0.1",            // "this network"
-		"192.0.0.192",        // IETF protocol assignments
-		"198.18.0.1",         // benchmarking
-		"240.0.0.1",          // reserved
-		"255.255.255.255",    // broadcast
-		"239.1.1.1",          // multicast
-	} {
-		assert.True(t, IsPrivateIP(net.ParseIP(s)), s)
-	}
-}
-
-func TestValidateURLForSSRF_RejectsBeforeAnyLookup(t *testing.T) {
+func TestValidateURL_RejectsBeforeAnyLookup(t *testing.T) {
 	useStubDNS(t, func(name string, query int) []net.IP {
 		t.Errorf("unexpected DNS lookup for %q", name)
 		return nil
@@ -211,7 +142,7 @@ func TestValidateURLForSSRF_RejectsBeforeAnyLookup(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			parsed, err := validateURLForSSRF(tt.url)
+			parsed, err := validateURL(tt.url)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.wantErr)
 			assert.Nil(t, parsed)
@@ -219,7 +150,7 @@ func TestValidateURLForSSRF_RejectsBeforeAnyLookup(t *testing.T) {
 	}
 }
 
-func TestValidateURLForSSRF_RejectsInternalIPLiterals(t *testing.T) {
+func TestValidateURL_RejectsInternalIPLiterals(t *testing.T) {
 	for _, u := range []string{
 		"http://10.0.0.1/a.png",
 		"http://172.16.0.1/a.png",
@@ -233,30 +164,28 @@ func TestValidateURLForSSRF_RejectsInternalIPLiterals(t *testing.T) {
 		"http://[fe80::1%25en0]/a.png",
 	} {
 		t.Run(u, func(t *testing.T) {
-			_, err := validateURLForSSRF(u)
+			_, err := validateURL(u)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "internal IP")
 		})
 	}
 }
 
-func TestValidateURLForSSRF_ChecksEveryResolvedAddress(t *testing.T) {
+// Names are not resolved before the request: netguard checks every address when it dials,
+// which a check before the request cannot replace. The dial-time guard is what refuses here.
+func TestFetchImageFromURL_RefusesNamesThatResolveToInternalAddresses(t *testing.T) {
 	useStubDNS(t, func(name string, query int) []net.IP {
 		switch name {
-		case "public.example.test":
-			return []net.IP{net.ParseIP(documentationIP)}
 		case "internal.example.test":
 			return []net.IP{net.ParseIP("10.0.0.5")}
 		case "metadata.example.test":
 			return []net.IP{net.ParseIP("169.254.169.254")}
-		case "mixed.example.test":
-			return []net.IP{net.ParseIP(documentationIP), net.ParseIP("192.168.0.1")}
 		}
 		return nil
 	})
 
-	t.Run("public name is allowed and keeps its path", func(t *testing.T) {
-		parsed, err := validateURLForSSRF("https://public.example.test/a.png?size=1")
+	t.Run("a name is accepted by validation and keeps its path", func(t *testing.T) {
+		parsed, err := validateURL("https://public.example.test/a.png?size=1")
 		require.NoError(t, err)
 		assert.Equal(t, "public.example.test", parsed.Hostname())
 		assert.Equal(t, "/a.png", parsed.Path)
@@ -265,17 +194,16 @@ func TestValidateURLForSSRF_ChecksEveryResolvedAddress(t *testing.T) {
 	for _, tt := range []struct{ name, host string }{
 		{"name resolving to a private address", "internal.example.test"},
 		{"name resolving to the metadata address", "metadata.example.test"},
-		{"public address alongside a private one", "mixed.example.test"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := validateURLForSSRF("https://" + tt.host + "/a.png")
+			_, _, err := FetchImageFromURL(context.Background(), "http://"+tt.host+"/a.png")
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "internal IP")
 		})
 	}
 
 	t.Run("unresolvable name", func(t *testing.T) {
-		_, err := validateURLForSSRF("https://nothing.example.test/a.png")
+		_, _, err := FetchImageFromURL(context.Background(), "http://nothing.example.test/a.png")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to resolve")
 	})
@@ -291,7 +219,7 @@ func TestFetchImageFromURL_DoesNotContactLoopbackServer(t *testing.T) {
 	defer server.Close()
 
 	// httptest binds loopback, which is exactly what the guard must refuse.
-	body, contentType, err := FetchImageFromURL(server.URL + "/a.png")
+	body, contentType, err := FetchImageFromURL(context.Background(), server.URL+"/a.png")
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "internal hosts")
@@ -310,7 +238,7 @@ func TestFetchImageFromURL_StripsWhitespaceBeforeValidating(t *testing.T) {
 		" http://localhost/a.png ",
 	} {
 		t.Run(u, func(t *testing.T) {
-			_, _, err := FetchImageFromURL(u)
+			_, _, err := FetchImageFromURL(context.Background(), u)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "internal hosts")
 		})
@@ -318,44 +246,9 @@ func TestFetchImageFromURL_StripsWhitespaceBeforeValidating(t *testing.T) {
 }
 
 func TestFetchImageFromURL_RejectsDisallowedSchemes(t *testing.T) {
-	_, _, err := FetchImageFromURL("file:///etc/passwd")
+	_, _, err := FetchImageFromURL(context.Background(), "file:///etc/passwd")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "only http and https")
-}
-
-// The first lookup passes validation and the connection-time lookup returns something else.
-// The check at dial time is what stops a DNS rebinding attack, because validation alone
-// would have let the request through.
-func TestFetchImageFromURL_BlocksDNSRebindingAtDialTime(t *testing.T) {
-	useStubDNS(t, func(name string, query int) []net.IP {
-		if name != "rebind.example.test" {
-			return nil
-		}
-		if query <= 0 {
-			return []net.IP{net.ParseIP(documentationIP)}
-		}
-		return []net.IP{net.ParseIP("127.0.0.1")}
-	})
-
-	body, _, err := FetchImageFromURL("http://rebind.example.test/a.png")
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "internal IP")
-	assert.Nil(t, body)
-}
-
-func TestFetchImageFromURL_FailsWhenNameStopsResolvingAtDialTime(t *testing.T) {
-	useStubDNS(t, func(name string, query int) []net.IP {
-		if name == "vanish.example.test" && query <= 0 {
-			return []net.IP{net.ParseIP(documentationIP)}
-		}
-		return nil
-	})
-
-	_, _, err := FetchImageFromURL("http://vanish.example.test/a.png")
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to resolve")
 }
 
 // roundTripFunc lets the client seam serve responses without a network or the
@@ -401,7 +294,7 @@ func TestFetchImage_ResponseHandling(t *testing.T) {
 				return imageResponse(req, tt.status, tt.contentType, bytes.NewReader(make([]byte, tt.size))), nil
 			})}
 
-			body, contentType, err := fetchImage(client, "http://93.184.216.34/photo.png")
+			body, contentType, err := fetchImage(context.Background(), client, "http://93.184.216.34/photo.png")
 
 			if tt.wantErr != "" {
 				require.ErrorContains(t, err, tt.wantErr)
@@ -422,7 +315,7 @@ func TestFetchImage_SendsUserAgent(t *testing.T) {
 		return imageResponse(req, http.StatusOK, "image/png", strings.NewReader("x")), nil
 	})}
 
-	_, _, err := fetchImage(client, "http://93.184.216.34/photo.png")
+	_, _, err := fetchImage(context.Background(), client, "http://93.184.216.34/photo.png")
 
 	require.NoError(t, err)
 	assert.Contains(t, userAgent, "MeerkatCRM")
@@ -440,7 +333,7 @@ func TestFetchImage_Redirects(t *testing.T) {
 			}),
 		}
 
-		body, _, err := fetchImage(client, "http://93.184.216.34/start")
+		body, _, err := fetchImage(context.Background(), client, "http://93.184.216.34/start")
 
 		require.NoError(t, err)
 		assert.Equal(t, "image", string(body))
@@ -463,7 +356,7 @@ func TestFetchImage_Redirects(t *testing.T) {
 				}),
 			}
 
-			_, _, err := fetchImage(client, "http://93.184.216.34/start")
+			_, _, err := fetchImage(context.Background(), client, "http://93.184.216.34/start")
 
 			require.ErrorContains(t, err, "redirect to disallowed location")
 			assert.Equal(t, []string{"http://93.184.216.34/start"}, requested)
@@ -480,7 +373,7 @@ func TestFetchImage_Redirects(t *testing.T) {
 			}),
 		}
 
-		_, _, err := fetchImage(client, "http://93.184.216.34/start")
+		_, _, err := fetchImage(context.Background(), client, "http://93.184.216.34/start")
 
 		require.ErrorContains(t, err, "too many redirects")
 		assert.Equal(t, 3, hops)
@@ -493,7 +386,7 @@ func TestFetchImage_TimesOutOnASilentServer(t *testing.T) {
 	defer server.Close()
 	defer close(release)
 
-	_, _, err := fetchImage(&http.Client{Timeout: 50 * time.Millisecond}, server.URL)
+	_, _, err := fetchImage(context.Background(), &http.Client{Timeout: 50 * time.Millisecond}, server.URL)
 
 	var netErr net.Error
 	require.ErrorAs(t, err, &netErr)
@@ -509,4 +402,103 @@ func TestNewSafeClient_GuardsAreWiredIn(t *testing.T) {
 	require.True(t, ok)
 	_, err := transport.DialContext(context.Background(), "tcp", "127.0.0.1:80")
 	assert.ErrorContains(t, err, "internal IP")
+}
+
+// routeTo sends every connection to srv, whatever host the URL names, and counts the dials.
+func routeTo(t *testing.T, srv *httptest.Server) *atomic.Int32 {
+	var dials atomic.Int32
+	old := transport
+	t.Cleanup(func() { transport = old })
+	transport = &http.Transport{DialContext: func(ctx context.Context, network, _ string) (net.Conn, error) {
+		dials.Add(1)
+		return (&net.Dialer{}).DialContext(ctx, network, srv.Listener.Addr().String())
+	}}
+	return &dials
+}
+
+func imageServer(t *testing.T, handler http.HandlerFunc) *httptest.Server {
+	srv := httptest.NewServer(handler)
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func servePNG(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "image/png")
+	_, _ = w.Write([]byte("png"))
+}
+
+func TestFetchImageFromURLFetchesFromTheWebPorts(t *testing.T) {
+	routeTo(t, imageServer(t, servePNG))
+	for _, u := range []string{"http://images.example/a.png", "http://images.example:80/a.png", "http://images.example:443/a.png"} {
+		body, contentType, err := FetchImageFromURL(context.Background(), u)
+		require.NoError(t, err, u)
+		assert.Equal(t, "png", string(body))
+		assert.Equal(t, "image/png", contentType)
+	}
+}
+
+func TestFetchImageFromURLRefusesOtherPorts(t *testing.T) {
+	dials := routeTo(t, imageServer(t, servePNG))
+	for _, u := range []string{"http://images.example:8080/a.png", "https://images.example:22/a.png", "http://images.example:0/a.png"} {
+		_, _, err := FetchImageFromURL(context.Background(), u)
+		require.Error(t, err, u)
+	}
+	assert.Zero(t, dials.Load())
+}
+
+func TestFetchImageFromURLRefusesRedirectsToOtherPorts(t *testing.T) {
+	routeTo(t, imageServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/a.png" {
+			http.Redirect(w, r, "http://images.example:6379/b.png", http.StatusFound)
+			return
+		}
+		servePNG(w, r)
+	}))
+	_, _, err := FetchImageFromURL(context.Background(), "http://images.example/a.png")
+	require.Error(t, err)
+}
+
+func TestFetchImageFromURLWaitsWhileTheServerFetchesFourImages(t *testing.T) {
+	release := make(chan struct{})
+	var started atomic.Int32
+	routeTo(t, imageServer(t, func(w http.ResponseWriter, r *http.Request) {
+		started.Add(1)
+		<-release
+		servePNG(w, r)
+	}))
+	done := make(chan error, maxFetches)
+	for range maxFetches {
+		go func() {
+			_, _, err := FetchImageFromURL(context.Background(), "http://images.example/a.png")
+			done <- err
+		}()
+	}
+	require.Eventually(t, func() bool { return started.Load() == maxFetches }, 5*time.Second, 10*time.Millisecond)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	_, _, err := FetchImageFromURL(ctx, "http://images.example/a.png")
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.Equal(t, int32(maxFetches), started.Load())
+
+	close(release)
+	for range maxFetches {
+		require.NoError(t, <-done)
+	}
+}
+
+// Photo URLs come from users and vCards: internal targets are always refused, whatever
+// the BLOCK_PRIVATE_URLS setting.
+func TestFetchImageFromURLRefusesInternalTargets(t *testing.T) {
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		w.Header().Set("Content-Type", "image/png")
+	}))
+	defer srv.Close()
+	for _, u := range []string{srv.URL + "/a.png", "http://localhost/a.png", "http://0.0.0.0/a.png", "http://[::ffff:127.0.0.1]/a.png", "http://169.254.169.254/latest/meta-data", "http://100.100.100.200/"} {
+		_, _, err := FetchImageFromURL(context.Background(), u)
+		require.Error(t, err, u)
+	}
+	assert.Zero(t, hits.Load())
 }

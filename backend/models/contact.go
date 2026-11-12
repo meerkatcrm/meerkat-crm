@@ -2,6 +2,7 @@ package models
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -48,6 +49,17 @@ type ContactAddress struct {
 // or CSV import is cut to it, since rejecting it would fail the whole sync or import.
 const MaxNoteLength = 5000
 
+// ThumbnailURL is where a contact's thumbnail is served ("" when there is none). The
+// version in the query is the file's unique name, so the URL changes with the picture and
+// can be cached for good.
+func ThumbnailURL(contactID uint, file string) string {
+	if file == "" {
+		return ""
+	}
+	version := strings.TrimSuffix(file, "_thumb.jpg")
+	return fmt.Sprintf("/api/v1/contacts/%d/profile_picture?thumbnail=true&v=%s", contactID, url.QueryEscape(version))
+}
+
 type Contact struct {
 	gorm.Model
 	UserID              uint                `gorm:"not null;index" json:"-"`
@@ -58,16 +70,17 @@ type Contact struct {
 	Email               string              `gorm:"type:text COLLATE NOCASE" json:"email" validate:"omitempty,email"`
 	Phone               string              `json:"phone" validate:"omitempty,phone"`
 	Birthday            string              `json:"birthday" validate:"omitempty,birthday"`
-	Photo               string              `json:"photo"`                                     // Path to the profile photo
-	PhotoThumbnail      string              `json:"-"`                                         // Base64 data URL of thumbnail (not exposed in JSON directly)
-	Relationships       []Relationship      `gorm:"foreignKey:ContactID" json:"relationships"` // Has many relationships
-	Address             string              `json:"address" validate:"max=500"`                // Full address as a string
-	HowWeMet            string              `json:"how_we_met" validate:"max=1000"`            // Text field
-	FoodPreference      string              `json:"food_preference" validate:"max=500"`        // Text field
-	WorkInformation     string              `json:"work_information" validate:"max=1000"`      // Text field
-	ContactInformation  string              `json:"contact_information" validate:"max=1000"`   // Additional contact information
-	Note                string              `json:"note" validate:"max=5000"`                  // Free text, mapped to vCard NOTE
-	Circles             []string            `gorm:"type:text;serializer:json" json:"circles"`  // Serialize Circles properly
+	Photo               string              `json:"photo"`                                                    // Path to the profile photo
+	PhotoThumbnailFile  string              `gorm:"column:photo_thumbnail_file;not null;default:''" json:"-"` // Name of the 48px thumbnail in the photo directory ("" = none)
+	LegacyThumbnail     string              `gorm:"column:photo_thumbnail" json:"-"`                          // Old base64 data URL column; nothing writes it, ExportLegacyThumbnails moves it into files at startup and it stays until a later migration drops it
+	Relationships       []Relationship      `gorm:"foreignKey:ContactID" json:"relationships"`                // Has many relationships
+	Address             string              `json:"address" validate:"max=500"`                               // Full address as a string
+	HowWeMet            string              `json:"how_we_met" validate:"max=1000"`                           // Text field
+	FoodPreference      string              `json:"food_preference" validate:"max=500"`                       // Text field
+	WorkInformation     string              `json:"work_information" validate:"max=1000"`                     // Text field
+	ContactInformation  string              `json:"contact_information" validate:"max=1000"`                  // Additional contact information
+	Note                string              `json:"note" validate:"max=5000"`                                 // Free text, mapped to vCard NOTE
+	Circles             []string            `gorm:"type:text;serializer:json" json:"circles"`                 // Serialize Circles properly
 	Activities          []Activity          `gorm:"many2many:activity_contacts;foreignKey:ID;joinForeignKey:ContactID;References:ID;joinReferences:ActivityID" json:"activities,omitempty"`
 	Notes               []Note              `json:"notes,omitempty"`                // One-to-many relationship with notes
 	Reminders           []Reminder          `json:"reminders,omitempty"`            // One-to-many relationship with reminders
@@ -155,7 +168,7 @@ func (c *Contact) BeforeCreate(tx *gorm.DB) error {
 
 func (c *Contact) AfterCreate(tx *gorm.DB) error {
 	// Now we have the ID, generate proper ETag
-	c.ETag = fmt.Sprintf("e-%d-%d", c.ID, c.UpdatedAt.Unix())
+	c.ETag = fmt.Sprintf("e-%d-%d", c.ID, c.UpdatedAt.UnixNano())
 	return tx.Model(c).UpdateColumn("etag", c.ETag).Error
 }
 
@@ -164,7 +177,7 @@ func (c *Contact) AfterSave(tx *gorm.DB) error {
 		return nil
 	}
 
-	newETag := fmt.Sprintf("e-%d-%d", c.ID, c.UpdatedAt.Unix())
+	newETag := fmt.Sprintf("e-%d-%d", c.ID, c.UpdatedAt.UnixNano())
 	if newETag != c.ETag {
 		c.ETag = newETag
 		if err := tx.Model(c).UpdateColumn("etag", c.ETag).Error; err != nil {

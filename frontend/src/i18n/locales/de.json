@@ -464,7 +464,8 @@
     "or": "oder",
     "urlPlaceholder": "Bild-URL einfügen...",
     "fetch": "Abrufen",
-    "urlFetchError": "Bild konnte nicht von URL abgerufen werden"
+    "urlFetchError": "Bild konnte nicht von URL abgerufen werden",
+    "urlRateLimited": "Zu viele Bilder von URLs abgerufen. Bitte eine Minute warten und erneut versuchen."
   },
   "itemImage": {
     "alt": "Angehängtes Bild",
@@ -754,6 +755,10 @@
       "test": "Testen",
       "testSuccess": "Test zugestellt ({{statusCode}})",
       "testFailed": "Test fehlgeschlagen: {{error}}",
+      "deliveryRetrying": "Wiederholung geplant",
+      "deliverySending": "Wird gesendet",
+      "deliveryGaveUp": "Aufgegeben",
+      "deliveryNextRetry": "Nächster Versuch: {{time}}",
       "deliveryErrors": {
         "invalidUrl": "Webhook-URL ist ungültig",
         "connectionFailed": "Verbindung zur Webhook-URL fehlgeschlagen",

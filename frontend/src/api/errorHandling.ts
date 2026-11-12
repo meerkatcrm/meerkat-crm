@@ -2,6 +2,10 @@
 
 export type ErrorDetails = Record<string, unknown> | undefined | null;
 
+// Detail keys that name something instead of describing the error. The backend's external
+// service errors carry {"service": "CardDAV"}; shown alone, that hides the real message.
+const NON_MESSAGE_KEYS = new Set(['service']);
+
 export function extractDetailMessage(details: ErrorDetails): string | null {
   if (!details || typeof details !== 'object') {
     return null;
@@ -16,7 +20,10 @@ export function extractDetailMessage(details: ErrorDetails): string | null {
 
   const messages: string[] = [];
 
-  Object.values(normalized).forEach(value => {
+  Object.entries(normalized).forEach(([key, value]) => {
+    if (NON_MESSAGE_KEYS.has(key)) {
+      return;
+    }
     if (typeof value === 'string' && value.trim().length > 0) {
       messages.push(value.trim());
       return;

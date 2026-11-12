@@ -464,7 +464,8 @@
     "or": "或",
     "urlPlaceholder": "粘贴图片 URL...",
     "fetch": "获取",
-    "urlFetchError": "从 URL 获取图片失败"
+    "urlFetchError": "从 URL 获取图片失败",
+    "urlRateLimited": "从 URL 获取的图片过多，请稍等一分钟后再试。"
   },
   "itemImage": {
     "alt": "附加的图片",
@@ -754,6 +755,10 @@
       "test": "测试",
       "testSuccess": "测试已送达（{{statusCode}}）",
       "testFailed": "测试失败：{{error}}",
+      "deliveryRetrying": "正在重试",
+      "deliverySending": "正在发送",
+      "deliveryGaveUp": "已放弃",
+      "deliveryNextRetry": "下次尝试：{{time}}",
       "deliveryErrors": {
         "invalidUrl": "Webhook URL 无效",
         "connectionFailed": "无法连接到 Webhook URL",

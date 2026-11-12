@@ -799,7 +799,7 @@ func (m *MonicaImportManager) processAvatars(db *gorm.DB, s *monicaImportSession
 		if task.source == avatarSourcePhoto {
 			photoData, mediaType, err = s.client.FetchContactPhoto(ctx, task.monicaID, task.avatarURL)
 		} else {
-			photoData, mediaType, err = s.client.FetchAvatar(ctx, task.avatarURL)
+			photoData, mediaType, err = carddav.FetchPhotoFromURL(ctx, task.avatarURL)
 		}
 		// Only fetch errors are shown: storage errors can carry server paths.
 		failure := ""
@@ -807,13 +807,10 @@ func (m *MonicaImportManager) processAvatars(db *gorm.DB, s *monicaImportSession
 			failure = userSafeMonicaError(err)
 			log.Warn().Err(err).Uint("contact_id", task.contactID).Str("source", task.source).Msg("Failed to fetch Monica avatar")
 		} else {
-			photoPath, thumbnailData, saveErr := carddav.SaveContactPhoto(photoData, mediaType, cfg.ProfilePhotoDir)
+			photoPath, thumbnailPath, saveErr := carddav.SaveContactPhoto(photoData, mediaType, cfg.ProfilePhotoDir)
 			if saveErr != nil {
 				log.Warn().Err(saveErr).Uint("contact_id", task.contactID).Msg("Failed to save Monica avatar")
-			} else if updateErr := db.Model(&models.Contact{}).Where("id = ?", task.contactID).Updates(map[string]interface{}{
-				"photo":           photoPath,
-				"photo_thumbnail": thumbnailData,
-			}).Error; updateErr != nil {
+			} else if updateErr := replaceContactPhoto(db, cfg.ProfilePhotoDir, task.contactID, photoPath, thumbnailPath); updateErr != nil {
 				log.Warn().Err(updateErr).Uint("contact_id", task.contactID).Msg("Failed to update contact with avatar")
 			} else {
 				saved = true

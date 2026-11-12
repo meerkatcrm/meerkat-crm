@@ -19,7 +19,7 @@ import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import LinkIcon from '@mui/icons-material/Link';
 import { handleError, getErrorMessage } from '../utils/errorHandler';
-import { API_BASE_URL, apiFetch } from '../api/client';
+import { API_BASE_URL, apiFetch, parseErrorResponse } from '../api/client';
 
 interface ProfilePictureUploadDialogProps {
   open: boolean;
@@ -159,8 +159,12 @@ export default function ProfilePictureUploadDialog({
       const response = await apiFetch(proxyUrl);
 
       if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || t('profilePicture.urlFetchError'));
+        // The server does not say why a fetch failed (that would tell which internal hosts exist),
+        // so only the rate limit gets its own message.
+        const apiError = await parseErrorResponse(response);
+        throw new Error(
+          apiError.code === 'RATE_LIMIT_EXCEEDED' ? t('profilePicture.urlRateLimited') : t('profilePicture.urlFetchError'),
+        );
       }
 
       const contentType = response.headers.get('content-type');

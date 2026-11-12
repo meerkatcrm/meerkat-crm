@@ -2,6 +2,7 @@ package carddav
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"meerkat/logger"
 	"meerkat/models"
@@ -173,8 +174,11 @@ func (b *Backend) GetAddressObject(ctx context.Context, urlPath string, req *car
 			err = db.Where("user_id = ? AND id = ?", userID, id).First(&contact).Error
 		}
 	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, webdav.NewHTTPError(http.StatusNotFound, fmt.Errorf("contact not found"))
+	}
 	if err != nil {
-		return nil, fmt.Errorf("contact not found")
+		return nil, err
 	}
 
 	filter, err := b.getCircleFilter(ctx, userID)
@@ -273,11 +277,24 @@ func (b *Backend) PutAddressObject(ctx context.Context, urlPath string, card vca
 		}
 	}
 
-	// Check ETag for conflict detection on updates (If-Match header)
-	if !isNew && opts != nil && opts.IfMatch.IsSet() {
-		matched, err := opts.IfMatch.MatchETag(contact.ETag)
-		if err != nil || !matched {
-			return nil, webdav.NewHTTPError(http.StatusPreconditionFailed, fmt.Errorf("ETag mismatch: resource has been modified"))
+	// Conditional writes (RFC 7232): If-Match needs the contact to exist with that ETag,
+	// If-None-Match needs it not to exist (a client creating a contact must not overwrite one).
+	if opts != nil {
+		if isNew && opts.IfMatch.IsSet() {
+			return nil, webdav.NewHTTPError(http.StatusPreconditionFailed, fmt.Errorf("resource does not exist"))
+		}
+		// "If-Match: *" matches any existing contact (RFC 7232). It is checked first because
+		// go-webdav's MatchETag answers false for an empty stored ETag before looking at "*".
+		if !isNew && opts.IfMatch.IsSet() && !opts.IfMatch.IsWildcard() {
+			matched, err := opts.IfMatch.MatchETag(contact.ETag)
+			if err != nil || !matched {
+				return nil, webdav.NewHTTPError(http.StatusPreconditionFailed, fmt.Errorf("ETag mismatch: resource has been modified"))
+			}
+		}
+		if !isNew && opts.IfNoneMatch.IsSet() {
+			if matched, _ := opts.IfNoneMatch.MatchETag(contact.ETag); matched || opts.IfNoneMatch.IsWildcard() {
+				return nil, webdav.NewHTTPError(http.StatusPreconditionFailed, fmt.Errorf("resource already exists"))
+			}
 		}
 	}
 
@@ -298,8 +315,9 @@ func (b *Backend) PutAddressObject(ctx context.Context, urlPath string, card vca
 	}
 
 	// Handle photo if provided (embedded base64)
+	oldPhoto, oldThumbnail := updatedContact.Photo, updatedContact.PhotoThumbnailFile
 	if len(photoData) > 0 {
-		photoPath, thumbnailBase64, err := SaveContactPhoto(photoData, photoMediaType, b.getPhotoDir(ctx))
+		photoPath, thumbnailPath, err := SaveContactPhoto(photoData, photoMediaType, b.getPhotoDir(ctx))
 		if err != nil {
 			logger.Warn().
 				Err(err).
@@ -309,11 +327,12 @@ func (b *Backend) PutAddressObject(ctx context.Context, urlPath string, card vca
 				Msg("CardDAV: failed to save contact photo")
 		} else {
 			updatedContact.Photo = photoPath
-			updatedContact.PhotoThumbnail = thumbnailBase64
+			updatedContact.PhotoThumbnailFile = thumbnailPath
+			updatedContact.LegacyThumbnail = "" // the old picture's copy must not outlive it
 		}
 	} else if photoURL != "" {
 		// Handle URL-based photo - fetch and save
-		fetchedData, fetchedMediaType, err := FetchPhotoFromURL(photoURL)
+		fetchedData, fetchedMediaType, err := FetchPhotoFromURL(ctx, photoURL)
 		if err != nil {
 			logger.Warn().
 				Err(err).
@@ -321,7 +340,7 @@ func (b *Backend) PutAddressObject(ctx context.Context, urlPath string, card vca
 				Str("photo_url", photoURL).
 				Msg("CardDAV: failed to fetch photo from URL")
 		} else if len(fetchedData) > 0 {
-			photoPath, thumbnailBase64, err := SaveContactPhoto(fetchedData, fetchedMediaType, b.getPhotoDir(ctx))
+			photoPath, thumbnailPath, err := SaveContactPhoto(fetchedData, fetchedMediaType, b.getPhotoDir(ctx))
 			if err != nil {
 				logger.Warn().
 					Err(err).
@@ -330,7 +349,8 @@ func (b *Backend) PutAddressObject(ctx context.Context, urlPath string, card vca
 					Msg("CardDAV: failed to save fetched photo")
 			} else {
 				updatedContact.Photo = photoPath
-				updatedContact.PhotoThumbnail = thumbnailBase64
+				updatedContact.PhotoThumbnailFile = thumbnailPath
+				updatedContact.LegacyThumbnail = ""
 			}
 		}
 	}
@@ -343,7 +363,14 @@ func (b *Backend) PutAddressObject(ctx context.Context, urlPath string, card vca
 		}
 	}
 	if err := db.Save(updatedContact).Error; err != nil {
+		if updatedContact.Photo != oldPhoto {
+			RemoveContactPhotoFile(b.getPhotoDir(ctx), updatedContact.Photo, updatedContact.PhotoThumbnailFile)
+		}
 		return nil, err
+	}
+	if updatedContact.Photo != oldPhoto {
+		// The new picture is stored: the old picture's files are unused now.
+		RemoveContactPhotoFile(b.getPhotoDir(ctx), oldPhoto, oldThumbnail)
 	}
 
 	return b.contactToAddressObject(ctx, updatedContact), nil
@@ -369,8 +396,11 @@ func (b *Backend) DeleteAddressObject(ctx context.Context, urlPath string) error
 	// 404 and picks up the UID-based path on its next sync.
 	var contact models.Contact
 	err = db.Where("user_id = ? AND vcard_uid = ?", userID, uid).First(&contact).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return webdav.NewHTTPError(http.StatusNotFound, fmt.Errorf("contact not found"))
+	}
 	if err != nil {
-		return fmt.Errorf("contact not found")
+		return err
 	}
 
 	// A device may still hold a contact that has since left the circle filter.
@@ -389,7 +419,7 @@ func (b *Backend) DeleteAddressObject(ctx context.Context, urlPath string) error
 		return err
 	}
 	// File deletion cannot be rolled back, so it waits for the commit.
-	RemoveContactPhotoFile(b.getPhotoDir(ctx), contact.Photo)
+	RemoveContactPhotoFiles(b.getPhotoDir(ctx), contact)
 	return nil
 }
 

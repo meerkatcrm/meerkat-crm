@@ -31,6 +31,7 @@ import { useDateFormat } from './DateFormatProvider';
 import { isReminderOverdue } from './utils/reminderDue';
 import { useSnackbar } from './context/SnackbarContext';
 import { useConfirm } from './components/ConfirmDialog';
+import { thumbnailSrc } from './utils/thumbnail';
 
 function DashboardPage() {
   const { t } = useTranslation();
@@ -270,7 +271,7 @@ function DashboardPage() {
                     <CardContent sx={{ py: 1.5 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                         <Avatar
-                          src={birthday.type === 'contact' ? birthday.photo_thumbnail : undefined}
+                          src={birthday.type === 'contact' ? thumbnailSrc(birthday.photo_thumbnail) : undefined}
                           sx={{ bgcolor: 'primary.main', width: 40, height: 40 }}
                         >
                           {birthday.name.charAt(0)}
@@ -519,7 +520,7 @@ function DashboardPage() {
                   <CardContent sx={{ py: 1.5 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                       <Avatar
-                        src={contact.photo_thumbnail || undefined}
+                        src={thumbnailSrc(contact.photo_thumbnail)}
                         sx={{ bgcolor: 'secondary.main', width: 40, height: 40 }}
                       >
                         {contact.firstname.charAt(0)}

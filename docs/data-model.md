@@ -14,7 +14,7 @@ When creating a contact you can optionally create a birthday reminder. This simp
 
 You can add **custom fields** through the settings menu. These will appear on every contact and can hold any text value. When deleting a custom field the information will still be stored in the database but not be visible. It will reappear when you add the same custom field again.
 
-**Profile pictures** are stored downsized to 400x400px as files as well as as 48x48px thumbnails in the database (base64). You upload pictures directly or enter an image URL and have the backend pull it in from the web. Currently JPEG, PNG and HEIC up to 10 MB are supported file formats.
+**Profile pictures** are stored downsized to 400x400px as files together with 48x48px thumbnail files. You upload pictures directly or enter an image URL and have the backend pull it in from the web. Currently JPEG, PNG and HEIC up to 10 MB are supported file formats.
 
 You can **archive** contacts to hide them from default search results and the dashboard. Archiving permanently deletes all active reminders for that contact. Notes, activities and relationships are preserved. Archived contacts are still synced via CardDAV (as often you might have phone contacts that you want to keep but do not want them to show up in Meerkat CRM).
 

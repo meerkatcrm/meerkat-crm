@@ -19,6 +19,9 @@ export interface WebhookDelivery {
   status_code: number | null;
   error: string | null;
   attempts: number;
+  /** pending: waiting for a (re)try; delivered; dead: gave up after the last try. */
+  status: 'pending' | 'delivered' | 'dead';
+  next_retry_at: string | null;
   created_at: string;
 }
 

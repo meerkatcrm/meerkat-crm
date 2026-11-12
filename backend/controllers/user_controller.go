@@ -297,8 +297,8 @@ func processPasswordResetRequest(db *gorm.DB, cfg *config.Config, log *zerolog.L
 		return
 	}
 
-	if err := services.SendPasswordResetEmail(user.Email, token, user.Language, cfg); err != nil {
-		log.Error().Err(err).Uint("user_id", user.ID).Msg("Failed to send password reset email")
+	if err := services.SendPasswordResetEmail(db, user.ID, user.Email, token, user.Language, cfg); err != nil {
+		log.Error().Err(err).Uint("user_id", user.ID).Msg("Failed to queue password reset email")
 		// Nothing was delivered, so a retry should not have to wait out the cooldown
 		if err := db.Model(&models.User{}).Where("id = ?", user.ID).Update("password_reset_requested_at", nil).Error; err != nil {
 			log.Error().Err(err).Uint("user_id", user.ID).Msg("Failed to clear password reset cooldown")

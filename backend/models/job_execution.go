@@ -9,14 +9,17 @@ import (
 // JobExecution tracks the execution of scheduled jobs to prevent duplicates
 // during rapid restarts or crash loops.
 type JobExecution struct {
-	ID        uint           `gorm:"primarykey" json:"id"`
-	JobName   string         `gorm:"uniqueIndex;not null" json:"job_name"`
-	LastRunAt time.Time      `gorm:"not null" json:"last_run_at"`
-	LockedAt  *time.Time     `json:"locked_at"`
-	LockedBy  string         `json:"locked_by"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt time.Time      `json:"updated_at"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"deleted_at"`
+	ID        uint      `gorm:"primarykey" json:"id"`
+	JobName   string    `gorm:"uniqueIndex;not null" json:"job_name"`
+	LastRunAt time.Time `gorm:"not null" json:"last_run_at"`
+	// LastSuccessAt is set when a run completes (LastRunAt is written when a run starts and drives
+	// the rate limit). NULL until the first success after the migration.
+	LastSuccessAt *time.Time     `json:"last_success_at"`
+	LockedAt      *time.Time     `json:"locked_at"`
+	LockedBy      string         `json:"locked_by"`
+	CreatedAt     time.Time      `json:"created_at"`
+	UpdatedAt     time.Time      `json:"updated_at"`
+	DeletedAt     gorm.DeletedAt `gorm:"index" json:"deleted_at"`
 }
 
 const (

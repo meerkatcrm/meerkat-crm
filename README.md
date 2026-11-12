@@ -87,6 +87,7 @@ Prefer to skip Compose? You can run the image directly.
 docker run -d --name meerkat --restart unless-stopped \
   -p 7300:8080 \
   -e JWT_SECRET_KEY='<paste a secret here, changing it will invalidate logins>' \
+  -e ENCRYPTION_KEY='<output of: openssl rand -base64 32; keep it with your backups>' \
   -v "$(pwd)/data:/app/data" \
   -v "$(pwd)/photos:/app/static/photos" \
   ghcr.io/meerkatcrm/meerkat-crm:latest

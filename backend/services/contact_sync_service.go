@@ -8,10 +8,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	mcarddav "meerkat/carddav"
 	"meerkat/config"
 	"meerkat/logger"
+	"meerkat/metrics"
 	"meerkat/models"
+	"meerkat/netguard"
+	"net"
 	"net/http"
 	"net/url"
 	"sort"
@@ -33,6 +37,7 @@ var (
 	ErrContactSyncNotFound       = errors.New("CardDAV resource not found")
 	ErrContactSyncUnreachable    = errors.New("CardDAV server could not be reached")
 	ErrContactSyncInvalidData    = errors.New("CardDAV server returned data that could not be parsed")
+	ErrContactSyncServerError    = errors.New("CardDAV server answered with an error")
 	ErrContactSyncTooLarge       = errors.New("CardDAV response exceeds the size limit")
 	ErrContactSyncPrivateAddress = errors.New("CardDAV URL resolves to a private or loopback address")
 	ErrContactSyncTooMany        = errors.New("address book exceeds the per-sync contact limit")
@@ -73,7 +78,7 @@ type ContactSyncService struct {
 func NewContactSyncService(blockPrivateURLs bool) *ContactSyncService {
 	transport := &http.Transport{}
 	if blockPrivateURLs {
-		transport.DialContext = newPrivateBlockingDialContext(ErrContactSyncUnreachable, ErrContactSyncPrivateAddress)
+		transport = netguard.NewTransport(ErrContactSyncUnreachable, ErrContactSyncPrivateAddress)
 	}
 	return &ContactSyncService{
 		client: &http.Client{
@@ -107,14 +112,47 @@ func (t *contactRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 		resp.Body.Close()
 		return nil, errContactSyncUnsupported
 	}
+	if resp.StatusCode >= 400 {
+		defer resp.Body.Close()
+		return nil, fmt.Errorf("%w: %s", ErrContactSyncServerError, statusWithBody(resp))
+	}
 	resp.Body = &limitedBody{inner: resp.Body, remaining: maxContactResponseBytes, errTooLarge: ErrContactSyncTooLarge}
 	return quoteETags(resp)
+}
+
+// statusWithBody appends the start of the error body, which often says what the server disliked
+func statusWithBody(resp *http.Response) string {
+	const limit = 300
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, limit+1))
+	text := strings.Join(strings.Fields(strings.ToValidUTF8(string(body), "")), " ")
+	if text == "" {
+		return resp.Status
+	}
+	if len(body) > limit {
+		text = strings.ToValidUTF8(text[:min(len(text), limit)], "") + " […]"
+	}
+	return resp.Status + ": " + text
 }
 
 func isContactSyncSentinel(err error) bool {
 	return errors.Is(err, ErrContactSyncUnauthorized) || errors.Is(err, ErrContactSyncNotFound) ||
 		errors.Is(err, ErrContactSyncTooLarge) || errors.Is(err, ErrContactSyncPrivateAddress) ||
-		errors.Is(err, ErrContactSyncForbidden) || errors.Is(err, errContactSyncUnsupported)
+		errors.Is(err, ErrContactSyncForbidden) || errors.Is(err, errContactSyncUnsupported) ||
+		errors.Is(err, ErrContactSyncServerError)
+}
+
+// remoteError tells a server that never answered apart from an answer that could not be parsed
+func remoteError(err error) error {
+	var urlErr *url.Error
+	var netErr net.Error
+	switch {
+	case isContactSyncSentinel(err):
+		return err
+	case errors.As(err, &urlErr), errors.As(err, &netErr), errors.Is(err, context.DeadlineExceeded):
+		return fmt.Errorf("%w: %v", ErrContactSyncUnreachable, err)
+	default:
+		return fmt.Errorf("%w: %v", ErrContactSyncInvalidData, err)
+	}
 }
 
 // validates a CardDAV base or address book URL (inline credentials are stripped)
@@ -177,7 +215,13 @@ func (s *ContactSyncService) Discover(ctx context.Context, baseURL, username, pa
 		if book, ok := s.probeAddressBook(ctx, client, parsed); ok {
 			return []models.DiscoveredAddressBook{book}, nil
 		}
-		return nil, fmt.Errorf("%w: principal discovery failed: %v", ErrContactSyncUnreachable, principalErr)
+		// A server that answered with an error or an unreadable response is not "unreachable".
+		err := remoteError(principalErr)
+		if errors.Is(err, errContactSyncUnsupported) {
+			// No WebDAV at all: the URL is not a CardDAV server.
+			err = fmt.Errorf("%w: %v", ErrContactSyncInvalidData, principalErr)
+		}
+		return nil, fmt.Errorf("principal discovery failed: %w", err)
 	}
 
 	homeSet, err := client.FindAddressBookHomeSet(ctx, principal)
@@ -555,7 +599,7 @@ func (s *ContactSyncService) syncConnection(ctx context.Context, db *gorm.DB, cf
 		return nil, err
 	}
 
-	password, err := DecryptCredential(cfg.JWTSecretKey, conn.PasswordEncrypted)
+	password, err := DecryptCredential(CredentialKeysOf(cfg), conn.PasswordEncrypted)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrContactSyncUnauthorized, err)
 	}
@@ -693,10 +737,7 @@ func (r *contactSyncRun) fetchRemoteState() error {
 		FilterTest:  carddav.FilterAllOf,
 	})
 	if err != nil {
-		if isContactSyncSentinel(err) {
-			return err
-		}
-		return fmt.Errorf("%w: %v", ErrContactSyncUnreachable, err)
+		return remoteError(err)
 	}
 	for i := range objects {
 		obj := objects[i]
@@ -741,10 +782,7 @@ func (r *contactSyncRun) fetchNeededCards() error {
 			DataRequest: carddav.AddressDataRequest{AllProp: true},
 		})
 		if err != nil {
-			if isContactSyncSentinel(err) {
-				return err
-			}
-			return fmt.Errorf("%w: %v", ErrContactSyncUnreachable, err)
+			return remoteError(err)
 		}
 		for i := range objects {
 			obj := objects[i]
@@ -964,7 +1002,7 @@ func (r *contactSyncRun) pullCreate(obj *remoteObject, link *models.CardDAVConta
 	if contact.VCardUID == "" {
 		contact.VCardUID = remoteUID(obj)
 	}
-	r.applyPhoto(contact, photoData, mediaType, photoURL)
+	swap := r.applyPhoto(contact, photoData, mediaType, photoURL)
 
 	var hash string
 	err := r.db.Transaction(func(tx *gorm.DB) error {
@@ -991,9 +1029,11 @@ func (r *contactSyncRun) pullCreate(obj *remoteObject, link *models.CardDAVConta
 		return tx.Save(link).Error
 	})
 	if err != nil {
+		swap.Rollback(r.cfg.ProfilePhotoDir, contact)
 		r.recordItemError(err, "Failed to import remote contact", map[string]string{"path": obj.Path})
 		return
 	}
+	swap.Commit(r.cfg.ProfilePhotoDir)
 	r.contactByID[contact.ID] = contact
 	r.setLocalHash(contact.ID, hash)
 	r.linkByPath[obj.Path] = link
@@ -1005,7 +1045,7 @@ func (r *contactSyncRun) pullCreate(obj *remoteObject, link *models.CardDAVConta
 func (r *contactSyncRun) pullUpdate(obj *remoteObject, link *models.CardDAVContactLink, contact *models.Contact) {
 	updated, photoData, mediaType, photoURL := mcarddav.VCardToContact(obj.Card, contact)
 	updated.UserID = r.conn.UserID
-	r.applyPhoto(updated, photoData, mediaType, photoURL)
+	swap := r.applyPhoto(updated, photoData, mediaType, photoURL)
 	r.invalidateLocalHash(updated.ID) // the contact just changed
 	updated.RevertStaleEmployment = true
 
@@ -1023,9 +1063,11 @@ func (r *contactSyncRun) pullUpdate(obj *remoteObject, link *models.CardDAVConta
 		return tx.Save(link).Error
 	})
 	if err != nil {
+		swap.Rollback(r.cfg.ProfilePhotoDir, updated)
 		r.recordItemError(err, "Failed to update contact from remote", map[string]string{"path": obj.Path})
 		return
 	}
+	swap.Commit(r.cfg.ProfilePhotoDir)
 	r.contactByID[updated.ID] = updated
 	r.setLocalHash(updated.ID, hash)
 	r.stats.PulledUpdated++
@@ -1056,25 +1098,26 @@ func (r *contactSyncRun) resolveByRevision(obj *remoteObject, link *models.CardD
 // applyPhoto stores an embedded or URL-referenced photo on the contact,
 // mirroring the CardDAV server's PutAddressObject behavior. Photo failures
 // are logged, never fatal.
-func (r *contactSyncRun) applyPhoto(contact *models.Contact, photoData []byte, mediaType, photoURL string) {
+func (r *contactSyncRun) applyPhoto(contact *models.Contact, photoData []byte, mediaType, photoURL string) mcarddav.PhotoSwap {
+	swap := mcarddav.NewPhotoSwap(contact)
 	if len(photoData) == 0 && photoURL != "" {
-		fetched, fetchedType, err := mcarddav.FetchPhotoFromURL(photoURL)
+		fetched, fetchedType, err := mcarddav.FetchPhotoFromURL(r.ctx, photoURL)
 		if err != nil {
 			logger.Warn().Err(err).Str("photo_url", photoURL).Msg("Contact sync: failed to fetch photo from URL")
-			return
+			return swap
 		}
 		photoData, mediaType = fetched, fetchedType
 	}
 	if len(photoData) == 0 {
-		return
+		return swap
 	}
 	photoPath, thumbnail, err := mcarddav.SaveContactPhoto(photoData, mediaType, r.cfg.ProfilePhotoDir)
 	if err != nil {
 		logger.Warn().Err(err).Msg("Contact sync: failed to save contact photo")
-		return
+		return swap
 	}
-	contact.Photo = photoPath
-	contact.PhotoThumbnail = thumbnail
+	swap.Apply(contact, photoPath, thumbnail)
+	return swap
 }
 
 // reconcileRemoteDeletions handles objects that disappeared from the server.
@@ -1116,7 +1159,7 @@ func (r *contactSyncRun) reconcileRemoteDeletions() {
 				r.recordItemError(err, "Failed to delete contact removed on server", map[string]string{"path": link.RemotePath})
 				continue
 			}
-			mcarddav.RemoveContactPhotoFile(r.cfg.ProfilePhotoDir, contact.Photo)
+			mcarddav.RemoveContactPhotoFiles(r.cfg.ProfilePhotoDir, *contact)
 			r.markLinkDropped(link)
 			r.stats.PulledDeleted++
 		}
@@ -1319,9 +1362,11 @@ func SyncContactsWithRateLimit(db *gorm.DB, cfg config.Config) {
 	acquired, err := acquireJobLock(db, models.JobNameContactSync, minInterval)
 	if err != nil {
 		logger.Error().Err(err).Msg("Error checking contact sync job lock")
+		metrics.JobResult(JobContactSync, metrics.ResultFailure)
 		return
 	}
 	if !acquired {
+		metrics.JobResult(JobContactSync, metrics.ResultSkipped)
 		logger.Info().Msg("Skipping contact sync job - rate limited")
 		return
 	}
@@ -1331,4 +1376,5 @@ func SyncContactsWithRateLimit(db *gorm.DB, cfg config.Config) {
 	if err := releaseJobLock(db, models.JobNameContactSync, true); err != nil {
 		logger.Error().Err(err).Msg("Error releasing contact sync job lock")
 	}
+	metrics.JobResult(JobContactSync, metrics.ResultSuccess)
 }

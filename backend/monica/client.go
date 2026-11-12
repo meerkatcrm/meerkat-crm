@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"meerkat/httputil"
+	"meerkat/netguard"
 	"net"
 	"net/http"
 	"net/url"
@@ -83,7 +83,7 @@ func NewClient(baseURL, token string, blockPrivate bool) (*Client, error) {
 
 	transport := &http.Transport{}
 	if blockPrivate {
-		transport.DialContext = privateBlockingDialContext
+		transport = netguard.NewTransport(ErrUnreachable, ErrPrivateAddress)
 	}
 	return &Client{
 		baseURL: u,
@@ -94,29 +94,6 @@ func NewClient(baseURL, token string, blockPrivate bool) (*Client, error) {
 		},
 		limiter: newLimiter(),
 	}, nil
-}
-
-func privateBlockingDialContext(ctx context.Context, network, addr string) (net.Conn, error) {
-	host, port, err := net.SplitHostPort(addr)
-	if err != nil {
-		return nil, err
-	}
-	ips, err := net.DefaultResolver.LookupIP(ctx, "ip", host)
-	if err != nil {
-		return nil, fmt.Errorf("%w: could not resolve host", ErrUnreachable)
-	}
-	var safeIP net.IP
-	for _, ip := range ips {
-		if !httputil.IsPrivateIP(ip) {
-			safeIP = ip
-			break
-		}
-	}
-	if safeIP == nil {
-		return nil, ErrPrivateAddress
-	}
-	dialer := &net.Dialer{Timeout: 10 * time.Second, KeepAlive: 10 * time.Second}
-	return dialer.DialContext(ctx, network, net.JoinHostPort(safeIP.String(), port))
 }
 
 // get performs one rate-limited GET against the API and decodes the JSON
@@ -366,39 +343,4 @@ func selectAvatarPhoto(photos []Photo, avatarURL string) *Photo {
 		return &photos[0]
 	}
 	return nil
-}
-
-// FetchAvatar downloads an avatar straight from its URL, which works for
-// third-party hosts such as gravatar. Monica's own /store URLs need
-// FetchContactPhoto instead. The bearer token is only sent when the avatar is
-// served by the Monica instance itself, never to third-party hosts (gravatar,
-// presigned S3 URLs).
-func (c *Client) FetchAvatar(ctx context.Context, avatarURL string) (data []byte, mediaType string, err error) {
-	u, err := url.Parse(avatarURL)
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
-		return nil, "", ErrInvalidURL
-	}
-	if err := c.limiter.Wait(ctx); err != nil {
-		return nil, "", err
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
-	if err != nil {
-		return nil, "", ErrInvalidURL
-	}
-	if u.Host == c.baseURL.Host {
-		req.Header.Set("Authorization", "Bearer "+c.token)
-	}
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return nil, "", fmt.Errorf("%w: %v", ErrUnreachable, err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, "", fmt.Errorf("%w: avatar status %d", ErrUnreachable, resp.StatusCode)
-	}
-	data, err = io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
-	if err != nil {
-		return nil, "", fmt.Errorf("%w: %v", ErrUnreachable, err)
-	}
-	return data, resp.Header.Get("Content-Type"), nil
 }
