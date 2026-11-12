@@ -376,7 +376,8 @@
     "cancel": "Abbrechen",
     "save": "Speichern",
     "required": "Titel und Datum sind erforderlich",
-    "dateError": "Ungültiges Datumsformat. Überprüfen Sie Ihre Datumsformat-Einstellung."
+    "dateError": "Ungültiges Datumsformat. Überprüfen Sie Ihre Datumsformat-Einstellung.",
+    "saveError": "Aktivität konnte nicht gespeichert werden"
   },
   "activities": {
     "title": "Aktivitäten",
@@ -464,6 +465,13 @@
     "urlPlaceholder": "Bild-URL einfügen...",
     "fetch": "Abrufen",
     "urlFetchError": "Bild konnte nicht von URL abgerufen werden"
+  },
+  "itemImage": {
+    "alt": "Angehängtes Bild",
+    "attach": "Bild anhängen",
+    "replace": "Bild ersetzen",
+    "remove": "Bild entfernen",
+    "noPreview": "{{name}} (keine Vorschau in diesem Browser, wird beim Speichern umgewandelt)"
   },
   "settings": {
     "title": "Einstellungen",

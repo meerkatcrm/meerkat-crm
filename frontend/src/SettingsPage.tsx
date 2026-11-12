@@ -24,6 +24,7 @@ import InfoIcon from '@mui/icons-material/Info';
 import GitHubIcon from '@mui/icons-material/GitHub';
 import Link from '@mui/material/Link';
 import { changePassword } from './api/auth';
+import { isDemoMode } from './auth';
 import { updateLanguage, updateDateFormat } from './api/users';
 import { ThemePreference, useThemePreference } from './AppThemeProvider';
 import { DateFormat, useDateFormat } from './DateFormatProvider';
@@ -266,59 +267,62 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Card sx={{ mb: 2 }}>
-        <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-            <LockResetIcon sx={{ mr: 1, color: 'text.secondary', fontSize: 20 }} />
-            <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
-              {t('settings.password.title')}
-            </Typography>
-          </Box>
-          <Divider sx={{ mb: 1.5 }} />
-
-          <form onSubmit={handlePasswordChange}>
-            <Stack spacing={1.5}>
-              <Typography variant="body2" sx={{
-                color: "text.secondary"
-              }}>
-                {t('settings.password.description')}
+      {/* The server refuses password changes in demo mode. */}
+      {!isDemoMode() && (
+        <Card sx={{ mb: 2 }}>
+          <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+              <LockResetIcon sx={{ mr: 1, color: 'text.secondary', fontSize: 20 }} />
+              <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
+                {t('settings.password.title')}
               </Typography>
-              {passwordError && <Alert severity="error" sx={{ py: 0 }}>{passwordError}</Alert>}
-              {passwordSuccess && <Alert severity="success" sx={{ py: 0 }}>{passwordSuccess}</Alert>}
-              <TextField
-                label={t('settings.password.current')}
-                type="password"
-                value={currentPassword}
-                onChange={event => setCurrentPassword(event.target.value)}
-                fullWidth
-                required
-                size="small"
-              />
-              <TextField
-                label={t('settings.password.new')}
-                type="password"
-                value={newPassword}
-                onChange={event => setNewPassword(event.target.value)}
-                fullWidth
-                required
-                size="small"
-              />
-              <TextField
-                label={t('settings.password.confirm')}
-                type="password"
-                value={confirmPassword}
-                onChange={event => setConfirmPassword(event.target.value)}
-                fullWidth
-                required
-                size="small"
-              />
-              <Button type="submit" variant="contained" size="small" disabled={changingPassword}>
-                {changingPassword ? t('settings.password.changing') : t('settings.password.changeButton')}
-              </Button>
-            </Stack>
-          </form>
-        </CardContent>
-      </Card>
+            </Box>
+            <Divider sx={{ mb: 1.5 }} />
+
+            <form onSubmit={handlePasswordChange}>
+              <Stack spacing={1.5}>
+                <Typography variant="body2" sx={{
+                  color: "text.secondary"
+                }}>
+                  {t('settings.password.description')}
+                </Typography>
+                {passwordError && <Alert severity="error" sx={{ py: 0 }}>{passwordError}</Alert>}
+                {passwordSuccess && <Alert severity="success" sx={{ py: 0 }}>{passwordSuccess}</Alert>}
+                <TextField
+                  label={t('settings.password.current')}
+                  type="password"
+                  value={currentPassword}
+                  onChange={event => setCurrentPassword(event.target.value)}
+                  fullWidth
+                  required
+                  size="small"
+                />
+                <TextField
+                  label={t('settings.password.new')}
+                  type="password"
+                  value={newPassword}
+                  onChange={event => setNewPassword(event.target.value)}
+                  fullWidth
+                  required
+                  size="small"
+                />
+                <TextField
+                  label={t('settings.password.confirm')}
+                  type="password"
+                  value={confirmPassword}
+                  onChange={event => setConfirmPassword(event.target.value)}
+                  fullWidth
+                  required
+                  size="small"
+                />
+                <Button type="submit" variant="contained" size="small" disabled={changingPassword}>
+                  {changingPassword ? t('settings.password.changing') : t('settings.password.changeButton')}
+                </Button>
+              </Stack>
+            </form>
+          </CardContent>
+        </Card>
+      )}
     </Box>
   );
 }

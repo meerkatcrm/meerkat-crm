@@ -16,6 +16,8 @@ import { useContactSearch } from '../hooks/useContactSearch';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useDateFormat } from '../DateFormatProvider';
 import { contactDisplayName } from '../utils/contactName';
+import { ImageChange } from '../api/itemImages';
+import ImageAttachmentField from './ImageAttachmentField';
 
 type TimelineContact = { ID: number; firstname: string; lastname: string; nickname?: string };
 
@@ -27,6 +29,10 @@ export interface TimelineItemValues {
   activityLocation?: string;
   activityDate?: string;
   activityContacts?: TimelineContact[];
+  /** The edited note or activity, and its current image. */
+  itemId?: number;
+  image?: string;
+  imageChange?: ImageChange;
 }
 
 interface EditTimelineItemDialogProps {
@@ -99,6 +105,13 @@ export default function EditTimelineItemDialog({
               error={!!dateError}
               helperText={dateError}
             />
+            <ImageAttachmentField
+              type="notes"
+              id={values.itemId}
+              image={values.image}
+              value={values.imageChange}
+              onChange={(imageChange) => onChange({ ...values, imageChange })}
+            />
           </Box>
         ) : (
           // Edit Activity
@@ -161,6 +174,13 @@ export default function EditTimelineItemDialog({
                   />
                 ))
               }
+            />
+            <ImageAttachmentField
+              type="activities"
+              id={values.itemId}
+              image={values.image}
+              value={values.imageChange}
+              onChange={(imageChange) => onChange({ ...values, imageChange })}
             />
           </Box>
         )}

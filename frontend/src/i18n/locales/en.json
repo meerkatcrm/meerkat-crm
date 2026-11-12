@@ -376,7 +376,8 @@
     "cancel": "Cancel",
     "save": "Save",
     "required": "Title and date are required",
-    "dateError": "Invalid date format. Check your date format setting."
+    "dateError": "Invalid date format. Check your date format setting.",
+    "saveError": "Failed to save activity"
   },
   "activities": {
     "title": "Activities",
@@ -464,6 +465,13 @@
     "urlPlaceholder": "Paste image URL...",
     "fetch": "Fetch",
     "urlFetchError": "Failed to fetch image from URL"
+  },
+  "itemImage": {
+    "alt": "Attached image",
+    "attach": "Attach image",
+    "replace": "Replace image",
+    "remove": "Remove image",
+    "noPreview": "{{name}} (no preview in this browser, it is converted on save)"
   },
   "settings": {
     "title": "Settings",

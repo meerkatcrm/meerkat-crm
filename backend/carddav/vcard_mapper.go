@@ -492,7 +492,7 @@ func RemoveContactPhotoFile(photoDir, photo string) {
 		return
 	}
 	if err := os.Remove(filepath.Join(photoDir, photo)); err != nil && !os.IsNotExist(err) {
-		logger.Warn().Err(err).Str("photo", photo).Msg("Failed to delete photo of a deleted contact")
+		logger.Warn().Err(err).Str("photo", photo).Msg("Failed to delete photo file")
 	}
 }
 

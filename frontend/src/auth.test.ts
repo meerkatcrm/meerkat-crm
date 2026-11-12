@@ -8,13 +8,14 @@ import {
   logoutAndRedirect,
   decodeToken,
   isAdmin,
+  isDemoMode,
 } from './auth';
 
 const fetchMock = vi.fn();
 const ok = (body: object) => ({ ok: true, status: 200, json: async () => body });
 const denied = { ok: false, status: 401, json: async () => ({}) };
 const me = { id: 7, username: 'anna', is_admin: true };
-const cached = { user_id: 7, username: 'anna', is_admin: true };
+const cached = { user_id: 7, username: 'anna', is_admin: true, demo_mode: false };
 
 const cache = (value: object | string) =>
   localStorage.setItem('user_info', typeof value === 'string' ? value : JSON.stringify(value));
@@ -76,6 +77,13 @@ describe('fetchAndCacheUserInfo', () => {
     await expect(fetchAndCacheUserInfo()).resolves.toMatchObject({ is_admin: false });
   });
 
+  test('caches demo mode so the UI can hide the controls the server refuses', async () => {
+    expect(isDemoMode()).toBe(false);
+    fetchMock.mockResolvedValueOnce(ok({ ...me, demo_mode: true }));
+    await fetchAndCacheUserInfo();
+    expect(isDemoMode()).toBe(true);
+  });
+
   test('without a session returns null and caches nothing', async () => {
     fetchMock.mockResolvedValueOnce(denied);
     await expect(fetchAndCacheUserInfo()).resolves.toBeNull();
@@ -100,7 +108,7 @@ describe('session state', () => {
     cache(cached);
     expect(isAuthenticated()).toBe(true);
     expect(getToken()).toBe('cookie-auth');
-    expect(decodeToken()).toEqual({ ...cached, exp: 0 });
+    expect(decodeToken()).toEqual({ user_id: 7, username: 'anna', is_admin: true, exp: 0 });
   });
 
   test.each([
@@ -116,6 +124,7 @@ describe('session state', () => {
   test('corrupt cached user info decodes to null instead of throwing', () => {
     cache('{not json');
     expect(decodeToken()).toBeNull();
+    expect(isDemoMode()).toBe(false);
   });
 });
 

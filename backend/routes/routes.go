@@ -134,6 +134,13 @@ func RegisterRoutes(router *gin.Engine, cfg *config.Config, db *gorm.DB, oidcPro
 			protected.PUT("/notes/:id", middleware.ValidateJSONMiddleware(&models.NoteInput{}), controllers.UpdateNote)
 			protected.DELETE("/notes/:id", controllers.DeleteNote)
 
+			// Note and activity image routes (one optional image each)
+			for path, item := range map[string]controllers.ImageItem{"notes": controllers.NoteImages, "activities": controllers.ActivityImages} {
+				protected.GET("/"+path+"/:id/image", func(c *gin.Context) { controllers.GetItemImage(c, cfg, item) })
+				protected.POST("/"+path+"/:id/image", func(c *gin.Context) { controllers.UploadItemImage(c, cfg, item) })
+				protected.DELETE("/"+path+"/:id/image", func(c *gin.Context) { controllers.DeleteItemImage(c, cfg, item) })
+			}
+
 			// Activity routes
 			protected.GET("/contacts/:id/activities", controllers.GetActivitiesForContact)
 			protected.POST("/activities", middleware.ValidateJSONMiddleware(&models.ActivityInput{}), controllers.CreateActivity)

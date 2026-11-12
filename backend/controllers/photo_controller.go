@@ -212,62 +212,9 @@ func AddPhotoToContact(c *gin.Context, cfg *config.Config) {
 var errInvalidPhoto = errors.New("invalid photo")
 
 func processAndSavePhoto(file *multipart.FileHeader, uploadDir string) (string, string, error) {
-	// Open the uploaded file
-	src, err := file.Open()
+	img, err := decodeUploadedImage(file)
 	if err != nil {
 		return "", "", err
-	}
-	defer src.Close()
-
-	// Detect the image format
-	buf := make([]byte, 512)
-	_, err = src.Read(buf)
-	if errors.Is(err, io.EOF) {
-		return "", "", fmt.Errorf("%w: empty file", errInvalidPhoto)
-	}
-	if err != nil {
-		return "", "", err
-	}
-	contentType := http.DetectContentType(buf)
-
-	// Check for HEIC/HEIF format (http.DetectContentType doesn't recognize it)
-	// HEIC files have "ftyp" followed by "heic", "heix", "hevc", "hevx", or "mif1" at byte 4
-	if contentType == "application/octet-stream" && len(buf) >= 12 {
-		if string(buf[4:8]) == "ftyp" {
-			brand := string(buf[8:12])
-			if brand == "heic" || brand == "heix" || brand == "hevc" || brand == "hevx" || brand == "mif1" {
-				contentType = "image/heic"
-			}
-		}
-	}
-
-	// Validate supported content types
-	if contentType != "image/jpeg" && contentType != "image/png" &&
-		contentType != "image/heic" && contentType != "image/heif" {
-		return "", "", fmt.Errorf("%w: unsupported file format", errInvalidPhoto)
-	}
-
-	// Check the declared size before decoding allocates memory for it.
-	src.Seek(0, 0)
-	if err := httputil.CheckImageDimensions(src); err != nil {
-		return "", "", fmt.Errorf("%w: %v", errInvalidPhoto, err)
-	}
-
-	// Rewind the file reader
-	src.Seek(0, 0)
-
-	// Decode the image (handle JPEG, PNG, and HEIC)
-	var img image.Image
-	switch contentType {
-	case "image/jpeg":
-		img, err = jpeg.Decode(src)
-	case "image/png":
-		img, err = png.Decode(src)
-	case "image/heic", "image/heif":
-		img, err = heic.Decode(src)
-	}
-	if err != nil {
-		return "", "", fmt.Errorf("%w: %v", errInvalidPhoto, err)
 	}
 
 	// Crop to centered square if rectangular
@@ -303,6 +250,68 @@ func processAndSavePhoto(file *multipart.FileHeader, uploadDir string) (string, 
 	thumbnailBase64 := "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(thumbnailBuf.Bytes())
 
 	return photoPath, thumbnailBase64, nil
+}
+
+// decodeUploadedImage decodes an uploaded JPEG, PNG or HEIC file. Failures caused
+// by the file itself wrap errInvalidPhoto.
+func decodeUploadedImage(file *multipart.FileHeader) (image.Image, error) {
+	src, err := file.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer src.Close()
+
+	// Detect the image format
+	buf := make([]byte, 512)
+	_, err = src.Read(buf)
+	if errors.Is(err, io.EOF) {
+		return nil, fmt.Errorf("%w: empty file", errInvalidPhoto)
+	}
+	if err != nil {
+		return nil, err
+	}
+	contentType := http.DetectContentType(buf)
+
+	// Check for HEIC/HEIF format (http.DetectContentType doesn't recognize it)
+	// HEIC files have "ftyp" followed by "heic", "heix", "hevc", "hevx", or "mif1" at byte 4
+	if contentType == "application/octet-stream" && len(buf) >= 12 {
+		if string(buf[4:8]) == "ftyp" {
+			brand := string(buf[8:12])
+			if brand == "heic" || brand == "heix" || brand == "hevc" || brand == "hevx" || brand == "mif1" {
+				contentType = "image/heic"
+			}
+		}
+	}
+
+	// Validate supported content types
+	if contentType != "image/jpeg" && contentType != "image/png" &&
+		contentType != "image/heic" && contentType != "image/heif" {
+		return nil, fmt.Errorf("%w: unsupported file format", errInvalidPhoto)
+	}
+
+	// Check the declared size before decoding allocates memory for it.
+	src.Seek(0, 0)
+	if err := httputil.CheckImageDimensions(src); err != nil {
+		return nil, fmt.Errorf("%w: %v", errInvalidPhoto, err)
+	}
+
+	// Rewind the file reader
+	src.Seek(0, 0)
+
+	// Decode the image (handle JPEG, PNG, and HEIC)
+	var img image.Image
+	switch contentType {
+	case "image/jpeg":
+		img, err = jpeg.Decode(src)
+	case "image/png":
+		img, err = png.Decode(src)
+	case "image/heic", "image/heif":
+		img, err = heic.Decode(src)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", errInvalidPhoto, err)
+	}
+	return img, nil
 }
 
 // cropToSquare crops an image to a centered square

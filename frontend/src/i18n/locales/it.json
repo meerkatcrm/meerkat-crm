@@ -376,7 +376,8 @@
     "cancel": "Annulla",
     "save": "Salva",
     "required": "Titolo e data sono obbligatori",
-    "dateError": "Formato data non valido. Controlla le impostazioni del formato data."
+    "dateError": "Formato data non valido. Controlla le impostazioni del formato data.",
+    "saveError": "Impossibile salvare l'attività"
   },
   "activities": {
     "title": "Attività",
@@ -464,6 +465,13 @@
     "urlPlaceholder": "Incolla URL immagine...",
     "fetch": "Recupera",
     "urlFetchError": "Impossibile recuperare l'immagine dall'URL"
+  },
+  "itemImage": {
+    "alt": "Immagine allegata",
+    "attach": "Allega immagine",
+    "replace": "Sostituisci immagine",
+    "remove": "Rimuovi immagine",
+    "noPreview": "{{name}} (anteprima non disponibile in questo browser, viene convertito al salvataggio)"
   },
   "settings": {
     "title": "Impostazioni",

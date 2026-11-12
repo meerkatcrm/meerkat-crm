@@ -376,7 +376,8 @@
     "cancel": "取消",
     "save": "保存",
     "required": "标题和日期为必填项",
-    "dateError": "日期格式无效。请检查您的日期格式设置。"
+    "dateError": "日期格式无效。请检查您的日期格式设置。",
+    "saveError": "保存活动失败"
   },
   "activities": {
     "title": "活动",
@@ -464,6 +465,13 @@
     "urlPlaceholder": "粘贴图片 URL...",
     "fetch": "获取",
     "urlFetchError": "从 URL 获取图片失败"
+  },
+  "itemImage": {
+    "alt": "附加的图片",
+    "attach": "附加图片",
+    "replace": "替换图片",
+    "remove": "移除图片",
+    "noPreview": "{{name}}（此浏览器无法预览，保存时会自动转换）"
   },
   "settings": {
     "title": "设置",

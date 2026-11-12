@@ -26,6 +26,9 @@ import { ListSkeleton } from './components/LoadingSkeletons';
 import { useNotes } from './hooks/useNotes';
 import { useDebouncedValue } from './hooks/useDebounce';
 import { createUnassignedNote, updateNote, deleteNote, Note } from './api/notes';
+import { applyImageChange, uploadItemImage } from './api/itemImages';
+import ItemImage from './components/ItemImage';
+import type { TimelineItemValues } from './components/EditTimelineItemDialog';
 import AddNoteDialog from './components/AddNoteDialog';
 import EditTimelineItemDialog from './components/EditTimelineItemDialog';
 import { handleError } from './utils/errorHandler';
@@ -67,7 +70,7 @@ const NotesPage: React.FC = () => {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [editError, setEditError] = useState('');
-  const [editValues, setEditValues] = useState<{ noteContent?: string; noteDate?: string }>({});
+  const [editValues, setEditValues] = useState<TimelineItemValues>({});
   const [infoAnchorEl, setInfoAnchorEl] = useState<HTMLElement | null>(null);
   const infoOpen = Boolean(infoAnchorEl);
   const infoPopoverId = infoOpen ? 'notes-info-popover' : undefined;
@@ -99,9 +102,11 @@ const NotesPage: React.FC = () => {
     setAddDialogOpen(true);
   };
 
-  const handleNoteSave = async (content: string, date: string) => {
+  const handleNoteSave = async (content: string, date: string, image?: File) => {
     try {
-      await createUnassignedNote({ content, date: new Date(date).toISOString() });
+      const note = await createUnassignedNote({ content, date: new Date(date).toISOString() });
+      // The note exists either way: a failed upload must not make Save create it again.
+      if (image) await uploadItemImage('notes', note.ID, image).catch((err) => handleError(err, { operation: 'uploading image' }, { showError }));
       setAddDialogOpen(false);
       refetch();
     } catch (err) {
@@ -116,6 +121,8 @@ const NotesPage: React.FC = () => {
     setEditValues({
       noteContent: note.content || '',
       noteDate: note.date ? formatDate(note.date) : '',
+      itemId: note.ID,
+      image: note.image,
     });
   };
 
@@ -134,6 +141,7 @@ const NotesPage: React.FC = () => {
         content: editValues.noteContent,
         date: parsedDate ? new Date(parsedDate).toISOString() : new Date().toISOString(),
       });
+      await applyImageChange('notes', editingNote.ID, editValues.imageChange);
       setEditingNote(null);
       setEditValues({});
       refetch();
@@ -294,9 +302,12 @@ const NotesPage: React.FC = () => {
                         justifyContent: "space-between",
                         alignItems: "flex-start"
                       }}>
-                      <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', flex: 1 }}>
-                        {note.content}
-                      </Typography>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                          {note.content}
+                        </Typography>
+                        <ItemImage type="notes" id={note.ID} image={note.image} />
+                      </Box>
                       <Box
                         className="edit-actions"
                         sx={{ opacity: 0, transition: 'opacity 0.2s', display: 'flex', gap: 1 }}

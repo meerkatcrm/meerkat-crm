@@ -56,6 +56,7 @@ func GetCurrentUser(c *gin.Context) {
 		CustomFieldNames:       user.CustomFieldNames,
 		EnabledContactFields:   user.EnabledContactFields,
 		HideEmptyContactFields: user.HideEmptyContactFields,
+		DemoMode:               currentConfig(c).DemoMode,
 	})
 }
 

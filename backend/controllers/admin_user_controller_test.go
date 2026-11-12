@@ -203,7 +203,13 @@ func TestGetCurrentUser(t *testing.T) {
 	w := doRequest(router, http.MethodGet, "/users/me", nil, "")
 	require.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, "me", decodeJSON[models.CurrentUserResponse](t, w).Username)
+	assert.False(t, decodeJSON[models.CurrentUserResponse](t, w).DemoMode)
 	assert.NotContains(t, strings.ToLower(w.Body.String()), "password")
+
+	demo := routerForUser(db, user.ID)
+	demo.Use(func(c *gin.Context) { c.Set("cfg", config.Config{DemoMode: true}) })
+	demo.GET("/users/me", GetCurrentUser)
+	assert.True(t, decodeJSON[models.CurrentUserResponse](t, doRequest(demo, http.MethodGet, "/users/me", nil, "")).DemoMode)
 
 	gone := routerForUser(db, 9999)
 	gone.GET("/users/me", GetCurrentUser)

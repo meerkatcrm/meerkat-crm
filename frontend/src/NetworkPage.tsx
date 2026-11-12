@@ -25,6 +25,7 @@ import EditTimelineItemDialog from './components/EditTimelineItemDialog';
 import { useGraph } from './hooks/useGraph';
 import { GraphNode } from './types/graph';
 import { Activity, getActivity, updateActivity, deleteActivity } from './api/activities';
+import { applyImageChange, ImageChange } from './api/itemImages';
 import { Contact } from './api/contacts';
 import { NetworkFilters, loadNetworkFilters, saveNetworkFilters } from './networkFilters';
 import { useDateFormat } from './DateFormatProvider';
@@ -52,6 +53,9 @@ export default function NetworkPage() {
     activityLocation?: string;
     activityDate?: string;
     activityContacts?: Contact[];
+    itemId?: number;
+    image?: string;
+    imageChange?: ImageChange;
   }>({});
   const [editDateError, setEditDateError] = useState('');
 
@@ -126,6 +130,8 @@ export default function NetworkPage() {
         activityLocation: activity.location || '',
         activityDate: activity.date ? formatDate(activity.date) : '',
         activityContacts: activity.contacts || [],
+        itemId: activity.ID,
+        image: activity.image,
       });
     } catch (err) {
       handleError(err, { operation: 'fetching activity' }, { showError });
@@ -157,6 +163,7 @@ export default function NetworkPage() {
         date: parsedDate ? new Date(parsedDate).toISOString() : new Date().toISOString(),
         contact_ids: editValues.activityContacts?.map(c => c.ID) || [],
       });
+      await applyImageChange('activities', editingActivity.ID, editValues.imageChange);
       handleActivityEditClose();
       await refetch();
     } catch (err) {

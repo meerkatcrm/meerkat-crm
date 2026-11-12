@@ -17,6 +17,7 @@ import { useContactSearch } from '../hooks/useContactSearch';
 import { useDateFormat } from '../DateFormatProvider';
 import { todayISO } from '../utils/today';
 import { contactDisplayName } from '../utils/contactName';
+import ImageAttachmentField from './ImageAttachmentField';
 
 interface AddActivityDialogProps {
   open: boolean;
@@ -27,7 +28,7 @@ interface AddActivityDialogProps {
     location: string;
     date: string;
     contact_ids: number[];
-  }) => Promise<void>;
+  }, image?: File) => Promise<void>;
   preselectedContactId?: number;
 }
 
@@ -44,6 +45,7 @@ export default function AddActivityDialog({
   const [location, setLocation] = useState('');
   const [date, setDate] = useState(formatDate(todayISO()));
   const [selectedContacts, setSelectedContacts] = useState<Contact[]>([]);
+  const [image, setImage] = useState<File | null>();
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   // Saving before the preselected contact arrives would store the activity without it.
@@ -105,10 +107,10 @@ export default function AddActivityDialog({
         location,
         date: parsedDate,
         contact_ids: selectedContacts.map((c) => c.ID),
-      });
+      }, image ?? undefined);
       handleClose();
     } catch {
-      setError('Failed to save activity');
+      setError(t('activityDialog.saveError'));
     } finally {
       setSaving(false);
     }
@@ -121,6 +123,7 @@ export default function AddActivityDialog({
     setDate(formatDate(todayISO()));
     setSelectedContacts([]);
     setSearchInput('');
+    setImage(undefined);
     setError('');
     onClose();
   };
@@ -214,6 +217,8 @@ export default function AddActivityDialog({
               ))
             }
           />
+
+          <ImageAttachmentField type="activities" value={image} onChange={setImage} />
         </Box>
       </DialogContent>
       <DialogActions>

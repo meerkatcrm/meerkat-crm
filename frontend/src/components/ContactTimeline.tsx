@@ -28,6 +28,7 @@ import { ReminderCompletion } from '../api/reminders';
 import { useDateFormat } from '../DateFormatProvider';
 import { contactDisplayName } from '../utils/contactName';
 import { responsiveTimelineSx } from './timelineLayout';
+import ItemImage from './ItemImage';
 
 interface ContactTimelineProps {
   // instant: date is a real timestamp (shown by local day) rather than a date-only value.
@@ -99,6 +100,13 @@ export default function ContactTimeline({ timelineItems, onEditItem, onDeleteCom
                     ? (item.data as Activity).description || t('contactDetail.noDescription')
                     : (item.data as ReminderCompletion).message}
                 </Typography>
+                {item.type !== 'completion' && (
+                  <ItemImage
+                    type={item.type === 'note' ? 'notes' : 'activities'}
+                    id={item.data.ID}
+                    image={(item.data as Note | Activity).image}
+                  />
+                )}
                 {item.type === 'activity' && (item.data as Activity).location && (
                   <Typography
                     variant="caption"

@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"errors"
+	"meerkat/carddav"
 	apperrors "meerkat/errors"
 	"meerkat/logger"
 	"meerkat/middleware"
@@ -248,6 +249,8 @@ func DeleteNote(c *gin.Context) {
 		apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to delete note").WithError(err))
 		return
 	}
+
+	carddav.RemoveContactPhotoFile(currentConfig(c).ProfilePhotoDir, note.Image)
 
 	go services.TriggerWebhooks(db, currentConfig(c), userID, "note.deleted", gin.H{"id": note.ID})
 	c.JSON(http.StatusOK, gin.H{"message": "Note deleted"})

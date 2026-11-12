@@ -3,7 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { useDateFormat } from '../DateFormatProvider';
 import { updateNote, deleteNote, Note } from '../api/notes';
 import { updateActivity, deleteActivity, Activity } from '../api/activities';
+import { applyImageChange } from '../api/itemImages';
 import { handleError, ErrorNotifier } from '../utils/errorHandler';
+import type { TimelineItemValues } from '../components/EditTimelineItemDialog';
 
 export function useTimelineEditing(
   contactId: number | undefined,
@@ -14,15 +16,7 @@ export function useTimelineEditing(
   const { formatDate, parseDateInput } = useDateFormat();
   const [editTimelineDateError, setEditTimelineDateError] = useState('');
   const [editingTimelineItem, setEditingTimelineItem] = useState<{ type: 'note' | 'activity'; id: number } | null>(null);
-  const [editTimelineValues, setEditTimelineValues] = useState<{
-    noteContent?: string;
-    noteDate?: string;
-    activityTitle?: string;
-    activityDescription?: string;
-    activityLocation?: string;
-    activityDate?: string;
-    activityContacts?: { ID: number; firstname: string; lastname: string; nickname?: string }[];
-  }>({});
+  const [editTimelineValues, setEditTimelineValues] = useState<TimelineItemValues>({});
 
   const handleStartEditTimelineItem = (type: 'note' | 'activity', item: Note | Activity) => {
     setEditingTimelineItem({ type, id: item.ID });
@@ -32,7 +26,9 @@ export function useTimelineEditing(
       const note = item as Note;
       setEditTimelineValues({
         noteContent: note.content || '',
-        noteDate: note.date ? formatDate(note.date) : ''
+        noteDate: note.date ? formatDate(note.date) : '',
+        itemId: note.ID,
+        image: note.image
       });
     } else {
       const activity = item as Activity;
@@ -42,7 +38,9 @@ export function useTimelineEditing(
         activityDescription: activity.description || '',
         activityLocation: activity.location || '',
         activityDate: activity.date ? formatDate(activity.date) : '',
-        activityContacts: activity.contacts || []
+        activityContacts: activity.contacts || [],
+        itemId: activity.ID,
+        image: activity.image
       });
     }
   };
@@ -77,6 +75,7 @@ export function useTimelineEditing(
         date,
         contact_id: contactId
       });
+      await applyImageChange('notes', noteId, editTimelineValues.imageChange);
       await onRefresh();
       handleCancelEditTimelineItem();
     } catch (err) {
@@ -98,6 +97,7 @@ export function useTimelineEditing(
         date,
         contact_ids: editTimelineValues.activityContacts?.map(c => c.ID) || []
       });
+      await applyImageChange('activities', activityId, editTimelineValues.imageChange);
       await onRefresh();
       handleCancelEditTimelineItem();
     } catch (err) {

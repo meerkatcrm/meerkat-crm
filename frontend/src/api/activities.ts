@@ -14,6 +14,7 @@ export interface Activity {
   description?: string;
   location?: string;
   date: string;
+  image?: string;
   CreatedAt: string;
   UpdatedAt: string;
   contacts?: ActivityContact[];
@@ -90,10 +91,11 @@ export async function createActivity(
     contact_ids: number[];
   }
 ): Promise<Activity> {
-  return apiJson('/activities', {
+  const res = await apiJson<{ activity: Activity }>('/activities', {
     method: 'POST',
     body: JSON.stringify(data),
   });
+  return res.activity;
 }
 
 // Update activity

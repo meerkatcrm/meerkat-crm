@@ -18,6 +18,8 @@ export interface UserInfo {
   user_id: number;
   username: string;
   is_admin: boolean;
+  // Public demo instance: the server refuses uploads and password changes.
+  demo_mode?: boolean;
 }
 
 export async function loginUser(identifier: string, password: string): Promise<LoginResponse> {
@@ -60,6 +62,7 @@ export async function fetchAndCacheUserInfo(): Promise<(UserInfo & LoginResponse
       user_id: data.id,
       username: data.username,
       is_admin: data.is_admin || false,
+      demo_mode: data.demo_mode || false,
     };
     localStorage.setItem(USER_INFO_KEY, JSON.stringify(userInfo));
     // The preferences are returned for the caller to apply, not cached with the identity.
@@ -128,4 +131,17 @@ export function decodeToken(): DecodedToken | null {
 export function isAdmin(): boolean {
   const decoded = decodeToken();
   return decoded?.is_admin || false;
+}
+
+/**
+ * True on a public demo instance, where the server refuses uploads and password
+ * changes, so the UI hides those controls. Read from the cached /users/me info.
+ */
+export function isDemoMode(): boolean {
+  try {
+    const userInfo: UserInfo = JSON.parse(localStorage.getItem(USER_INFO_KEY) ?? 'null');
+    return userInfo?.demo_mode || false;
+  } catch {
+    return false;
+  }
 }

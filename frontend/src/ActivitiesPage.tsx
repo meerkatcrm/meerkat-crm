@@ -27,6 +27,8 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { useActivities } from './hooks/useActivities';
 import { useDebouncedValue } from './hooks/useDebounce';
 import { createActivity, updateActivity, deleteActivity, Activity } from './api/activities';
+import { applyImageChange, ImageChange, uploadItemImage } from './api/itemImages';
+import ItemImage from './components/ItemImage';
 import { Contact } from './api/contacts';
 import AddActivityDialog from './components/AddActivityDialog';
 import EditTimelineItemDialog from './components/EditTimelineItemDialog';
@@ -81,6 +83,9 @@ const ActivitiesPage: React.FC = () => {
     activityLocation?: string;
     activityDate?: string;
     activityContacts?: Contact[];
+    itemId?: number;
+    image?: string;
+    imageChange?: ImageChange;
   }>({});
   const [infoAnchorEl, setInfoAnchorEl] = useState<HTMLElement | null>(null);
   const infoOpen = Boolean(infoAnchorEl);
@@ -119,12 +124,14 @@ const ActivitiesPage: React.FC = () => {
     location: string;
     date: string;
     contact_ids: number[];
-  }) => {
+  }, image?: File) => {
     try {
-      await createActivity({
+      const created = await createActivity({
         ...activity,
         date: new Date(activity.date).toISOString()
       });
+      // The activity exists either way: a failed upload must not make Save create it again.
+      if (image) await uploadItemImage('activities', created.ID, image).catch((err) => handleError(err, { operation: 'uploading image' }, { showError }));
       setAddDialogOpen(false);
       refetch();
     } catch (err) {
@@ -142,6 +149,8 @@ const ActivitiesPage: React.FC = () => {
       activityLocation: activity.location || '',
       activityDate: activity.date ? formatDate(activity.date) : '',
       activityContacts: activity.contacts || [],
+      itemId: activity.ID,
+      image: activity.image,
     });
   };
 
@@ -163,6 +172,7 @@ const ActivitiesPage: React.FC = () => {
         date: parsedDate ? new Date(parsedDate).toISOString() : new Date().toISOString(),
         contact_ids: editValues.activityContacts?.map(c => c.ID) || [],
       });
+      await applyImageChange('activities', editingActivity.ID, editValues.imageChange);
       setEditingActivity(null);
       setEditValues({});
       refetch();
@@ -353,6 +363,7 @@ const ActivitiesPage: React.FC = () => {
                             📍 {activity.location}
                           </Typography>
                         )}
+                        <ItemImage type="activities" id={activity.ID} image={activity.image} />
                       </Box>
                       <Box
                         className="edit-actions"

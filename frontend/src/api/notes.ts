@@ -6,6 +6,7 @@ export interface Note {
   content: string;
   date: string;
   contact_id?: number;
+  image?: string;
   CreatedAt: string;
   UpdatedAt: string;
 }
@@ -64,20 +65,22 @@ export async function createNote(
   contactId: string | number,
   data: { content: string; date: string; contact_id?: number }
 ): Promise<Note> {
-  return apiJson(`/contacts/${contactId}/notes`, {
+  const res = await apiJson<{ note: Note }>(`/contacts/${contactId}/notes`, {
     method: 'POST',
     body: JSON.stringify(data),
   });
+  return res.note;
 }
 
 // Create unassigned note
 export async function createUnassignedNote(
   data: { content: string; date: string }
 ): Promise<Note> {
-  return apiJson('/notes', {
+  const res = await apiJson<{ note: Note }>('/notes', {
     method: 'POST',
     body: JSON.stringify(data),
   });
+  return res.note;
 }
 
 // Update note
@@ -85,10 +88,11 @@ export async function updateNote(
   id: string | number,
   data: { content: string; date: string; contact_id?: number }
 ): Promise<Note> {
-  return apiJson(`/notes/${id}`, {
+  const res = await apiJson<{ note: Note }>(`/notes/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   });
+  return res.note;
 }
 
 // Delete note

@@ -11,11 +11,12 @@ import AppDialog from './AppDialog';
 import { useTranslation } from 'react-i18next';
 import { useDateFormat } from '../DateFormatProvider';
 import { todayISO } from '../utils/today';
+import ImageAttachmentField from './ImageAttachmentField';
 
 interface AddNoteDialogProps {
   open: boolean;
   onClose: () => void;
-  onSave: (content: string, date: string) => Promise<void>;
+  onSave: (content: string, date: string, image?: File) => Promise<void>;
 }
 
 export default function AddNoteDialog({ open, onClose, onSave }: AddNoteDialogProps) {
@@ -23,6 +24,7 @@ export default function AddNoteDialog({ open, onClose, onSave }: AddNoteDialogPr
   const { formatDate, parseDateInput, autoFormatDateInput, getDatePlaceholder } = useDateFormat();
   const [content, setContent] = useState('');
   const [date, setDate] = useState(formatDate(todayISO()));
+  const [image, setImage] = useState<File | null>();
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -40,7 +42,7 @@ export default function AddNoteDialog({ open, onClose, onSave }: AddNoteDialogPr
 
     setSaving(true);
     try {
-      await onSave(content, parsedDate || todayISO());
+      await onSave(content, parsedDate || todayISO(), image ?? undefined);
       handleClose();
     } catch {
       setError(t('noteDialog.saveError'));
@@ -52,6 +54,7 @@ export default function AddNoteDialog({ open, onClose, onSave }: AddNoteDialogPr
   const handleClose = () => {
     setContent('');
     setDate(formatDate(todayISO()));
+    setImage(undefined);
     setError('');
     onClose();
   };
@@ -84,6 +87,7 @@ export default function AddNoteDialog({ open, onClose, onSave }: AddNoteDialogPr
             onChange={(e) => setDate(autoFormatDateInput(e.target.value, date))}
             fullWidth
           />
+          <ImageAttachmentField type="notes" value={image} onChange={setImage} />
         </Box>
       </DialogContent>
       <DialogActions>
