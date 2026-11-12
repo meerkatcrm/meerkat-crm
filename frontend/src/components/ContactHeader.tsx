@@ -53,7 +53,8 @@ interface ContactHeaderProps {
   onAddCircle: (circleName?: string) => void;
   onDeleteCircle: (circle: string) => void;
   onNewCircleNameChange: (name: string) => void;
-  onUploadProfilePicture: () => void;
+  /** Omitted when photo uploads are unavailable (demo mode): the avatar is then not clickable. */
+  onUploadProfilePicture?: () => void;
   onStayInTouch?: () => void;
   onArchiveContact?: () => void;
   onUnarchiveContact?: () => void;
@@ -110,35 +111,37 @@ export default function ContactHeader({
               sx={{
                 width: 90,
                 height: 90,
-                cursor: 'pointer',
+                cursor: onUploadProfilePicture ? 'pointer' : 'default',
                 bgcolor: 'primary.main',
                 fontSize: '2rem',
-                '&:hover': { opacity: 0.8 }
+                '&:hover': onUploadProfilePicture ? { opacity: 0.8 } : undefined
               }}
               onClick={onUploadProfilePicture}
             >
               {contact.firstname.charAt(0)}
             </Avatar>
-            <IconButton
-              className="camera-badge"
-              size="small"
-              aria-label={t('profilePicture.title')}
-              onClick={onUploadProfilePicture}
-              sx={{
-                position: 'absolute',
-                bottom: -4,
-                right: -4,
-                bgcolor: 'primary.main',
-                color: 'white',
-                width: 22,
-                height: 22,
-                opacity: 0,
-                transition: 'opacity 0.2s',
-                '&:hover': { bgcolor: 'primary.dark' }
-              }}
-            >
-              <CameraAltIcon sx={{ fontSize: 14 }} />
-            </IconButton>
+            {onUploadProfilePicture && (
+              <IconButton
+                className="camera-badge"
+                size="small"
+                aria-label={t('profilePicture.title')}
+                onClick={onUploadProfilePicture}
+                sx={{
+                  position: 'absolute',
+                  bottom: -4,
+                  right: -4,
+                  bgcolor: 'primary.main',
+                  color: 'white',
+                  width: 22,
+                  height: 22,
+                  opacity: 0,
+                  transition: 'opacity 0.2s',
+                  '&:hover': { bgcolor: 'primary.dark' }
+                }}
+              >
+                <CameraAltIcon sx={{ fontSize: 14 }} />
+              </IconButton>
+            )}
           </Box>
           <Box sx={{ flex: 1, minWidth: 0, width: { xs: '100%', sm: 'auto' } }}>
             {editingProfile ? (

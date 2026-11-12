@@ -5,6 +5,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import ImageIcon from '@mui/icons-material/Image';
 import { useTranslation } from 'react-i18next';
 import { ImageChange, ImageItemType } from '../api/itemImages';
+import { isDemoMode } from '../auth';
 import ItemImage from './ItemImage';
 
 interface ImageAttachmentFieldProps {
@@ -36,6 +37,10 @@ export default function ImageAttachmentField({ type, id, image, value, onChange 
   }, [value]);
 
   const hasImage = value ? true : value === undefined && !!image;
+  // The server refuses image changes in demo mode: show the saved image, offer no controls.
+  if (isDemoMode()) {
+    return hasImage && id !== undefined ? <ItemImage type={type} id={id} image={image} /> : null;
+  }
 
   return (
     <Box>

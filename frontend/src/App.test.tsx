@@ -78,7 +78,7 @@ test('a server session without cached user info (OIDC redirect) restores the app
   serverSession({ id: 1, username: 'anna', is_admin: false });
   render(<App />);
   await expectAppShell();
-  expect(JSON.parse(localStorage.getItem('user_info')!)).toEqual({ user_id: 1, username: 'anna', is_admin: false });
+  expect(JSON.parse(localStorage.getItem('user_info')!)).toEqual({ user_id: 1, username: 'anna', is_admin: false, demo_mode: false });
 });
 
 test('logging out in another tab returns this tab to the login form', async () => {

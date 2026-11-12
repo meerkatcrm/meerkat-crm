@@ -80,3 +80,19 @@ test('a file the browser cannot preview is named instead of shown as a broken im
   expect(screen.getByText(/party\.heic \(no preview in this browser/)).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Remove image' })).toBeInTheDocument();
 });
+
+test('in demo mode the saved image is shown without controls, and nothing without one', () => {
+  localStorage.setItem('user_info', JSON.stringify({ user_id: 1, username: 'demo', is_admin: false, demo_mode: true }));
+  try {
+    renderField({ id: 5, image: 'a_image.jpg', value: undefined });
+    expect(screen.getByRole('button', { name: 'Attached image' })).toBeInTheDocument();
+    expect(screen.queryByText('Replace image')).toBeNull();
+    expect(screen.queryByText('Remove image')).toBeNull();
+    cleanup();
+
+    renderField({ value: undefined });
+    expect(screen.queryByText('Attach image')).toBeNull();
+  } finally {
+    localStorage.clear();
+  }
+});

@@ -303,6 +303,8 @@ type CurrentUserResponse struct {
 	CustomFieldNames       []string `json:"custom_field_names"`
 	EnabledContactFields   []string `json:"enabled_contact_fields"`
 	HideEmptyContactFields bool     `json:"hide_empty_contact_fields"`
+	// The server refuses uploads in demo mode; the UI hides their controls.
+	DemoMode bool `json:"demo_mode"`
 }
 
 // AdminUserUpdateInput - DTO for admin updating a user

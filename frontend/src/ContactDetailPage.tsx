@@ -69,6 +69,7 @@ import { ApiError } from './api/client';
 import { handleFetchError } from './utils/errorHandler';
 import { useDateFormat } from './DateFormatProvider';
 import { contactDisplayName } from './utils/contactName';
+import { isDemoMode } from './auth';
 
 // Extended Contact type with optional relations for local state
 interface ContactWithRelations extends Contact {
@@ -769,7 +770,7 @@ function ContactDetail() {
         onAddCircle={handleAddCircle}
         onDeleteCircle={handleDeleteCircle}
         onNewCircleNameChange={setNewCircleName}
-        onUploadProfilePicture={() => setProfilePictureDialogOpen(true)}
+        onUploadProfilePicture={isDemoMode() ? undefined : () => setProfilePictureDialogOpen(true)}
         onStayInTouch={contact.archived ? undefined : handleStayInTouch}
         onArchiveContact={contact.archived ? undefined : handleArchiveContact}
         onUnarchiveContact={contact.archived ? handleUnarchiveContact : undefined}
