@@ -54,6 +54,11 @@ func main() {
 
 	logger.Info().Msg("Validating configuration...")
 	cfg.ValidateOrPanic()
+	if weak := cfg.WeakJWTSecret(); weak != "" {
+		log.Printf("⚠️  %s\n"+
+			"    Make a new value with: openssl rand -base64 32\n"+
+			"    Changing JWT_SECRET_KEY signs everyone out. Do not change ENCRYPTION_KEY.", weak)
+	}
 
 	logger.Info().Msg("Loading database and running migrations...")
 	db, err := database.InitDB(cfg.DBPath)
