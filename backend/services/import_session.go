@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
@@ -479,7 +480,7 @@ func (m *ImportSessionManager) ConfirmVCF(db *gorm.DB, userID uint, req models.I
 		} else if task.photoURL != "" {
 			// Fetch photo from URL
 			var err error
-			photoData, mediaType, err = carddav.FetchPhotoFromURL(task.photoURL)
+			photoData, mediaType, err = carddav.FetchPhotoFromURL(context.Background(), task.photoURL)
 			if err != nil {
 				log.Warn().Err(err).Uint("contact_id", task.contactID).Str("photo_url", task.photoURL).Msg("Failed to fetch photo from URL")
 				result.Errors = append(result.Errors, fmt.Sprintf("Row %d: The contact was imported, but its photo could not be downloaded", task.rowIndex+1))

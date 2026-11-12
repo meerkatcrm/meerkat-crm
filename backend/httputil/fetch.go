@@ -1,6 +1,7 @@
 package httputil
 
 import (
+	"context"
 	"errors"
 	"io"
 	"meerkat/netguard"
@@ -11,8 +12,21 @@ import (
 	"time"
 )
 
-// validateURLForSSRF checks if a URL is safe to fetch (not pointing to internal resources)
-func validateURLForSSRF(rawURL string) (*url.URL, error) {
+// maxFetches is how many user-supplied image URLs the server fetches at once; others wait.
+const maxFetches = 4
+
+var (
+	// transport dials through netguard, which checks each address when it is dialled
+	// (also for redirects, so DNS rebinding cannot reach an internal host) and ignores
+	// HTTP(S)_PROXY so the checked address is the one dialled. Tests replace it.
+	transport  http.RoundTripper = netguard.NewTransport(errors.New("failed to resolve hostname"), errors.New("access to internal IP addresses is not allowed"))
+	fetchSlots                   = make(chan struct{}, maxFetches)
+)
+
+// validateURL accepts http and https URLs on the web ports. It rejects internal host names and
+// IP literals without a DNS lookup; addresses behind a name are checked by netguard when they
+// are dialled, which a check before the request cannot replace (a second DNS answer can differ).
+func validateURL(rawURL string) (*url.URL, error) {
 	parsedURL, err := url.Parse(rawURL)
 	if err != nil {
 		return nil, errors.New("invalid URL format")
@@ -37,57 +51,56 @@ func validateURLForSSRF(rawURL string) (*url.URL, error) {
 		}
 	}
 
-	// Resolve the hostname to IP addresses
-	ips, err := net.LookupIP(host)
-	if err != nil {
-		return nil, errors.New("failed to resolve hostname")
+	if port := parsedURL.Port(); port != "" && port != "80" && port != "443" {
+		return nil, errors.New("only ports 80 and 443 are allowed")
 	}
 
-	// Check all resolved IPs
-	for _, ip := range ips {
-		if netguard.IsBlockedIP(ip) {
-			return nil, errors.New("access to internal IP addresses is not allowed")
-		}
+	// An IP literal is checked here; it needs no lookup. A zone (fe80::1%en0) is dropped first.
+	if ip := net.ParseIP(strings.SplitN(host, "%", 2)[0]); ip != nil && netguard.IsBlockedIP(ip) {
+		return nil, errors.New("access to internal IP addresses is not allowed")
 	}
 
 	return parsedURL, nil
 }
 
-// FetchImageFromURL fetches an image from a URL with SSRF protection.
-// Returns the image data, content type, and any error.
-// The URL is sanitized to remove whitespace (handles Google VCF format).
-func FetchImageFromURL(imageURL string) ([]byte, string, error) {
+// FetchImageFromURL fetches an image from a URL that a user supplied (image proxy, vCard photo
+// URLs, Monica gravatars). The risk and the remaining exposure are in
+// docs/deployment.md, "Outgoing requests". Returns the image data, content type, and any
+// error. The URL is sanitized to remove whitespace (handles Google VCF format).
+func FetchImageFromURL(ctx context.Context, imageURL string) ([]byte, string, error) {
 	// Clean URL - remove spaces and newlines (Google VCF format may have these)
 	cleanURL := strings.ReplaceAll(imageURL, " ", "")
 	cleanURL = strings.ReplaceAll(cleanURL, "\n", "")
 	cleanURL = strings.ReplaceAll(cleanURL, "\r", "")
 
-	// Validate the URL format and scheme
-	parsedURL, err := validateURLForSSRF(cleanURL)
+	parsedURL, err := validateURL(cleanURL)
 	if err != nil {
 		return nil, "", err
 	}
 
-	return fetchImage(newSafeClient(), parsedURL.String())
+	select {
+	case fetchSlots <- struct{}{}:
+		defer func() { <-fetchSlots }()
+	case <-ctx.Done():
+		return nil, "", ctx.Err()
+	}
+
+	return fetchImage(ctx, newSafeClient(), parsedURL.String())
 }
 
 // newSafeClient returns an HTTP client that refuses internal addresses, both at
 // connection time and on redirects.
 func newSafeClient() *http.Client {
-	// netguard checks the address at connection time, which also prevents DNS rebinding/TOCTOU
-	// attacks, and ignores HTTP(S)_PROXY so the checked address is the one dialled.
 	return &http.Client{
 		Timeout:       15 * time.Second,
-		Transport:     netguard.NewTransport(errors.New("failed to resolve hostname"), errors.New("access to internal IP addresses is not allowed")),
+		Transport:     transport,
 		CheckRedirect: checkImageRedirect,
 	}
 }
 
 // checkImageRedirect validates each redirect target and limits the number of hops.
 func checkImageRedirect(req *http.Request, via []*http.Request) error {
-	// Validate redirect target URL format
-	_, err := validateURLForSSRF(req.URL.String())
-	if err != nil {
+	if _, err := validateURL(req.URL.String()); err != nil {
 		return errors.New("redirect to disallowed location")
 	}
 	if len(via) >= 3 {
@@ -97,9 +110,8 @@ func checkImageRedirect(req *http.Request, via []*http.Request) error {
 }
 
 // fetchImage downloads an already validated URL with the given client.
-func fetchImage(client *http.Client, imageURL string) ([]byte, string, error) {
-	// Fetch the image using the validated URL
-	req, err := http.NewRequest("GET", imageURL, nil)
+func fetchImage(ctx context.Context, client *http.Client, imageURL string) ([]byte, string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, imageURL, nil)
 	if err != nil {
 		return nil, "", err
 	}

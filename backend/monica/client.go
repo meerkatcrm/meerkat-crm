@@ -344,38 +344,3 @@ func selectAvatarPhoto(photos []Photo, avatarURL string) *Photo {
 	}
 	return nil
 }
-
-// FetchAvatar downloads an avatar straight from its URL, which works for
-// third-party hosts such as gravatar. Monica's own /store URLs need
-// FetchContactPhoto instead. The bearer token is only sent when the avatar is
-// served by the Monica instance itself, never to third-party hosts (gravatar,
-// presigned S3 URLs).
-func (c *Client) FetchAvatar(ctx context.Context, avatarURL string) (data []byte, mediaType string, err error) {
-	u, err := url.Parse(avatarURL)
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
-		return nil, "", ErrInvalidURL
-	}
-	if err := c.limiter.Wait(ctx); err != nil {
-		return nil, "", err
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
-	if err != nil {
-		return nil, "", ErrInvalidURL
-	}
-	if u.Host == c.baseURL.Host {
-		req.Header.Set("Authorization", "Bearer "+c.token)
-	}
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return nil, "", fmt.Errorf("%w: %v", ErrUnreachable, err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, "", fmt.Errorf("%w: avatar status %d", ErrUnreachable, resp.StatusCode)
-	}
-	data, err = io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
-	if err != nil {
-		return nil, "", fmt.Errorf("%w: %v", ErrUnreachable, err)
-	}
-	return data, resp.Header.Get("Content-Type"), nil
-}

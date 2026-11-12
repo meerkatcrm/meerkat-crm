@@ -3,6 +3,7 @@ package middleware
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -568,5 +569,32 @@ func TestLimiterBurstsComeFromTheirEnvVars(t *testing.T) {
 	}
 	if got := newAPILimiter().b; got != 222 {
 		t.Errorf("API burst = %d, want 222", got)
+	}
+}
+
+func TestUserRateLimitMiddlewareLimitsEachUserAlone(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	limiter := NewIPRateLimiter(rate.Every(time.Hour), 2)
+	request := func(userID uint) *httptest.ResponseRecorder {
+		w := httptest.NewRecorder()
+		c, r := gin.CreateTestContext(w)
+		r.Use(func(c *gin.Context) { c.Set("userID", userID) })
+		r.GET("/", UserRateLimitMiddleware(limiter), func(c *gin.Context) { c.Status(http.StatusOK) })
+		c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+		r.HandleContext(c)
+		return w
+	}
+
+	for range 2 {
+		if w := request(1); w.Code != http.StatusOK {
+			t.Fatalf("request within the burst got %d", w.Code)
+		}
+	}
+	w := request(1)
+	if w.Code != http.StatusTooManyRequests || !strings.Contains(w.Body.String(), "RATE_LIMIT_EXCEEDED") {
+		t.Errorf("request over the burst got %d %s", w.Code, w.Body.String())
+	}
+	if w := request(2); w.Code != http.StatusOK {
+		t.Errorf("another user got %d", w.Code)
 	}
 }

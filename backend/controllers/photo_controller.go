@@ -9,6 +9,7 @@ import (
 	"image/jpeg"
 	"image/png"
 	"io"
+	"meerkat/carddav"
 	"meerkat/config"
 	apperrors "meerkat/errors"
 	"meerkat/httputil"
@@ -370,13 +371,20 @@ func ProxyImage(c *gin.Context) {
 	}
 
 	// Use the shared SSRF-protected fetch function
-	body, contentType, err := httputil.FetchImageFromURL(imageURL)
+	body, contentType, err := httputil.FetchImageFromURL(c.Request.Context(), imageURL)
 	if err != nil {
 		logger.FromContext(c).Warn().Err(err).Str("url", imageURL).Msg("Failed to fetch image from URL")
 		apperrors.AbortWithError(c, apperrors.ErrExternal("image proxy", "Failed to fetch image").WithError(err))
 		return
 	}
 
-	// Return the image with appropriate content type
-	c.Data(http.StatusOK, contentType, body)
+	// Never pass the remote bytes on: decode the image and encode it again as JPEG.
+	photo, err := carddav.ReencodePhoto(body, contentType)
+	if err != nil {
+		logger.FromContext(c).Warn().Err(err).Str("url", imageURL).Msg("Fetched image could not be decoded")
+		apperrors.AbortWithError(c, apperrors.ErrExternal("image proxy", "Failed to fetch image").WithError(err))
+		return
+	}
+
+	c.Data(http.StatusOK, "image/jpeg", photo)
 }

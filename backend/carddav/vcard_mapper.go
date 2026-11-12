@@ -2,6 +2,7 @@ package carddav
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -503,6 +504,55 @@ func SaveContactPhoto(photoData []byte, mediaType string, photoDir string) (stri
 		return "", "", nil
 	}
 
+	img, err := decodePhoto(photoData, mediaType)
+	if err != nil {
+		return "", "", err
+	}
+
+	// Crop to centered square if rectangular
+	img = cropToSquare(img)
+
+	// Generate unique filename
+	baseFilename := uuid.New().String()
+	photoPath := baseFilename + "_photo.jpg"
+
+	// Ensure directory exists
+	if err := os.MkdirAll(photoDir, os.ModePerm); err != nil {
+		return "", "", err
+	}
+
+	// Save photo (max 400x400, only downscale - smaller images keep their size)
+	const maxPhotoSize = 400
+	bounds := img.Bounds()
+	photoImg := img
+	if bounds.Dx() > maxPhotoSize || bounds.Dy() > maxPhotoSize {
+		photoImg = resize.Resize(maxPhotoSize, maxPhotoSize, img, resize.Lanczos3)
+	}
+	fullPhotoPath := filepath.Join(photoDir, photoPath)
+	outFile, err := os.Create(fullPhotoPath)
+	if err != nil {
+		return "", "", err
+	}
+	defer outFile.Close()
+
+	if err := jpeg.Encode(outFile, photoImg, &jpeg.Options{Quality: 85}); err != nil {
+		return "", "", err
+	}
+
+	// Create thumbnail and encode as base64 data URL (48x48)
+	thumbnail := resize.Resize(48, 48, img, resize.Lanczos3)
+	var thumbnailBuf bytes.Buffer
+	if err := jpeg.Encode(&thumbnailBuf, thumbnail, &jpeg.Options{Quality: 85}); err != nil {
+		return "", "", err
+	}
+	thumbnailBase64 := "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(thumbnailBuf.Bytes())
+
+	return photoPath, thumbnailBase64, nil
+}
+
+// decodePhoto decodes a photo from a client or a remote server. The media type may be
+// missing or wrong; every decoder is tried then.
+func decodePhoto(photoData []byte, mediaType string) (image.Image, error) {
 	// Detect content type if not provided
 	if mediaType == "" {
 		mediaType = http.DetectContentType(photoData)
@@ -511,7 +561,7 @@ func SaveContactPhoto(photoData []byte, mediaType string, photoDir string) (stri
 	// Photos arrive from clients and remote servers: check the declared size
 	// before decoding allocates memory for it.
 	if err := httputil.CheckImageDimensions(bytes.NewReader(photoData)); err != nil {
-		return "", "", err
+		return nil, err
 	}
 
 	// Decode the image
@@ -560,48 +610,22 @@ func SaveContactPhoto(photoData []byte, mediaType string, photoDir string) (stri
 		}
 	}
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
+	return img, nil
+}
 
-	// Crop to centered square if rectangular
-	img = cropToSquare(img)
-
-	// Generate unique filename
-	baseFilename := uuid.New().String()
-	photoPath := baseFilename + "_photo.jpg"
-
-	// Ensure directory exists
-	if err := os.MkdirAll(photoDir, os.ModePerm); err != nil {
-		return "", "", err
-	}
-
-	// Save photo (max 400x400, only downscale - smaller images keep their size)
-	const maxPhotoSize = 400
-	bounds := img.Bounds()
-	photoImg := img
-	if bounds.Dx() > maxPhotoSize || bounds.Dy() > maxPhotoSize {
-		photoImg = resize.Resize(maxPhotoSize, maxPhotoSize, img, resize.Lanczos3)
-	}
-	fullPhotoPath := filepath.Join(photoDir, photoPath)
-	outFile, err := os.Create(fullPhotoPath)
+// ReencodePhoto decodes a photo and encodes it again as JPEG, so no byte of the input is passed on.
+func ReencodePhoto(photoData []byte, mediaType string) ([]byte, error) {
+	img, err := decodePhoto(photoData, mediaType)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
-	defer outFile.Close()
-
-	if err := jpeg.Encode(outFile, photoImg, &jpeg.Options{Quality: 85}); err != nil {
-		return "", "", err
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 85}); err != nil {
+		return nil, err
 	}
-
-	// Create thumbnail and encode as base64 data URL (48x48)
-	thumbnail := resize.Resize(48, 48, img, resize.Lanczos3)
-	var thumbnailBuf bytes.Buffer
-	if err := jpeg.Encode(&thumbnailBuf, thumbnail, &jpeg.Options{Quality: 85}); err != nil {
-		return "", "", err
-	}
-	thumbnailBase64 := "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(thumbnailBuf.Bytes())
-
-	return photoPath, thumbnailBase64, nil
+	return buf.Bytes(), nil
 }
 
 // cropToSquare crops an image to a centered square
@@ -639,10 +663,10 @@ func cropToSquare(img image.Image) image.Image {
 	return cropped
 }
 
-// FetchPhotoFromURL fetches a photo from a URL with SSRF protection
-// Returns the photo data, media type, and any error
-func FetchPhotoFromURL(photoURL string) ([]byte, string, error) {
-	return httputil.FetchImageFromURL(photoURL)
+// FetchPhotoFromURL fetches a photo from a user-supplied URL with SSRF protection
+// (docs/deployment.md, "Outgoing requests"). Returns the photo data, media type, and any error.
+func FetchPhotoFromURL(ctx context.Context, photoURL string) ([]byte, string, error) {
+	return httputil.FetchImageFromURL(ctx, photoURL)
 }
 
 // readContactPhoto reads photo from disk or falls back to thumbnail

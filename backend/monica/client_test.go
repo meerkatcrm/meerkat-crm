@@ -181,36 +181,6 @@ func TestFetchContactRelationships(t *testing.T) {
 	assert.Equal(t, 9, rels[0].OfContact.ID)
 }
 
-func TestFetchAvatarTokenScoping(t *testing.T) {
-	var monicaAuth string
-	monicaServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		monicaAuth = r.Header.Get("Authorization")
-		w.Header().Set("Content-Type", "image/jpeg")
-		w.Write([]byte("jpeg-bytes"))
-	}))
-	defer monicaServer.Close()
-
-	var thirdPartyAuth string
-	thirdParty := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		thirdPartyAuth = r.Header.Get("Authorization")
-		w.Header().Set("Content-Type", "image/png")
-		w.Write([]byte("png-bytes"))
-	}))
-	defer thirdParty.Close()
-
-	c := newTestClient(t, monicaServer.URL)
-
-	data, mediaType, err := c.FetchAvatar(context.Background(), monicaServer.URL+"/storage/avatar.jpg")
-	assert.NoError(t, err)
-	assert.Equal(t, "jpeg-bytes", string(data))
-	assert.Equal(t, "image/jpeg", mediaType)
-	assert.Equal(t, "Bearer test-token", monicaAuth)
-
-	_, _, err = c.FetchAvatar(context.Background(), thirdParty.URL+"/avatar.png")
-	assert.NoError(t, err)
-	assert.Empty(t, thirdPartyAuth)
-}
-
 func TestGetRespectsContextCancellation(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Retry-After", "5")

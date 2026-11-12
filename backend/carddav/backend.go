@@ -313,7 +313,7 @@ func (b *Backend) PutAddressObject(ctx context.Context, urlPath string, card vca
 		}
 	} else if photoURL != "" {
 		// Handle URL-based photo - fetch and save
-		fetchedData, fetchedMediaType, err := FetchPhotoFromURL(photoURL)
+		fetchedData, fetchedMediaType, err := FetchPhotoFromURL(ctx, photoURL)
 		if err != nil {
 			logger.Warn().
 				Err(err).

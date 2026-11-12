@@ -67,6 +67,31 @@ If auto-provisioning is disabled and no match is found, the user sees an error a
 
 Accounts created through SSO have no password and can only log in via SSO. Existing password-based accounts that get linked retain their password.
 
+## Outgoing requests
+
+Meerkat makes requests to URLs that users choose: webhooks, calendar (CalDAV/ICS) and contact
+(CardDAV) sync, the Monica import, and image URLs (the profile picture dialog, photo URLs in vCards,
+Monica gravatars). Every one of them dials through one guard (`backend/netguard`), which checks the
+address it connects to, also after a redirect or a changed DNS answer, and never uses `HTTP_PROXY`.
+
+**Private addresses.** `BLOCK_PRIVATE_URLS=true` refuses private, loopback and link-local addresses
+for webhooks, sync and the Monica import. Set it on any instance with more than one user; Meerkat
+logs a warning at startup when it is off there. It is off by default because a LAN server
+(Nextcloud, Radicale, a local Monica) is a common setup. While it is unset, the older
+`WEBHOOK_`, `CALDAV_`, `CARDDAV_` and `MONICA_BLOCK_PRIVATE_URLS` flags apply per feature.
+
+**Image URLs** are always refused when they point to an internal address, whatever
+`BLOCK_PRIVATE_URLS` says. The decision behind the remaining rules:
+
+- Only `http` and `https` on ports 80 and 443, also for each redirect (at most two).
+- At most four image fetches run at a time on the server; others wait. Each has 15 s and 10 MB.
+- The image proxy allows 30 requests per minute per user (burst 5) and returns the image decoded
+  and encoded again as JPEG, never the remote bytes.
+
+What remains: a signed-in user can make the server request public hosts on ports 80 and 443,
+slowly, and see whether the request returned an image. A private CardDAV server's photo URLs do not
+load. An allow-list of hosts is not possible, since users paste image URLs from any site.
+
 ## Upgrades
 
 ```sh

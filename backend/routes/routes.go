@@ -123,7 +123,7 @@ func RegisterRoutes(router *gin.Engine, cfg *config.Config, db *gorm.DB, oidcPro
 			})
 
 			// Image proxy route (for fetching images from external URLs)
-			protected.GET("/proxy/image", controllers.ProxyImage)
+			protected.GET("/proxy/image", middleware.ImageProxyRateLimitMiddleware(), controllers.ProxyImage)
 
 			// Note routes
 			protected.GET("/contacts/:id/notes", controllers.GetNotesForContact)

@@ -799,7 +799,7 @@ func (m *MonicaImportManager) processAvatars(db *gorm.DB, s *monicaImportSession
 		if task.source == avatarSourcePhoto {
 			photoData, mediaType, err = s.client.FetchContactPhoto(ctx, task.monicaID, task.avatarURL)
 		} else {
-			photoData, mediaType, err = s.client.FetchAvatar(ctx, task.avatarURL)
+			photoData, mediaType, err = carddav.FetchPhotoFromURL(ctx, task.avatarURL)
 		}
 		// Only fetch errors are shown: storage errors can carry server paths.
 		failure := ""

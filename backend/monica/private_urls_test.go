@@ -24,13 +24,10 @@ func TestPrivateURLSwitchOnMonicaClient(t *testing.T) {
 	blocked, err := NewClient(srv.URL, "tok", true)
 	require.NoError(t, err)
 	assert.ErrorIs(t, blocked.TestConnection(context.Background()), ErrPrivateAddress)
-	// The avatar fetch goes through the same client, so it is guarded as well.
-	_, _, err = blocked.FetchAvatar(context.Background(), srv.URL+"/avatar.png")
-	assert.ErrorContains(t, err, ErrPrivateAddress.Error())
 	assert.Zero(t, hits.Load())
 
 	open, err := NewClient(srv.URL, "tok", false)
 	require.NoError(t, err)
-	_, _, _ = open.FetchAvatar(context.Background(), srv.URL+"/avatar.png")
+	_ = open.TestConnection(context.Background())
 	assert.NotZero(t, hits.Load())
 }
