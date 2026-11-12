@@ -155,7 +155,7 @@ func (c *Contact) BeforeCreate(tx *gorm.DB) error {
 
 func (c *Contact) AfterCreate(tx *gorm.DB) error {
 	// Now we have the ID, generate proper ETag
-	c.ETag = fmt.Sprintf("e-%d-%d", c.ID, c.UpdatedAt.Unix())
+	c.ETag = fmt.Sprintf("e-%d-%d", c.ID, c.UpdatedAt.UnixNano())
 	return tx.Model(c).UpdateColumn("etag", c.ETag).Error
 }
 
@@ -164,7 +164,7 @@ func (c *Contact) AfterSave(tx *gorm.DB) error {
 		return nil
 	}
 
-	newETag := fmt.Sprintf("e-%d-%d", c.ID, c.UpdatedAt.Unix())
+	newETag := fmt.Sprintf("e-%d-%d", c.ID, c.UpdatedAt.UnixNano())
 	if newETag != c.ETag {
 		c.ETag = newETag
 		if err := tx.Model(c).UpdateColumn("etag", c.ETag).Error; err != nil {

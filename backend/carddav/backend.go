@@ -2,6 +2,7 @@ package carddav
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"meerkat/logger"
 	"meerkat/models"
@@ -173,8 +174,11 @@ func (b *Backend) GetAddressObject(ctx context.Context, urlPath string, req *car
 			err = db.Where("user_id = ? AND id = ?", userID, id).First(&contact).Error
 		}
 	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, webdav.NewHTTPError(http.StatusNotFound, fmt.Errorf("contact not found"))
+	}
 	if err != nil {
-		return nil, fmt.Errorf("contact not found")
+		return nil, err
 	}
 
 	filter, err := b.getCircleFilter(ctx, userID)
@@ -273,11 +277,22 @@ func (b *Backend) PutAddressObject(ctx context.Context, urlPath string, card vca
 		}
 	}
 
-	// Check ETag for conflict detection on updates (If-Match header)
-	if !isNew && opts != nil && opts.IfMatch.IsSet() {
-		matched, err := opts.IfMatch.MatchETag(contact.ETag)
-		if err != nil || !matched {
-			return nil, webdav.NewHTTPError(http.StatusPreconditionFailed, fmt.Errorf("ETag mismatch: resource has been modified"))
+	// Conditional writes (RFC 7232): If-Match needs the contact to exist with that ETag,
+	// If-None-Match needs it not to exist (a client creating a contact must not overwrite one).
+	if opts != nil {
+		if isNew && opts.IfMatch.IsSet() {
+			return nil, webdav.NewHTTPError(http.StatusPreconditionFailed, fmt.Errorf("resource does not exist"))
+		}
+		if !isNew && opts.IfMatch.IsSet() {
+			matched, err := opts.IfMatch.MatchETag(contact.ETag)
+			if err != nil || !matched {
+				return nil, webdav.NewHTTPError(http.StatusPreconditionFailed, fmt.Errorf("ETag mismatch: resource has been modified"))
+			}
+		}
+		if !isNew && opts.IfNoneMatch.IsSet() {
+			if matched, _ := opts.IfNoneMatch.MatchETag(contact.ETag); matched || opts.IfNoneMatch.IsWildcard() {
+				return nil, webdav.NewHTTPError(http.StatusPreconditionFailed, fmt.Errorf("resource already exists"))
+			}
 		}
 	}
 
@@ -369,8 +384,11 @@ func (b *Backend) DeleteAddressObject(ctx context.Context, urlPath string) error
 	// 404 and picks up the UID-based path on its next sync.
 	var contact models.Contact
 	err = db.Where("user_id = ? AND vcard_uid = ?", userID, uid).First(&contact).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return webdav.NewHTTPError(http.StatusNotFound, fmt.Errorf("contact not found"))
+	}
 	if err != nil {
-		return fmt.Errorf("contact not found")
+		return err
 	}
 
 	// A device may still hold a contact that has since left the circle filter.
