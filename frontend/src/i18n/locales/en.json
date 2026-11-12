@@ -755,6 +755,10 @@
       "test": "Test",
       "testSuccess": "Test delivered ({{statusCode}})",
       "testFailed": "Test failed: {{error}}",
+      "deliveryRetrying": "Retrying",
+      "deliverySending": "Sending",
+      "deliveryGaveUp": "Gave up",
+      "deliveryNextRetry": "Next try: {{time}}",
       "deliveryErrors": {
         "invalidUrl": "Webhook URL is invalid",
         "connectionFailed": "Could not connect to the webhook URL",

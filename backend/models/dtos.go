@@ -382,5 +382,6 @@ type WebhookDeliveryResponse struct {
 	Error       *string    `json:"error"`
 	Attempts    int        `json:"attempts"`
 	NextRetryAt *time.Time `json:"next_retry_at"`
+	Status      string     `json:"status"` // pending, delivered or dead
 	CreatedAt   time.Time  `json:"created_at"`
 }

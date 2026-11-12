@@ -755,6 +755,10 @@
       "test": "测试",
       "testSuccess": "测试已送达（{{statusCode}}）",
       "testFailed": "测试失败：{{error}}",
+      "deliveryRetrying": "正在重试",
+      "deliverySending": "正在发送",
+      "deliveryGaveUp": "已放弃",
+      "deliveryNextRetry": "下次尝试：{{time}}",
       "deliveryErrors": {
         "invalidUrl": "Webhook URL 无效",
         "connectionFailed": "无法连接到 Webhook URL",

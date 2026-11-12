@@ -87,7 +87,7 @@ func TestSyncAllContactConnectionsSkipsDeletedUsers(t *testing.T) {
 	assert.Nil(t, orphan.LastSyncedAt)
 }
 
-func TestProcessWebhookRetriesSkipsDeletedUsers(t *testing.T) {
+func TestProcessWebhookOutboxSkipsDeletedUsers(t *testing.T) {
 	db, live, deleted := setupDeletedUserJobsDB(t)
 	liveServer, liveHits := unavailableServer(t)
 	orphanServer, orphanHits := unavailableServer(t)
@@ -97,26 +97,26 @@ func TestProcessWebhookRetriesSkipsDeletedUsers(t *testing.T) {
 	orphanHook := models.Webhook{UserID: deleted.ID, Name: "orphan", URL: orphanServer.URL, Secret: "s", IsActive: true}
 	require.NoError(t, db.Create(&liveHook).Error)
 	require.NoError(t, db.Create(&orphanHook).Error)
-	liveDelivery := models.WebhookDelivery{WebhookID: liveHook.ID, EventType: "e", Payload: "{}", Attempts: 1, NextRetryAt: &past}
-	orphanDelivery := models.WebhookDelivery{WebhookID: orphanHook.ID, EventType: "e", Payload: "{}", Attempts: 1, NextRetryAt: &past}
+	liveDelivery := models.WebhookDelivery{WebhookID: liveHook.ID, EventType: "e", Payload: "{}", Attempts: 1, NextRetryAt: &past, Status: models.OutboxPending}
+	orphanDelivery := models.WebhookDelivery{WebhookID: orphanHook.ID, EventType: "e", Payload: "{}", Attempts: 1, NextRetryAt: &past, Status: models.OutboxPending}
 	require.NoError(t, db.Create(&liveDelivery).Error)
 	require.NoError(t, db.Create(&orphanDelivery).Error)
 	require.NoError(t, db.Delete(&deleted).Error)
 
-	ProcessWebhookRetries(db, config.Config{})
+	ProcessWebhookOutbox(db, config.Config{})
 
-	// The live retry saves a new delivery when done
-	assert.Eventually(t, func() bool {
-		var n int64
-		db.Model(&models.WebhookDelivery{}).Where("webhook_id = ?", liveHook.ID).Count(&n)
-		return n == 2
-	}, 5*time.Second, 10*time.Millisecond)
+	// The live retry is recorded on the same row and waits for the next try
+	var reloaded models.WebhookDelivery
+	require.NoError(t, db.First(&reloaded, liveDelivery.ID).Error)
+	assert.Equal(t, 2, reloaded.Attempts)
+	assert.Equal(t, models.OutboxPending, reloaded.Status)
 	assert.Equal(t, int32(1), liveHits.Load())
 	assert.Zero(t, orphanHits.Load())
 
-	var reloaded models.WebhookDelivery
-	require.NoError(t, db.First(&reloaded, orphanDelivery.ID).Error)
-	assert.Nil(t, reloaded.NextRetryAt, "the orphaned retry must not be picked up again")
+	var orphaned models.WebhookDelivery
+	require.NoError(t, db.First(&orphaned, orphanDelivery.ID).Error)
+	assert.Equal(t, models.OutboxDead, orphaned.Status, "the orphaned retry must not be picked up again")
+	assert.Nil(t, orphaned.NextRetryAt)
 }
 
 func TestSendRemindersSkipsDeletedUsers(t *testing.T) {

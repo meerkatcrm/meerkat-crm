@@ -247,6 +247,7 @@ func toDeliveryResponse(d models.WebhookDelivery) models.WebhookDeliveryResponse
 		Error:       d.Error,
 		Attempts:    d.Attempts,
 		NextRetryAt: d.NextRetryAt,
+		Status:      d.Status,
 		CreatedAt:   d.CreatedAt,
 	}
 }

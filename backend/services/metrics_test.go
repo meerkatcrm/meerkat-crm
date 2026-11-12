@@ -120,11 +120,11 @@ func TestWebhookDeliveryCountsResults(t *testing.T) {
 	f0, s0 := series(t, fail), series(t, ok)
 
 	msg := "boom"
-	saveDelivery(db, 1, "x", "{}", nil, &msg, 1, nil)
+	finishWebhookDelivery(db, models.WebhookDelivery{}, 1, nil, &msg, false)
 	code := 500
-	saveDelivery(db, 1, "x", "{}", &code, &msg, 2, nil)
+	finishWebhookDelivery(db, models.WebhookDelivery{}, 2, &code, &msg, false)
 	code = 204
-	saveDelivery(db, 1, "x", "{}", &code, nil, 1, nil)
+	finishWebhookDelivery(db, models.WebhookDelivery{}, 1, &code, nil, false)
 
 	assert.Equal(t, f0+2, series(t, fail))
 	assert.Equal(t, s0+1, series(t, ok))
@@ -144,10 +144,4 @@ func TestSendEmailCountsResults(t *testing.T) {
 	require.NoError(t, SendEmail(config.Config{}, EmailMessage{To: "a@example.com", Subject: "s"}))
 	assert.Equal(t, f0+1, series(t, fail))
 	assert.Equal(t, s0, series(t, ok))
-}
-
-// webhookDB is an in-memory database with the webhook tables.
-func webhookDB(t *testing.T) *gorm.DB {
-	t.Helper()
-	return setupWebhookTestDB(t)
 }

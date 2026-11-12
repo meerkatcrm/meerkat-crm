@@ -494,16 +494,18 @@ func sendReminderEmail(user models.User, reminders []models.Reminder, config con
 
 	logger.Debug().Int("reminder_count", len(reminderItems)).Int("birthday_count", len(birthdayItems)).Uint("user_id", user.ID).Str("language", lang).Msg("Sending reminder email")
 
-	if err := SendEmail(config, EmailMessage{
+	// Queued, not sent inline: the outbox retries a failing mail server with backoff, so a
+	// reminder is neither lost nor re-sent on the next run.
+	if err := QueueEmail(db, config, &user.ID, EmailMessage{
 		To:      user.Email,
 		Subject: i18n.T(lang, "email.reminder.subject"),
 		HTML:    htmlContent,
 	}); err != nil {
-		logger.Error().Err(err).Uint("user_id", user.ID).Msg("Failed to send reminder email")
+		logger.Error().Err(err).Uint("user_id", user.ID).Msg("Failed to queue reminder email")
 		return err
 	}
 
-	logger.Info().Uint("user_id", user.ID).Msg("Reminder email sent successfully")
+	logger.Info().Uint("user_id", user.ID).Msg("Reminder email queued")
 
 	return nil
 }

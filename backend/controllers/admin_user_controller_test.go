@@ -43,6 +43,7 @@ func seedUserData(t *testing.T, db *gorm.DB, user models.User) {
 		&models.CardDAVSync{UserID: user.ID, SyncToken: "s", LastModified: time.Now()},
 		&models.ContactDuplicateDismissal{UserID: user.ID, ContactAID: contact.ID, ContactBID: contact.ID + 1},
 		&models.ReminderCompletion{UserID: user.ID, ContactID: contact.ID, Message: "m", CompletedAt: time.Now()},
+		&models.EmailOutbox{UserID: &user.ID, ToAddr: user.Email, Subject: "s", HTML: "h", Status: models.OutboxPending, NextAttemptAt: time.Now()},
 	} {
 		require.NoError(t, db.Create(row).Error)
 	}

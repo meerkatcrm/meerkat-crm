@@ -38,7 +38,7 @@ func newTestDB(t *testing.T) *gorm.DB {
 	require.NoError(t, db.AutoMigrate(
 		&models.User{}, &models.Contact{}, &models.Activity{}, &models.Note{}, &models.Relationship{},
 		&models.Reminder{}, &models.ReminderCompletion{}, &models.EmploymentHistory{}, &models.ApiToken{},
-		&models.Webhook{}, &models.WebhookDelivery{}, &models.JobExecution{},
+		&models.Webhook{}, &models.WebhookDelivery{}, &models.EmailOutbox{}, &models.JobExecution{},
 		&models.CalendarSubscription{}, &models.CalendarEventLink{},
 		&models.CardDAVConnection{}, &models.CardDAVContactLink{}, &models.CardDAVSync{},
 		&models.ContactDuplicateDismissal{},

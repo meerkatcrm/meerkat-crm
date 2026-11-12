@@ -86,6 +86,7 @@ func main() {
 	var metricsSrv *http.Server
 	if cfg.MetricsEnabled {
 		services.RegisterJobMetrics(metrics.Default, db)
+		services.RegisterOutboxMetrics(metrics.Default, db)
 		switch {
 		case cfg.MetricsAddr != "":
 			metricsSrv = metrics.NewServer(cfg.MetricsAddr, metrics.Default, cfg.MetricsToken)
@@ -109,8 +110,23 @@ func main() {
 	}
 	schedule(s.Every(1).Day().At(cfg.ReminderTime).Do(task))
 	go task() // Run initially once on startup (rate-limited to prevent duplicates)
-	schedule(s.Every(5).Minutes().Do(func() {
-		services.ProcessWebhookRetries(db, *cfg)
+	// The delivery outbox (webhook and email retries, and first tries a restart interrupted).
+	// Singleton: a run that outlasts the interval must not overlap with the next one.
+	schedule(s.Every(1).Minute().SingletonMode().Do(func() {
+		services.ProcessWebhookOutbox(db, *cfg)
+		services.ProcessEmailOutbox(db, *cfg)
+	}))
+	schedule(s.Every(1).Hour().Do(func() {
+		if n, err := services.PurgeEmailOutbox(db, time.Now()); err != nil {
+			logger.Error().Err(err).Msg("Error purging the email outbox")
+		} else if n > 0 {
+			logger.Info().Int64("emails", n).Msg("Purged old emails from the outbox")
+		}
+		if n, err := services.PurgeWebhookDeliveries(db, time.Now()); err != nil {
+			logger.Error().Err(err).Msg("Error purging webhook deliveries")
+		} else if n > 0 {
+			logger.Info().Int64("deliveries", n).Msg("Purged old webhook deliveries")
+		}
 	}))
 	schedule(s.Every(10).Minutes().Do(controllers.CleanupImportSessions))
 	// Sync calendar subscriptions regularly (rate-limited via job lock).
