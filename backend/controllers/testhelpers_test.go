@@ -6,6 +6,7 @@ import (
 	"io"
 	"meerkat/config"
 	"meerkat/models"
+	"meerkat/services"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -19,6 +20,11 @@ import (
 )
 
 const testJWTSecret = "test-jwt-secret-key-with-32-chars!!"
+
+// testCredentialKeys are the keys a test config without ENCRYPTION_KEY uses for stored passwords.
+func testCredentialKeys() services.CredentialKeys {
+	return services.NewCredentialKeys(nil, testJWTSecret)
+}
 
 // newTestDB returns an isolated in-memory database with every table the handlers under test touch.
 func newTestDB(t *testing.T) *gorm.DB {

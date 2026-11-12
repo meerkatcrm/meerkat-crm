@@ -206,7 +206,7 @@ func (s *CalendarSyncService) syncSubscription(ctx context.Context, db *gorm.DB,
 		return CalendarSyncStats{}, err
 	}
 
-	password, err := DecryptCredential(cfg.JWTSecretKey, sub.PasswordEncrypted)
+	password, err := DecryptCredential(CredentialKeysOf(cfg), sub.PasswordEncrypted)
 	if err != nil {
 		return CalendarSyncStats{}, fmt.Errorf("%w: %v", ErrCalendarUnauthorized, err)
 	}

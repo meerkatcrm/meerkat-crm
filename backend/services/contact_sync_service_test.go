@@ -65,7 +65,7 @@ func setupContactSyncEnv(t *testing.T, direction string, remote *davRemote) *con
 		Username:        remote.user,
 	}
 	if remote.pass != "" {
-		encrypted, err := EncryptCredential(env.cfg.JWTSecretKey, remote.pass)
+		encrypted, err := EncryptCredential(CredentialKeysOf(env.cfg), remote.pass)
 		require.NoError(t, err)
 		env.conn.PasswordEncrypted = encrypted
 	}

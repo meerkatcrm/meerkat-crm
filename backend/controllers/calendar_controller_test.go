@@ -49,7 +49,7 @@ func setupCalendarsWith(t *testing.T, cfg config.Config) calendarFixture {
 
 func (f calendarFixture) seed(t *testing.T, userID uint, url, password string) models.CalendarSubscription {
 	t.Helper()
-	encrypted, err := services.EncryptCredential(testJWTSecret, password)
+	encrypted, err := services.EncryptCredential(testCredentialKeys(), password)
 	require.NoError(t, err)
 	subscription := models.CalendarSubscription{
 		UserID: userID, Name: "Cal", URL: url, Username: "cal-user", PasswordEncrypted: encrypted,
@@ -82,7 +82,7 @@ func TestCreateCalendarSubscription_AppliesDefaultsAndEncrypts(t *testing.T) {
 	stored := f.reload(t, response.ID)
 	assert.Equal(t, f.user.ID, stored.UserID)
 	assert.NotContains(t, stored.PasswordEncrypted, "hunter2")
-	decrypted, err := services.DecryptCredential(testJWTSecret, stored.PasswordEncrypted)
+	decrypted, err := services.DecryptCredential(testCredentialKeys(), stored.PasswordEncrypted)
 	require.NoError(t, err)
 	assert.Equal(t, "hunter2", decrypted)
 }
@@ -167,7 +167,7 @@ func TestUpdateCalendarSubscription_FieldsAndPasswordHandling(t *testing.T) {
 	subscription := f.seed(t, f.user.ID, "https://cal.example.com/", "original")
 	path := fmt.Sprintf("/calendars/%d", subscription.ID)
 	password := func() string {
-		decrypted, err := services.DecryptCredential(testJWTSecret, f.reload(t, subscription.ID).PasswordEncrypted)
+		decrypted, err := services.DecryptCredential(testCredentialKeys(), f.reload(t, subscription.ID).PasswordEncrypted)
 		require.NoError(t, err)
 		return decrypted
 	}

@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log"
 	"meerkat/config"
 	"meerkat/controllers"
 	"meerkat/database"
@@ -22,6 +24,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/go-co-op/gocron"
+	"gorm.io/gorm"
 )
 
 func main() {
@@ -57,6 +60,8 @@ func main() {
 	if err != nil {
 		logger.Fatal().Err(err).Msg("Failed to initialize database")
 	}
+
+	prepareEncryptionKey(db, cfg)
 
 	if warn, users, err := services.PrivateURLWarning(db, cfg.PrivateURLsAllowed()); err != nil {
 		logger.Warn().Err(err).Msg("Could not check the private URL setting")
@@ -234,5 +239,41 @@ func main() {
 func schedule(_ *gocron.Job, err error) {
 	if err != nil {
 		logger.Error().Err(err).Msg("Failed to schedule job")
+	}
+}
+
+// prepareEncryptionKey stops the server when ENCRYPTION_KEY does not fit the database, and
+// moves the passwords from before it to it (docs/deployment.md#encryption-key).
+func prepareEncryptionKey(db *gorm.DB, cfg *config.Config) {
+	moved, err := services.PrepareCredentialKeys(db, services.CredentialKeysOf(*cfg), cfg.EncryptionKeyReset)
+	switch {
+	case errors.Is(err, services.ErrEncryptionKeyNeeded), errors.Is(err, services.ErrEncryptionKeyWrong):
+		log.Printf("❌ %v.\n"+
+			"    To fix this, set ENCRYPTION_KEY to the value this database was encrypted with and\n"+
+			"    restart Meerkat. If you restored a backup, use the key from the time of the backup.\n"+
+			"    If the key is lost: set a new ENCRYPTION_KEY (openssl rand -base64 32) and\n"+
+			"    ENCRYPTION_KEY_RESET=true, start Meerkat once, then remove ENCRYPTION_KEY_RESET.\n"+
+			"    This deletes the stored CardDAV and calendar passwords; users must enter them again.\n"+
+			"    See docs/deployment.md#encryption-key.", err)
+		logger.Fatal().Msg("ENCRYPTION_KEY does not fit the database")
+	case err != nil:
+		logger.Fatal().Err(err).Msg("Failed to prepare ENCRYPTION_KEY")
+	case cfg.EncryptionKeyBytes() == nil:
+		log.Printf("❌ ENCRYPTION_KEY is not set. Meerkat starts and keeps the stored CardDAV and calendar\n"+
+			"    passwords encrypted with a key derived from JWT_SECRET_KEY, but a future version will\n"+
+			"    not start without it.\n%s", config.EncryptionKeySteps)
+	}
+	switch {
+	case moved.Reset:
+		log.Printf("❌ ENCRYPTION_KEY_RESET: the values of the lost key were deleted. Stored CardDAV and\n" +
+			"    calendar passwords must be entered again. Remove ENCRYPTION_KEY_RESET now.")
+	case cfg.EncryptionKeyReset:
+		logger.Warn().Msg("ENCRYPTION_KEY_RESET is set, but ENCRYPTION_KEY fits the database: nothing was reset. Remove ENCRYPTION_KEY_RESET")
+	}
+	if moved.Moved > 0 {
+		logger.Info().Int("passwords", moved.Moved).Msg("Moved stored CardDAV and calendar passwords to ENCRYPTION_KEY")
+	}
+	if moved.Failed > 0 {
+		logger.Warn().Int("passwords", moved.Failed).Msg("Stored CardDAV or calendar passwords could not be decrypted and stay unchanged; their users must enter them again")
 	}
 }

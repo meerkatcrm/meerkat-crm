@@ -556,7 +556,7 @@ func (s *ContactSyncService) syncConnection(ctx context.Context, db *gorm.DB, cf
 		return nil, err
 	}
 
-	password, err := DecryptCredential(cfg.JWTSecretKey, conn.PasswordEncrypted)
+	password, err := DecryptCredential(CredentialKeysOf(cfg), conn.PasswordEncrypted)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrContactSyncUnauthorized, err)
 	}

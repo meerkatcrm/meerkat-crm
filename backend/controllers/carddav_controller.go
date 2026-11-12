@@ -103,7 +103,7 @@ func SaveCardDAVConnection(c *gin.Context) {
 	if input.ClearPassword || (originChanged && input.Password == "") {
 		conn.PasswordEncrypted = ""
 	} else if input.Password != "" {
-		passwordEncrypted, err := services.EncryptCredential(currentConfig(c).JWTSecretKey, input.Password)
+		passwordEncrypted, err := services.EncryptCredential(services.CredentialKeysOf(currentConfig(c)), input.Password)
 		if err != nil {
 			apperrors.AbortWithError(c, apperrors.ErrInternal("failed to store credentials"))
 			return
@@ -194,7 +194,7 @@ func DiscoverCardDAVAddressBooks(c *gin.Context) {
 		if db.Where("user_id = ?", userID).First(&conn).Error == nil {
 			storedURL, urlErr := services.NormalizeCardDAVURL(conn.BaseURL)
 			if urlErr == nil && services.SameCredentialOrigin(storedURL, normalized) {
-				if stored, decErr := services.DecryptCredential(cfg.JWTSecretKey, conn.PasswordEncrypted); decErr == nil {
+				if stored, decErr := services.DecryptCredential(services.CredentialKeysOf(cfg), conn.PasswordEncrypted); decErr == nil {
 					password = stored
 				}
 			}

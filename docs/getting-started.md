@@ -24,6 +24,7 @@ After adjusting the environment variables as needed you can run:
 | Variable | Description |
 |---|---|
 | `JWT_SECRET_KEY` | Random string used for JWT signing (minimum 32 characters) |
+| `ENCRYPTION_KEY` | Encrypts the stored CardDAV and calendar passwords. Generate with `openssl rand -base64 32`, keep it with your backups and never change it. Optional for now: without it an error is logged at startup. See [Encryption key](deployment.md#encryption-key) |
 | `FRONTEND_URL` | Used for CORS headers. Wildcard (`*`) is allowed but not recommended for production use |
 | `RESEND_API_KEY` | API key for [Resend](https://resend.com), used to send e-mail notifications. The generous free tier is more than enough for any personal setup |
 | `RESEND_FROM_EMAIL` | Sender e-mail address for Resend, needs to be configured in Resend |

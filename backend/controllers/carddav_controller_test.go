@@ -60,7 +60,7 @@ func (f carddavFixture) connection(t *testing.T, userID uint) models.CardDAVConn
 
 func (f carddavFixture) seedConnection(t *testing.T, baseURL, password string) models.CardDAVConnection {
 	t.Helper()
-	encrypted, err := services.EncryptCredential(testJWTSecret, password)
+	encrypted, err := services.EncryptCredential(testCredentialKeys(), password)
 	require.NoError(t, err)
 	conn := models.CardDAVConnection{
 		UserID: f.user.ID, BaseURL: baseURL, AddressBookPath: "/books/personal/", Username: "owner",
@@ -90,7 +90,7 @@ func TestSaveCardDAVConnection_CreatesWithDefaultsAndEncryptsThePassword(t *test
 
 	conn := f.connection(t, f.user.ID)
 	assert.NotContains(t, conn.PasswordEncrypted, "hunter2", "the password must not be stored in plain text")
-	decrypted, err := services.DecryptCredential(testJWTSecret, conn.PasswordEncrypted)
+	decrypted, err := services.DecryptCredential(testCredentialKeys(), conn.PasswordEncrypted)
 	require.NoError(t, err)
 	assert.Equal(t, "hunter2", decrypted)
 }
@@ -115,7 +115,7 @@ func TestSaveCardDAVConnection_PasswordHandlingOnUpdate(t *testing.T) {
 		return body
 	}
 	stored := func() string {
-		decrypted, err := services.DecryptCredential(testJWTSecret, f.connection(t, f.user.ID).PasswordEncrypted)
+		decrypted, err := services.DecryptCredential(testCredentialKeys(), f.connection(t, f.user.ID).PasswordEncrypted)
 		require.NoError(t, err)
 		return decrypted
 	}

@@ -37,6 +37,29 @@ Set these variables in `.env` when running over HTTPS:
 | `COOKIE_SECURE` | `true` |
 | `COOKIE_DOMAIN` | Leave empty. Only set it (e.g. `.example.com`) if frontend and API live on different subdomains |
 | `JWT_SECRET_KEY` | Generate with `openssl rand -base64 32` |
+| `ENCRYPTION_KEY` | Generate with `openssl rand -base64 32`; a different value from `JWT_SECRET_KEY` |
+
+## Encryption key
+
+`ENCRYPTION_KEY` encrypts the CardDAV and calendar passwords stored in the database. Before it,
+they used a key derived from `JWT_SECRET_KEY`, so changing the JWT secret made them unreadable.
+
+- **Make one:** `openssl rand -base64 32`. Meerkat refuses to start when the value is not 32 bytes
+  in base64, looks typed by hand (few distinct bytes) or equals `JWT_SECRET_KEY`.
+- **Keep it** with your `.env` and your backups. It is never written to the database or the data
+  directory, so a backup alone cannot decrypt the passwords, and without the key they are lost.
+- **First start with it:** Meerkat encrypts all old passwords again with the new key, in one
+  transaction, and logs how many it moved. A password that cannot be decrypted stays as it is and
+  is counted in the log; its user must enter it again. A restored old backup is moved the same way.
+  An older Meerkat version cannot read the moved passwords.
+- **Wrong or missing key:** Meerkat stores a fixed text encrypted with the key. When it does not
+  decrypt, or when the database holds values of the new key and `ENCRYPTION_KEY` is unset, the
+  server stops with the steps to fix it.
+- **Lost key:** set a new `ENCRYPTION_KEY` and `ENCRYPTION_KEY_RESET=true`, start Meerkat once,
+  then remove `ENCRYPTION_KEY_RESET`. The passwords of the lost key are deleted and users enter
+  them again. With the right key the reset does nothing.
+- **Without it** Meerkat starts and logs an error with these steps. A future version will require
+  it. `JWT_SECRET_KEY` can change once the passwords use `ENCRYPTION_KEY`.
 
 
 ## Single Sign-On (OIDC)
