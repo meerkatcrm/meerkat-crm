@@ -283,7 +283,9 @@ func (b *Backend) PutAddressObject(ctx context.Context, urlPath string, card vca
 		if isNew && opts.IfMatch.IsSet() {
 			return nil, webdav.NewHTTPError(http.StatusPreconditionFailed, fmt.Errorf("resource does not exist"))
 		}
-		if !isNew && opts.IfMatch.IsSet() {
+		// "If-Match: *" matches any existing contact (RFC 7232). It is checked first because
+		// go-webdav's MatchETag answers false for an empty stored ETag before looking at "*".
+		if !isNew && opts.IfMatch.IsSet() && !opts.IfMatch.IsWildcard() {
 			matched, err := opts.IfMatch.MatchETag(contact.ETag)
 			if err != nil || !matched {
 				return nil, webdav.NewHTTPError(http.StatusPreconditionFailed, fmt.Errorf("ETag mismatch: resource has been modified"))

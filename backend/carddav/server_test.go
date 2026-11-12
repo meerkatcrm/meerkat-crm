@@ -175,6 +175,15 @@ func TestPutThatMustCreateRefusesAnExistingContactWithoutAStoredETag(t *testing.
 	assert.NotContains(t, s.get("c-6").Body.String(), "Overwritten")
 }
 
+func TestPutWithIfMatchAnyUpdatesAnExistingContactWithoutAStoredETag(t *testing.T) {
+	s := newServer(t)
+	require.Equal(t, http.StatusCreated, s.put("c-7", vcardBody("c-7", "Hal", "Hart")).Code)
+	require.NoError(t, s.db.Model(&models.Contact{}).Where("vcard_uid = ?", "c-7").UpdateColumn("etag", "").Error)
+
+	assertUpdated(t, s.put("c-7", vcardBody("c-7", "Hal", "Updated"), "If-Match", "*"))
+	assert.Contains(t, s.get("c-7").Body.String(), "Updated")
+}
+
 func TestPutThatMustUpdateRefusesAMissingContact(t *testing.T) {
 	s := newServer(t)
 	w := s.put("ghost", vcardBody("ghost", "Gus", "Gray"), "If-Match", `"anything"`)
