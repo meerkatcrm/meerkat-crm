@@ -464,7 +464,8 @@
     "or": "ou",
     "urlPlaceholder": "Collez l'URL de l'image...",
     "fetch": "Récupérer",
-    "urlFetchError": "Échec de la récupération de l'image depuis l'URL"
+    "urlFetchError": "Échec de la récupération de l'image depuis l'URL",
+    "urlRateLimited": "Trop d'images récupérées depuis des URL. Attendez une minute et réessayez."
   },
   "itemImage": {
     "alt": "Image jointe",

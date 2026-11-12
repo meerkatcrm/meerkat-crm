@@ -464,7 +464,8 @@
     "or": "o",
     "urlPlaceholder": "Incolla URL immagine...",
     "fetch": "Recupera",
-    "urlFetchError": "Impossibile recuperare l'immagine dall'URL"
+    "urlFetchError": "Impossibile recuperare l'immagine dall'URL",
+    "urlRateLimited": "Troppe immagini recuperate da URL. Attendi un minuto e riprova."
   },
   "itemImage": {
     "alt": "Immagine allegata",

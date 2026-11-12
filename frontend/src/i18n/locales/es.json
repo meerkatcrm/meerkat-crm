@@ -464,7 +464,8 @@
     "or": "o",
     "urlPlaceholder": "Pegar URL de imagen...",
     "fetch": "Obtener",
-    "urlFetchError": "Error al obtener la imagen desde la URL"
+    "urlFetchError": "Error al obtener la imagen desde la URL",
+    "urlRateLimited": "Demasiadas imágenes obtenidas desde URL. Espera un minuto e inténtalo de nuevo."
   },
   "itemImage": {
     "alt": "Imagen adjunta",

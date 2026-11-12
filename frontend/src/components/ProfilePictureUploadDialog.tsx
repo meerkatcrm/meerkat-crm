@@ -159,8 +159,12 @@ export default function ProfilePictureUploadDialog({
       const response = await apiFetch(proxyUrl);
 
       if (!response.ok) {
-        // The error envelope is an object; parseErrorResponse reads its message (rate limit, refused URL).
-        throw await parseErrorResponse(response, t('profilePicture.urlFetchError'));
+        // The server does not say why a fetch failed (that would tell which internal hosts exist),
+        // so only the rate limit gets its own message.
+        const apiError = await parseErrorResponse(response);
+        throw new Error(
+          apiError.code === 'RATE_LIMIT_EXCEEDED' ? t('profilePicture.urlRateLimited') : t('profilePicture.urlFetchError'),
+        );
       }
 
       const contentType = response.headers.get('content-type');

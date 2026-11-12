@@ -464,7 +464,8 @@
     "or": "或",
     "urlPlaceholder": "粘贴图片 URL...",
     "fetch": "获取",
-    "urlFetchError": "从 URL 获取图片失败"
+    "urlFetchError": "从 URL 获取图片失败",
+    "urlRateLimited": "从 URL 获取的图片过多，请稍等一分钟后再试。"
   },
   "itemImage": {
     "alt": "附加的图片",
