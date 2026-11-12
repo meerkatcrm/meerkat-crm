@@ -128,6 +128,7 @@ func LoadConfig() *Config {
 		cfg.CardDAVSyncIntervalHours = 1
 	}
 	cfg.CardDAVBlockPrivateURLs = getBoolEnv("CARDDAV_BLOCK_PRIVATE_URLS", cfg.CalDAVBlockPrivateURLs)
+	applyBlockPrivateURLs(cfg)
 
 	// An email channel is enabled only when it is fully configured
 	cfg.UseResend = cfg.ResendAPIKey != "" && cfg.ResendFromEmail != ""
@@ -166,6 +167,59 @@ func getIntEnv(key string, fallback int) int {
 		return intValue
 	}
 	return fallback
+}
+
+// applyBlockPrivateURLs applies BLOCK_PRIVATE_URLS. When it is set it decides for every
+// outbound feature (webhooks, CalDAV, CardDAV, Monica) and overrides the older per-feature
+// flags. When it is unset the per-feature flags keep working as before. The default stays
+// off: LAN servers are a common legitimate setup. It is a security switch, so a value that
+// is not a recognised boolean fails closed: blocking is turned on and an error is logged.
+func applyBlockPrivateURLs(cfg *Config) {
+	value, set := os.LookupEnv("BLOCK_PRIVATE_URLS")
+	if !set {
+		return
+	}
+	block, ok := parseSwitch(value)
+	if !ok {
+		log.Printf("ERROR: Invalid value for BLOCK_PRIVATE_URLS: %q (use true or false). Blocking private URLs to be safe", value)
+		block = true
+	}
+	cfg.WebhookBlockPrivateURLs = block
+	cfg.CalDAVBlockPrivateURLs = block
+	cfg.CardDAVBlockPrivateURLs = block
+	cfg.MonicaBlockPrivateURLs = block
+}
+
+// parseSwitch accepts true/false, 1/0, yes/no and on/off in any case.
+func parseSwitch(value string) (on, ok bool) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "true", "1", "yes", "on":
+		return true, true
+	case "false", "0", "no", "off":
+		return false, true
+	}
+	return false, false
+}
+
+// PrivateURLFeatures lists the outbound features that may still reach private,
+// loopback or link-local addresses. It is empty when every feature is blocked.
+func (c Config) PrivateURLFeatures() []string {
+	features := []string{}
+	for _, f := range []struct {
+		name    string
+		blocked bool
+	}{{"webhooks", c.WebhookBlockPrivateURLs}, {"caldav", c.CalDAVBlockPrivateURLs}, {"carddav", c.CardDAVBlockPrivateURLs}, {"monica", c.MonicaBlockPrivateURLs}} {
+		if !f.blocked {
+			features = append(features, f.name)
+		}
+	}
+	return features
+}
+
+// PrivateURLsAllowed reports whether any outbound feature may still reach private,
+// loopback or link-local addresses.
+func (c Config) PrivateURLsAllowed() bool {
+	return len(c.PrivateURLFeatures()) > 0
 }
 
 func getBoolEnv(key string, fallback bool) bool {

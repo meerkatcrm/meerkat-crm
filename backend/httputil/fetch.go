@@ -1,102 +1,15 @@
 package httputil
 
 import (
-	"context"
 	"errors"
 	"io"
+	"meerkat/netguard"
 	"net"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 )
-
-func mustCIDRs(cidrs ...string) []*net.IPNet {
-	nets := make([]*net.IPNet, 0, len(cidrs))
-	for _, cidr := range cidrs {
-		_, ipNet, err := net.ParseCIDR(cidr)
-		if err != nil {
-			panic(err)
-		}
-		nets = append(nets, ipNet)
-	}
-	return nets
-}
-
-// reservedRanges are special-purpose ranges that Go's Is* helpers leave out. The documentation
-// ranges are not listed: they are not routable, so they cannot reach anything.
-var reservedRanges = mustCIDRs(
-	"0.0.0.0/8",       // "this network"
-	"100.64.0.0/10",   // shared address space (RFC 6598), used by cloud providers for metadata endpoints
-	"192.0.0.0/24",    // IETF protocol assignments
-	"198.18.0.0/15",   // benchmarking
-	"240.0.0.0/4",     // reserved, including broadcast
-	"64:ff9b:1::/48",  // local-use NAT64
-	"::ffff:0:0:0/96", // IPv4-translated (SIIT); not ::ffff:0:0/96, which is every mapped IPv4 address
-	"fec0::/10",       // deprecated site-local, which Go's IsPrivate leaves out
-	"100::/64",        // discard-only
-	"2001::/32",       // Teredo, which tunnels to an address the prefix does not reveal
-)
-
-// embeddedIPv4 returns the IPv4 address an IPv6 transition address forwards to, or nil.
-func embeddedIPv4(ip net.IP) net.IP {
-	ip16 := ip.To16()
-	if ip16 == nil || ip.To4() != nil {
-		return nil
-	}
-	switch {
-	case ip16[0] == 0x20 && ip16[1] == 0x02: // 6to4, 2002::/16
-		return net.IPv4(ip16[2], ip16[3], ip16[4], ip16[5])
-	case nat64Prefix.Contains(ip16), ipv4CompatiblePrefix.Contains(ip16):
-		return net.IPv4(ip16[12], ip16[13], ip16[14], ip16[15])
-	}
-	return nil
-}
-
-var (
-	nat64Prefix          = mustCIDRs("64:ff9b::/96")[0]
-	ipv4CompatiblePrefix = mustCIDRs("::/96")[0]
-)
-
-// IsPrivateIP checks if an IP address is in a private/reserved range
-func IsPrivateIP(ip net.IP) bool {
-	if ip == nil {
-		return true
-	}
-
-	// Check for loopback
-	if ip.IsLoopback() {
-		return true
-	}
-
-	// Check for link-local (includes cloud metadata endpoint 169.254.169.254) and multicast
-	if ip.IsLinkLocalUnicast() || ip.IsMulticast() {
-		return true
-	}
-
-	// Check for private ranges
-	if ip.IsPrivate() {
-		return true
-	}
-
-	// Check for unspecified (0.0.0.0 or ::)
-	if ip.IsUnspecified() {
-		return true
-	}
-
-	for _, reserved := range reservedRanges {
-		if reserved.Contains(ip) {
-			return true
-		}
-	}
-
-	// A transition address reaches whatever IPv4 address it embeds
-	if embedded := embeddedIPv4(ip); embedded != nil {
-		return IsPrivateIP(embedded)
-	}
-
-	return false
-}
 
 // validateURLForSSRF checks if a URL is safe to fetch (not pointing to internal resources)
 func validateURLForSSRF(rawURL string) (*url.URL, error) {
@@ -132,7 +45,7 @@ func validateURLForSSRF(rawURL string) (*url.URL, error) {
 
 	// Check all resolved IPs
 	for _, ip := range ips {
-		if IsPrivateIP(ip) {
+		if netguard.IsBlockedIP(ip) {
 			return nil, errors.New("access to internal IP addresses is not allowed")
 		}
 	}
@@ -161,50 +74,11 @@ func FetchImageFromURL(imageURL string) ([]byte, string, error) {
 // newSafeClient returns an HTTP client that refuses internal addresses, both at
 // connection time and on redirects.
 func newSafeClient() *http.Client {
-	// Create a custom dialer that validates IP addresses at connection time
-	// This prevents DNS rebinding/TOCTOU attacks
-	safeDialer := &net.Dialer{
-		Timeout:   10 * time.Second,
-		KeepAlive: 10 * time.Second,
-	}
-
-	safeDialContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
-		// Extract host from addr (format is host:port)
-		host, port, err := net.SplitHostPort(addr)
-		if err != nil {
-			return nil, err
-		}
-
-		// Resolve the hostname to IP addresses
-		ips, err := net.LookupIP(host)
-		if err != nil {
-			return nil, errors.New("failed to resolve hostname")
-		}
-
-		// Find a safe IP to connect to
-		var safeIP net.IP
-		for _, ip := range ips {
-			if !IsPrivateIP(ip) {
-				safeIP = ip
-				break
-			}
-		}
-
-		if safeIP == nil {
-			return nil, errors.New("access to internal IP addresses is not allowed")
-		}
-
-		// Connect using the validated IP address directly
-		safeAddr := net.JoinHostPort(safeIP.String(), port)
-		return safeDialer.DialContext(ctx, network, safeAddr)
-	}
-
-	// Create HTTP client with custom transport that validates IPs at connection time
+	// netguard checks the address at connection time, which also prevents DNS rebinding/TOCTOU
+	// attacks, and ignores HTTP(S)_PROXY so the checked address is the one dialled.
 	return &http.Client{
-		Timeout: 15 * time.Second,
-		Transport: &http.Transport{
-			DialContext: safeDialContext,
-		},
+		Timeout:       15 * time.Second,
+		Transport:     netguard.NewTransport(errors.New("failed to resolve hostname"), errors.New("access to internal IP addresses is not allowed")),
 		CheckRedirect: checkImageRedirect,
 	}
 }

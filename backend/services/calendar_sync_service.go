@@ -11,6 +11,7 @@ import (
 	"meerkat/i18n"
 	"meerkat/logger"
 	"meerkat/models"
+	"meerkat/netguard"
 	"net/http"
 	"net/url"
 	"sort"
@@ -83,7 +84,7 @@ type CalendarSyncService struct {
 func NewCalendarSyncService(blockPrivateURLs bool) *CalendarSyncService {
 	transport := &http.Transport{}
 	if blockPrivateURLs {
-		transport.DialContext = newPrivateBlockingDialContext(ErrCalendarUnreachable, ErrCalendarPrivateAddress)
+		transport = netguard.NewTransport(ErrCalendarUnreachable, ErrCalendarPrivateAddress)
 	}
 	return &CalendarSyncService{
 		client: &http.Client{

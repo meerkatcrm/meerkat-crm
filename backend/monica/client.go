@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"meerkat/httputil"
+	"meerkat/netguard"
 	"net"
 	"net/http"
 	"net/url"
@@ -83,7 +83,7 @@ func NewClient(baseURL, token string, blockPrivate bool) (*Client, error) {
 
 	transport := &http.Transport{}
 	if blockPrivate {
-		transport.DialContext = privateBlockingDialContext
+		transport = netguard.NewTransport(ErrUnreachable, ErrPrivateAddress)
 	}
 	return &Client{
 		baseURL: u,
@@ -94,29 +94,6 @@ func NewClient(baseURL, token string, blockPrivate bool) (*Client, error) {
 		},
 		limiter: newLimiter(),
 	}, nil
-}
-
-func privateBlockingDialContext(ctx context.Context, network, addr string) (net.Conn, error) {
-	host, port, err := net.SplitHostPort(addr)
-	if err != nil {
-		return nil, err
-	}
-	ips, err := net.DefaultResolver.LookupIP(ctx, "ip", host)
-	if err != nil {
-		return nil, fmt.Errorf("%w: could not resolve host", ErrUnreachable)
-	}
-	var safeIP net.IP
-	for _, ip := range ips {
-		if !httputil.IsPrivateIP(ip) {
-			safeIP = ip
-			break
-		}
-	}
-	if safeIP == nil {
-		return nil, ErrPrivateAddress
-	}
-	dialer := &net.Dialer{Timeout: 10 * time.Second, KeepAlive: 10 * time.Second}
-	return dialer.DialContext(ctx, network, net.JoinHostPort(safeIP.String(), port))
 }
 
 // get performs one rate-limited GET against the API and decodes the JSON

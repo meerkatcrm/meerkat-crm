@@ -12,6 +12,7 @@ import (
 	"meerkat/config"
 	"meerkat/logger"
 	"meerkat/models"
+	"meerkat/netguard"
 	"net/http"
 	"net/url"
 	"sort"
@@ -73,7 +74,7 @@ type ContactSyncService struct {
 func NewContactSyncService(blockPrivateURLs bool) *ContactSyncService {
 	transport := &http.Transport{}
 	if blockPrivateURLs {
-		transport.DialContext = newPrivateBlockingDialContext(ErrContactSyncUnreachable, ErrContactSyncPrivateAddress)
+		transport = netguard.NewTransport(ErrContactSyncUnreachable, ErrContactSyncPrivateAddress)
 	}
 	return &ContactSyncService{
 		client: &http.Client{

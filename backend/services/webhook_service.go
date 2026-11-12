@@ -11,6 +11,7 @@ import (
 	"meerkat/config"
 	"meerkat/logger"
 	"meerkat/models"
+	"meerkat/netguard"
 	"net/http"
 	"time"
 
@@ -37,11 +38,10 @@ var (
 	deliveryClient = &http.Client{Timeout: webhookDeliveryTimeout}
 	// guardedDeliveryClient checks the address at dial time, so the check also covers
 	// redirects and cannot be bypassed by a DNS answer that changes after validation.
+	// netguard.NewTransport ignores HTTP(S)_PROXY: a proxy would be dialled instead of the target.
 	guardedDeliveryClient = &http.Client{
-		Timeout: webhookDeliveryTimeout,
-		Transport: &http.Transport{
-			DialContext: newPrivateBlockingDialContext(errWebhookUnreachable, errWebhookPrivateAddress),
-		},
+		Timeout:   webhookDeliveryTimeout,
+		Transport: netguard.NewTransport(errWebhookUnreachable, errWebhookPrivateAddress),
 	}
 	// semaphore limits concurrent outbound webhook HTTP calls
 	deliverySem = make(chan struct{}, 10)

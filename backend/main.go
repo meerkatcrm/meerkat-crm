@@ -58,6 +58,14 @@ func main() {
 		logger.Fatal().Err(err).Msg("Failed to initialize database")
 	}
 
+	if warn, users, err := services.PrivateURLWarning(db, cfg.PrivateURLsAllowed()); err != nil {
+		logger.Warn().Err(err).Msg("Could not check the private URL setting")
+	} else if warn {
+		logger.Warn().Int64("users", users).Strs("features", cfg.PrivateURLFeatures()).
+			Msg("Webhooks, calendar/contact sync or Monica import may reach private and loopback addresses " +
+				"on an instance with several users. Set BLOCK_PRIVATE_URLS=true to block them")
+	}
+
 	logger.Info().Msg("Initializing i18n translations...")
 	if err := i18n.Init(); err != nil {
 		logger.Fatal().Err(err).Msg("Failed to initialize i18n")
