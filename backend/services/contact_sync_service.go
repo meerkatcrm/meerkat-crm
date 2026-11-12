@@ -8,11 +8,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	mcarddav "meerkat/carddav"
 	"meerkat/config"
 	"meerkat/logger"
 	"meerkat/models"
 	"meerkat/netguard"
+	"net"
 	"net/http"
 	"net/url"
 	"sort"
@@ -34,6 +36,7 @@ var (
 	ErrContactSyncNotFound       = errors.New("CardDAV resource not found")
 	ErrContactSyncUnreachable    = errors.New("CardDAV server could not be reached")
 	ErrContactSyncInvalidData    = errors.New("CardDAV server returned data that could not be parsed")
+	ErrContactSyncServerError    = errors.New("CardDAV server answered with an error")
 	ErrContactSyncTooLarge       = errors.New("CardDAV response exceeds the size limit")
 	ErrContactSyncPrivateAddress = errors.New("CardDAV URL resolves to a private or loopback address")
 	ErrContactSyncTooMany        = errors.New("address book exceeds the per-sync contact limit")
@@ -108,14 +111,47 @@ func (t *contactRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 		resp.Body.Close()
 		return nil, errContactSyncUnsupported
 	}
+	if resp.StatusCode >= 400 {
+		defer resp.Body.Close()
+		return nil, fmt.Errorf("%w: %s", ErrContactSyncServerError, statusWithBody(resp))
+	}
 	resp.Body = &limitedBody{inner: resp.Body, remaining: maxContactResponseBytes, errTooLarge: ErrContactSyncTooLarge}
 	return quoteETags(resp)
+}
+
+// statusWithBody appends the start of the error body, which often says what the server disliked
+func statusWithBody(resp *http.Response) string {
+	const limit = 300
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, limit+1))
+	text := strings.Join(strings.Fields(strings.ToValidUTF8(string(body), "")), " ")
+	if text == "" {
+		return resp.Status
+	}
+	if len(body) > limit {
+		text = strings.ToValidUTF8(text[:min(len(text), limit)], "") + " […]"
+	}
+	return resp.Status + ": " + text
 }
 
 func isContactSyncSentinel(err error) bool {
 	return errors.Is(err, ErrContactSyncUnauthorized) || errors.Is(err, ErrContactSyncNotFound) ||
 		errors.Is(err, ErrContactSyncTooLarge) || errors.Is(err, ErrContactSyncPrivateAddress) ||
-		errors.Is(err, ErrContactSyncForbidden) || errors.Is(err, errContactSyncUnsupported)
+		errors.Is(err, ErrContactSyncForbidden) || errors.Is(err, errContactSyncUnsupported) ||
+		errors.Is(err, ErrContactSyncServerError)
+}
+
+// remoteError tells a server that never answered apart from an answer that could not be parsed
+func remoteError(err error) error {
+	var urlErr *url.Error
+	var netErr net.Error
+	switch {
+	case isContactSyncSentinel(err):
+		return err
+	case errors.As(err, &urlErr), errors.As(err, &netErr), errors.Is(err, context.DeadlineExceeded):
+		return fmt.Errorf("%w: %v", ErrContactSyncUnreachable, err)
+	default:
+		return fmt.Errorf("%w: %v", ErrContactSyncInvalidData, err)
+	}
 }
 
 // validates a CardDAV base or address book URL (inline credentials are stripped)
@@ -694,10 +730,7 @@ func (r *contactSyncRun) fetchRemoteState() error {
 		FilterTest:  carddav.FilterAllOf,
 	})
 	if err != nil {
-		if isContactSyncSentinel(err) {
-			return err
-		}
-		return fmt.Errorf("%w: %v", ErrContactSyncUnreachable, err)
+		return remoteError(err)
 	}
 	for i := range objects {
 		obj := objects[i]
@@ -742,10 +775,7 @@ func (r *contactSyncRun) fetchNeededCards() error {
 			DataRequest: carddav.AddressDataRequest{AllProp: true},
 		})
 		if err != nil {
-			if isContactSyncSentinel(err) {
-				return err
-			}
-			return fmt.Errorf("%w: %v", ErrContactSyncUnreachable, err)
+			return remoteError(err)
 		}
 		for i := range objects {
 			obj := objects[i]

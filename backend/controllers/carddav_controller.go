@@ -255,6 +255,8 @@ func contactSyncError(err error) *apperrors.AppError {
 		return apperrors.ErrExternal("CardDAV", "address book has too many contacts to sync")
 	case errors.Is(err, services.ErrContactSyncNoAddressBooks):
 		return apperrors.ErrExternal("CardDAV", "no address books found on the server")
+	case errors.Is(err, services.ErrContactSyncServerError):
+		return apperrors.ErrExternal("CardDAV", "server answered with an error")
 	case errors.Is(err, services.ErrContactSyncInvalidData):
 		return apperrors.ErrExternal("CardDAV", "server returned data that could not be parsed")
 	case errors.Is(err, services.ErrContactSyncUnreachable):
