@@ -12,6 +12,7 @@ import (
 
 	"meerkat/config"
 	"meerkat/logger"
+	"meerkat/metrics"
 
 	"github.com/resend/resend-go/v2"
 )
@@ -64,6 +65,7 @@ func SendEmail(cfg config.Config, msg EmailMessage) error {
 		}
 	}
 
+	metrics.EmailSent(succeeded > 0)
 	if succeeded == 0 {
 		return fmt.Errorf("all email channels failed (%d attempted): %s", attempted, strings.Join(errs, "; "))
 	}

@@ -61,6 +61,9 @@ type Config struct {
 	CardDAVSyncIntervalHours int    // Interval in hours for the scheduled CardDAV contact sync job
 	CardDAVBlockPrivateURLs  bool   // Block contact sync requests to private/loopback addresses (defaults to CALDAV_BLOCK_PRIVATE_URLS)
 	MonicaBlockPrivateURLs   bool   // Block Monica import requests to private/loopback addresses (useful for cloud deployments)
+	MetricsEnabled           bool   // Serve Prometheus metrics (off by default)
+	MetricsToken             string // Optional bearer token required to read /metrics
+	MetricsAddr              string // Optional separate listen address (e.g. 127.0.0.1:9090); empty = /metrics on the main port
 	OIDC                     OIDCConfig
 }
 
@@ -133,6 +136,9 @@ func LoadConfig() *Config {
 	}
 	cfg.CardDAVBlockPrivateURLs = getBoolEnv("CARDDAV_BLOCK_PRIVATE_URLS", cfg.CalDAVBlockPrivateURLs)
 	applyBlockPrivateURLs(cfg)
+	cfg.MetricsEnabled = getBoolEnv("METRICS_ENABLED", false)
+	cfg.MetricsToken = getEnv("METRICS_TOKEN", "")
+	cfg.MetricsAddr = getEnv("METRICS_ADDR", "")
 
 	// An email channel is enabled only when it is fully configured
 	cfg.UseResend = cfg.ResendAPIKey != "" && cfg.ResendFromEmail != ""

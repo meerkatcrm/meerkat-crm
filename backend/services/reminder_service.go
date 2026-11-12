@@ -6,6 +6,7 @@ import (
 	"meerkat/config"
 	"meerkat/i18n"
 	"meerkat/logger"
+	"meerkat/metrics"
 	"meerkat/models"
 	"os"
 	"sort"
@@ -142,6 +143,7 @@ func releaseJobLock(db *gorm.DB, jobName string, success bool) error {
 
 		if success {
 			job.LastRunAt = now
+			job.LastSuccessAt = &now
 		}
 		job.LockedAt = nil
 		job.LockedBy = ""
@@ -171,11 +173,13 @@ func SendRemindersWithRateLimit(db *gorm.DB, cfg config.Config) error {
 	acquired, err := acquireJobLock(db, models.JobNameDailyReminders, ReminderMinInterval)
 	if err != nil {
 		logger.Error().Err(err).Msg("Error checking job lock")
+		metrics.JobResult(JobReminders, metrics.ResultFailure)
 		return err
 	}
 
 	if !acquired {
 		logger.Info().Msg("Skipping reminder job - rate limited")
+		metrics.JobResult(JobReminders, metrics.ResultSkipped)
 		return nil
 	}
 
@@ -186,6 +190,7 @@ func SendRemindersWithRateLimit(db *gorm.DB, cfg config.Config) error {
 	if releaseErr := releaseJobLock(db, models.JobNameDailyReminders, err == nil); releaseErr != nil {
 		logger.Error().Err(releaseErr).Msg("Error releasing job lock")
 	}
+	metrics.JobDone(JobReminders, err)
 
 	return err
 }

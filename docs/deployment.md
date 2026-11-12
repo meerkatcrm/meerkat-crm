@@ -156,6 +156,61 @@ What remains: a signed-in user can make the server request public hosts on ports
 slowly, and see whether the request returned an image. A private CardDAV server's photo URLs do not
 load. An allow-list of hosts is not possible, since users paste image URLs from any site.
 
+## Monitoring with Prometheus
+
+Meerkat can expose metrics in the Prometheus text format. It is **off by default**. Set `METRICS_ENABLED=true` and choose how to protect it:
+
+| Variable | Meaning |
+|---|---|
+| `METRICS_ENABLED` | `true` to serve `/metrics`. Default `false` (no route exists) |
+| `METRICS_TOKEN` | If set, scrapers must send `Authorization: Bearer <token>` (compared in constant time) |
+| `METRICS_ADDR` | If set (for example `127.0.0.1:9090` or `:9090` on a private Docker network), `/metrics` is served only on this extra listener and not on the main port |
+
+**Where the endpoint is.** The nginx in the images proxies only `/api/`, `/health` and `/carddav/`; every other path, `/metrics` included, is answered with the web app (`index.html`), so the browser port never serves metrics. How to reach them depends on the layout:
+
+- *Single container* (`docker-compose.yml`, service `meerkat`): nginx listens on 8080 and the backend on `PORT=8081` inside the container. Scrape `meerkat:8081/metrics` from a container on the same Docker network (port 8081 is not published to the host, which is what you want), or set `METRICS_ADDR=:9090` and scrape `meerkat:9090/metrics`.
+- *Legacy split* (`docker-compose.legacy.yml`: `backend` and `frontend` containers): the backend listens on 8080, scrape `backend:8080/metrics`.
+- *Without Docker*: `/metrics` is on the backend `PORT`.
+
+If your own reverse proxy forwards everything to the backend, set a token or use `METRICS_ADDR`, or block `/metrics` there. Without a token or `METRICS_ADDR`, Meerkat logs a warning at startup. If `METRICS_ADDR` cannot be bound, Meerkat does not start. The metrics contain no user data (routes are patterns such as `/api/v1/contacts/:id`, never URLs), but they reveal traffic and failure patterns.
+
+| Metric | Type | Meaning |
+|---|---|---|
+| `meerkat_http_requests_total{method,route,status}` | counter | Requests by route pattern (`unmatched` for 404s without a route) |
+| `meerkat_http_request_duration_seconds{method,route}` | histogram | Latency |
+| `meerkat_job_last_success_timestamp_seconds{job}` | gauge | When the job last completed a run. Jobs: `reminders`, `calendar-sync`, `contact-sync` (the ones kept in `job_executions`). Missing until the first run after upgrading to this version has completed; a run that failed or was cut short never sets it |
+| `meerkat_job_running{job}` | gauge | 1 while the job holds its lock. A process that died mid-run leaves the lock until the next run takes it over (after 5 minutes), so it can stay 1 for a while |
+| `meerkat_job_runs_total{job,result}` | counter | Runs since the process started, same job names. `result` is `success`, `failure`, or `skipped` (turned away by the rate limit or another instance's lock; the sync jobs count `success` when they ran, per-connection errors are in their own status and logs) |
+| `meerkat_webhook_deliveries_total{result}` | counter | Webhook delivery attempts (every retry counts) |
+| `meerkat_emails_total{result}` | counter | Emails where at least one channel succeeded (`success`) or all failed (`failure`) |
+| `go_goroutines`, `go_memstats_alloc_bytes`, `process_start_time_seconds` | gauge | Process basics |
+
+Example scrape config:
+
+```yaml
+scrape_configs:
+  - job_name: meerkat
+    metrics_path: /metrics
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/meerkat-token
+    static_configs:
+      # single container: meerkat:8081 (or the METRICS_ADDR host and port); legacy split: backend:8080
+      - targets: ["meerkat:8081"]
+```
+
+Alert ideas (adapt the thresholds):
+
+- Backend down: `up{job="meerkat"} == 0` for 5 minutes.
+- Reminders did not run for over 26 hours: `time() - meerkat_job_last_success_timestamp_seconds{job="reminders"} > 26 * 3600`. The same for `calendar-sync` and `contact-sync`, with your sync interval.
+- A scheduled job failed: `increase(meerkat_job_runs_total{result="failure"}[1h]) > 0` (`skipped` is normal after restarts).
+- Email failing: `increase(meerkat_emails_total{result="failure"}[1h]) > 0`.
+- Many failing webhooks: `increase(meerkat_webhook_deliveries_total{result="failure"}[1h]) > 10`.
+- Server errors: `sum(rate(meerkat_http_requests_total{status=~"5.."}[5m])) > 0.05`.
+- Slow API: `histogram_quantile(0.95, sum by (le) (rate(meerkat_http_request_duration_seconds_bucket[5m]))) > 1`.
+
+Counters start at zero on every restart and the metrics are per instance. Job run counters of a job that never ran do not exist yet; use `absent()` with care.
+
 ## Upgrades
 
 ```sh

@@ -10,6 +10,7 @@ import (
 	"io"
 	"meerkat/config"
 	"meerkat/logger"
+	"meerkat/metrics"
 	"meerkat/models"
 	"meerkat/netguard"
 	"net/http"
@@ -184,6 +185,7 @@ func saveDelivery(db *gorm.DB, webhookID uint, eventType, payload string, status
 	if err := db.Create(&d).Error; err != nil {
 		logger.Error().Err(err).Uint("webhook_id", webhookID).Msg("Failed to save webhook delivery")
 	}
+	metrics.WebhookDelivery(errMsg == nil)
 	return d
 }
 
