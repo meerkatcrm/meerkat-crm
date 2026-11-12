@@ -90,6 +90,47 @@ If auto-provisioning is disabled and no match is found, the user sees an error a
 
 Accounts created through SSO have no password and can only log in via SSO. Existing password-based accounts that get linked retain their password.
 
+## Security headers
+
+Meerkat sets its security headers itself; a reverse proxy in front should pass them through and
+**not add its own** (a second `Content-Security-Policy` is combined with the first and can only make
+the policy stricter, a second `Strict-Transport-Security` or `X-Frame-Options` is sent twice).
+
+| Response | Headers |
+|---|---|
+| The web app (HTML, JS, CSS, images), sent by nginx | `Content-Security-Policy` (below), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (no camera, microphone, geolocation, payment, USB), `Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Resource-Policy: same-origin` |
+| The API (`/api/`, `/carddav/`, downloads, photos), sent by the backend | the same, but `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'` and `Cross-Origin-Resource-Policy: same-site` |
+
+The web app policy is enforced, and the E2E suite fails on any violation:
+
+```
+default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:;
+font-src 'self' data:; connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none';
+base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+```
+
+It lives in one file, `frontend/security-headers.conf`, which the all-in-one image and the separate
+frontend image both include in every location that serves files (never in the proxied ones, where the
+backend's headers pass through). `frontend/src/securityHeaders.test.ts` fails when a config drifts.
+
+**HSTS** is sent only when the browser is on HTTPS: nginx looks at `X-Forwarded-Proto` (set it to
+`https` in your TLS proxy; only `http` and `https` are accepted) and sends
+`Strict-Transport-Security: max-age=31536000`. The backend sends the same when the request came over
+TLS or with `X-Forwarded-Proto: https`, and adds `includeSubDomains` only when you declared HTTPS
+yourself with `COOKIE_SECURE=true`. Plain-HTTP access never gets it.
+
+**API on another origin.** Set `FRONTEND_URL` to the web app's origin as before (CORS and the
+cookie keep working). Serve the API on the same site as the web app, for example
+`app.example.com` and `api.example.com`: the backend sends `Cross-Origin-Resource-Policy: same-site`,
+and the session cookie is `SameSite=Lax`, so photos from another site would not load anyway. Then
+add the API origin to the web app's policy, for example `connect-src 'self' https://api.example.com`
+and `img-src 'self' data: blob: https://api.example.com`, by editing `frontend/security-headers.conf`
+and rebuilding, or by mounting your own copy over `/etc/nginx/security-headers.conf`. Never add
+`'unsafe-inline'` or `'unsafe-eval'` to `script-src`.
+
+**Gap:** responses that nginx generates itself (its error pages while the backend is down, the
+`/.well-known/carddav` redirect) carry no security headers. They contain no application data.
+
 ## Outgoing requests
 
 Meerkat makes requests to URLs that users choose: webhooks, calendar (CalDAV/ICS) and contact

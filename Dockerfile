@@ -82,6 +82,7 @@ COPY --from=frontend-builder /app/build /usr/share/nginx/html
 
 # Configuration files
 COPY docker/nginx.conf /etc/nginx/http.d/default.conf
+COPY frontend/security-headers.conf /etc/nginx/security-headers.conf
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY docker/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
