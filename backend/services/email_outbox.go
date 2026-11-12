@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"meerkat/config"
@@ -17,12 +18,17 @@ import (
 // emailSem limits concurrent sends from the outbox job.
 var emailSem = make(chan struct{}, 5)
 
-var (
-	// emailSender is the real send; a seam for tests.
-	emailSender = SendEmail
-	// startEmailDelivery runs the immediate try in the background; a seam for tests.
-	startEmailDelivery = func(f func()) { go f() }
-)
+// emailSender is the real send; a seam for tests.
+var emailSender = SendEmail
+
+// startEmailDelivery runs the immediate try in the background; a seam for tests. It is atomic
+// because a test may restore it while a request's background goroutine is still queueing.
+var startEmailDelivery atomic.Pointer[func(func())]
+
+func init() {
+	inBackground := func(f func()) { go f() }
+	startEmailDelivery.Store(&inBackground)
+}
 
 // QueueEmail stores msg in the email outbox and tries to send it right away in the
 // background. Failures are retried with backoff by the outbox job (see ProcessEmailOutbox),
@@ -36,9 +42,8 @@ func QueueEmail(db *gorm.DB, cfg config.Config, userID *uint, msg EmailMessage) 
 // StubEmailDelivery replaces the background immediate try (tests of other packages); the
 // returned function restores it.
 func StubEmailDelivery(f func(func())) (restore func()) {
-	old := startEmailDelivery
-	startEmailDelivery = f
-	return func() { startEmailDelivery = old }
+	old := startEmailDelivery.Swap(&f)
+	return func() { startEmailDelivery.Store(old) }
 }
 
 // QueueEmailUntil is QueueEmail for a message that is useless after expires (a password
@@ -66,7 +71,7 @@ func QueueEmailUntil(db *gorm.DB, cfg config.Config, userID *uint, msg EmailMess
 	if err := db.Create(&e).Error; err != nil {
 		return fmt.Errorf("queue email: %w", err)
 	}
-	startEmailDelivery(func() {
+	(*startEmailDelivery.Load())(func() {
 		emailSem <- struct{}{}
 		defer func() { <-emailSem }()
 		if claimEmail(db, e) {

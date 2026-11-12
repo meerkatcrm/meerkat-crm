@@ -40,9 +40,7 @@ func fakeSender(t *testing.T, errs ...error) *[]EmailMessage {
 
 func noKick(t *testing.T) {
 	t.Helper()
-	old := startEmailDelivery
-	startEmailDelivery = func(func()) {}
-	t.Cleanup(func() { startEmailDelivery = old })
+	t.Cleanup(StubEmailDelivery(func(func()) {}))
 }
 
 func TestQueueEmailWritesRowBeforeSending(t *testing.T) {
