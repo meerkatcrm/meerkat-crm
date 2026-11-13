@@ -14,6 +14,8 @@ import (
 	"gorm.io/gorm"
 )
 
+const legacyThumbnailColumn = "photo_thumbnail"
+
 // bulkTextField pairs a bulk-update input value with the contact field it sets.
 type bulkTextField struct {
 	name  string
@@ -81,7 +83,9 @@ func BulkUpdateContacts(c *gin.Context) {
 
 	var contacts, changed []models.Contact
 	err := db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("user_id = ? AND id IN ?", userID, ids).Find(&contacts).Error; err != nil {
+		// The legacy base64 thumbnail column is neither read nor written: nothing here
+		// needs it, and Save would otherwise carry it back for every contact.
+		if err := tx.Omit(legacyThumbnailColumn).Where("user_id = ? AND id IN ?", userID, ids).Find(&contacts).Error; err != nil {
 			return apperrors.ErrDatabase("Failed to load contacts").WithError(err)
 		}
 		if len(contacts) != len(ids) {
@@ -111,7 +115,7 @@ func BulkUpdateContacts(c *gin.Context) {
 			if reflect.DeepEqual(before, bulkSnapshotOf(contact)) {
 				continue
 			}
-			if err := tx.Save(contact).Error; err != nil {
+			if err := tx.Omit(legacyThumbnailColumn).Save(contact).Error; err != nil {
 				return apperrors.ErrDatabase("Failed to update contacts").WithError(err)
 			}
 			changed = append(changed, *contact)

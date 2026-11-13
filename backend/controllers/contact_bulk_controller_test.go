@@ -181,3 +181,16 @@ func TestBulkUpdateContacts_UnchangedContactsAreNotSaved(t *testing.T) {
 	assert.False(t, got.Archived)
 	assert.Equal(t, []string{"friends"}, got.Circles)
 }
+
+func TestBulkUpdateContacts_KeepsLegacyThumbnail(t *testing.T) {
+	db, router, user := setupBulkRouter(t)
+	ct := models.Contact{UserID: user.ID, Firstname: "Old", LegacyThumbnail: "data:image/png;base64,AAAA"}
+	require.NoError(t, db.Create(&ct).Error)
+
+	w := postBulk(router, gin.H{"contact_ids": []uint{ct.ID}, "food_preference": "tea"})
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	got := loadContact(t, db, ct.ID)
+	assert.Equal(t, "tea", got.FoodPreference)
+	assert.Equal(t, "data:image/png;base64,AAAA", got.LegacyThumbnail, "the column it doesn't load is not wiped")
+}
