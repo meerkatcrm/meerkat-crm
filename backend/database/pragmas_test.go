@@ -11,9 +11,9 @@ import (
 
 func TestDSNs(t *testing.T) {
 	cases := []struct{ got, want string }{
-		{appDSN("meerkat.db"), "meerkat.db?_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(1)&_txlock=immediate"},
-		{appDSN("file:a.db?mode=rw"), "file:a.db?mode=rw&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(1)&_txlock=immediate"},
-		{migrationDSN("/app/data/meerkat.db"), "/app/data/meerkat.db?_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)"},
+		{appDSN("meerkat.db"), "meerkat.db?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(1)&_txlock=immediate"},
+		{appDSN("file:a.db?mode=rw"), "file:a.db?mode=rw&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(1)&_txlock=immediate"},
+		{migrationDSN("/app/data/meerkat.db"), "/app/data/meerkat.db?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)"},
 	}
 	for _, c := range cases {
 		if c.got != c.want {

@@ -42,9 +42,11 @@ func InitDB(dbPath string) (*gorm.DB, error) {
 	return db, nil
 }
 
-// Connection settings, applied by the driver to every pooled connection
-// (the driver itself already sets busy_timeout to 5s).
+// Connection settings, applied by the driver to every pooled connection.
 //
+//   - busy_timeout=5000: a connection that finds the database locked waits up to
+//     5s instead of failing at once. The driver defaults to this too; it is set
+//     here because _txlock=immediate below relies on it.
 //   - journal_mode=WAL: readers no longer block on a writer, and a commit appends
 //     to the -wal file instead of rewriting pages. It persists in the database file.
 //     The -wal and -shm files must stay next to the database.
@@ -57,6 +59,7 @@ func InitDB(dbPath string) (*gorm.DB, error) {
 //     because waiting while holding a read lock could deadlock. With BEGIN IMMEDIATE
 //     the wait happens at BEGIN, where busy_timeout applies.
 const (
+	pragmaBusyTimeout = "_pragma=busy_timeout(5000)"
 	pragmaWAL         = "_pragma=journal_mode(WAL)"
 	pragmaSyncNormal  = "_pragma=synchronous(NORMAL)"
 	pragmaForeignKeys = "_pragma=foreign_keys(1)"
@@ -65,13 +68,13 @@ const (
 
 // appDSN is the DSN of the application's connection pool.
 func appDSN(dbPath string) string {
-	return withDSNParams(dbPath, pragmaWAL, pragmaSyncNormal, pragmaForeignKeys, txLockImmediate)
+	return withDSNParams(dbPath, pragmaBusyTimeout, pragmaWAL, pragmaSyncNormal, pragmaForeignKeys, txLockImmediate)
 }
 
 // migrationDSN leaves foreign keys off: migrations recreate tables, which with
 // enforcement on would cascade deletes into, or fail on, the dependent rows.
 func migrationDSN(dbPath string) string {
-	return withDSNParams(dbPath, pragmaWAL, pragmaSyncNormal)
+	return withDSNParams(dbPath, pragmaBusyTimeout, pragmaWAL, pragmaSyncNormal)
 }
 
 func withDSNParams(dbPath string, params ...string) string {
