@@ -170,8 +170,10 @@ func newError(status int, msg string, errs ...error) huma.StatusError {
 			}
 		}
 		return wrap(e)
-	case http.StatusBadRequest:
-		// Malformed JSON: the same error ValidateJSONMiddleware gave, with the parser's reason.
+	case http.StatusBadRequest, http.StatusRequestEntityTooLarge, http.StatusUnsupportedMediaType:
+		// Malformed JSON, a body over the limit or a non-JSON media type: the 400
+		// INVALID_INPUT that ValidateJSONMiddleware gave (and docs/api-reference.md
+		// lists), with the reason.
 		reason := msg
 		if len(errs) > 0 {
 			reason = errs[0].Error()
@@ -180,8 +182,6 @@ func newError(status int, msg string, errs ...error) huma.StatusError {
 			}
 		}
 		return wrap(apperrors.ErrInvalidInput("request body", reason))
-	case http.StatusRequestEntityTooLarge, http.StatusUnsupportedMediaType:
-		return wrap(apperrors.NewError(apperrors.ErrCodeInvalidInput, msg, status))
 	}
 	e := apperrors.NewError(codeFor(status), msg, status)
 	if len(errs) > 0 {

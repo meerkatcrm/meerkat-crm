@@ -146,3 +146,18 @@ func TestAnEmptyBodyIsInvalidInput(t *testing.T) {
 		t.Fatalf("got %d %v", status, body)
 	}
 }
+
+func TestANonJSONMediaTypeIsInvalidInputWith400(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/things/1", strings.NewReader(`{"full_name":"ok"}`))
+	req.Header.Set("Content-Type", "text/plain")
+	w := httptest.NewRecorder()
+	newTestRouter(t).ServeHTTP(w, req)
+	var body map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	code, _ := errorOf(t, body)
+	if w.Code != http.StatusBadRequest || code != apperrors.ErrCodeInvalidInput {
+		t.Fatalf("got %d %v", w.Code, body)
+	}
+}
