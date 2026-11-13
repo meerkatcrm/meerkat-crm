@@ -142,7 +142,8 @@
       "oldestFirst": "Älteste zuerst",
       "nameAZ": "Name A-Z",
       "nameZA": "Name Z-A",
-      "random": "Zufällig"
+      "random": "Zufällig",
+      "relevance": "Beste Treffer"
     },
     "showArchived": "Archivierte anzeigen",
     "archived": "Archiviert",

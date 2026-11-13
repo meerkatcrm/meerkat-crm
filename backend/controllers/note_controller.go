@@ -184,7 +184,7 @@ type listNotesInput struct {
 	// Strings, so a value that does not parse falls back to its default instead of failing.
 	Page     string `query:"page" doc:"Page number, from 1 (default 1)"`
 	Limit    string `query:"limit" doc:"Page size, 1 to 100 (default 25)"`
-	Search   string `query:"search" doc:"Text the content contains, case-insensitive"`
+	Search   string `query:"search" doc:"Words the content contains, each matching the start of a word; case and accents are ignored. Digits-only text, and scripts written without spaces (Chinese, Japanese, Korean, Thai, Lao, Khmer, Myanmar, Tibetan), match anywhere"`
 	FromDate string `query:"fromDate" doc:"First day, YYYY-MM-DD; ignored when not a date"`
 	ToDate   string `query:"toDate" doc:"Last day, inclusive, YYYY-MM-DD; ignored when not a date"`
 }
@@ -203,7 +203,9 @@ func listUnassignedNotes(ctx context.Context, in *listNotesInput) (*out[NotePage
 	if to, err := time.Parse("2006-01-02", in.ToDate); err == nil {
 		query = query.Where("notes.date < ?", to.AddDate(0, 0, 1)) // through the whole last day
 	}
-	if search := strings.ToLower(strings.TrimSpace(in.Search)); search != "" {
+	if match, ok := ftsMatch(in.Search); ok {
+		query = query.Where("notes.id IN (SELECT rowid FROM notes_fts WHERE notes_fts MATCH ?)", match)
+	} else if search := strings.ToLower(strings.TrimSpace(in.Search)); search != "" {
 		query = query.Where(likeAny("LOWER(content)"), searchArg(search))
 	}
 

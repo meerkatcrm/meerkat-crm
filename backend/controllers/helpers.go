@@ -5,8 +5,10 @@ import (
 	"errors"
 	"meerkat/config"
 	apperrors "meerkat/errors"
+	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -32,9 +34,60 @@ func likeAny(exprs ...string) string {
 }
 
 // searchArg binds a user search term for likeAny, escaping the LIKE wildcards so
-// that "50%" or "a_b" match literally.
+// that "50%" or "a_b" match literally. Like ftsMatch it uses the first maxSearchRunes.
 func searchArg(term string) sql.NamedArg {
+	if r := []rune(term); len(r) > maxSearchRunes {
+		term = string(r[:maxSearchRunes])
+	}
 	return sql.Named("search", "%"+likeEscaper.Replace(term)+"%")
+}
+
+// Bounds on what one search can ask the full-text index for.
+const (
+	maxSearchRunes = 200
+	maxSearchWords = 32
+)
+
+// phoneLike is input of only digits and phone punctuation: "795550" must find the middle of
+// "+41 79 5550101", which a word-prefix index cannot do.
+var phoneLike = regexp.MustCompile(`^[\d\s+()./-]*\d[\d\s+()./-]*$`)
+
+// unspacedScripts are written without spaces between words, so the tokenizer indexes a
+// whole phrase as one word and a prefix search cannot find a word inside it.
+var unspacedScripts = []*unicode.RangeTable{
+	unicode.Han, unicode.Hiragana, unicode.Katakana, unicode.Hangul,
+	unicode.Thai, unicode.Lao, unicode.Khmer, unicode.Myanmar, unicode.Tibetan,
+}
+
+// ftsMatch turns a typed search term into an FTS5 MATCH expression for the *_fts tables of
+// migration 41: every word must match the start of an indexed word, in any order ("mül zo"
+// finds "Zoë Müller"; case and accents are ignored by the tokenizer). Each word is quoted, so
+// FTS5 syntax in the input is plain text. ok is false when the caller should use the LIKE
+// search instead: no letters or digits, phone-like digits, or text in a script written
+// without spaces between words (unspacedScripts), where a typed part must match anywhere.
+func ftsMatch(term string) (match string, ok bool) {
+	if r := []rune(term); len(r) > maxSearchRunes {
+		term = string(r[:maxSearchRunes])
+	}
+	if phoneLike.MatchString(term) {
+		return "", false
+	}
+	for _, r := range term {
+		if unicode.In(r, unspacedScripts...) {
+			return "", false
+		}
+	}
+	words := strings.FieldsFunc(term, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) })
+	if len(words) == 0 {
+		return "", false
+	}
+	if len(words) > maxSearchWords {
+		words = words[:maxSearchWords]
+	}
+	for i, w := range words {
+		words[i] = `"` + w + `"*`
+	}
+	return strings.Join(words, " "), true
 }
 
 // PaginationParams represents sanitized pagination query values.

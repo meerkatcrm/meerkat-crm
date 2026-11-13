@@ -42,6 +42,13 @@ make migrate-create NAME=add_foo_column
 
 This creates two files in `database/migrations/`: `NNNNNN_add_foo_column.up.sql` and `.down.sql`.
 
+### Search index (FTS5)
+
+Search uses the SQLite FTS5 tables `contacts_fts`, `notes_fts` and `activities_fts` (migration 41). Each row's rowid is the id of the indexed row, `AFTER INSERT/UPDATE/DELETE` triggers keep them in sync, and the `unicode61 remove_diacritics 2` tokenizer folds case and accents. The index holds no `user_id`: queries always join back to the real table, which filters `user_id` and `deleted_at`. `ftsMatch` in `controllers/helpers.go` quotes every typed word as a prefix term, so input is never FTS5 syntax, and returns `ok == false` for phone-like digits, text in scripts without spaces between words (`unspacedScripts`: CJK, Thai, Lao, Khmer, Myanmar, Tibetan) and punctuation, which keep the `LIKE` search.
+
+- **Recreating `contacts`, `notes` or `activities`** in a migration drops their triggers. Recreate them and rebuild the index (`DELETE FROM contacts_fts;` and the `INSERT ... SELECT` from migration 41). `TestSearchIndexTriggersSurviveAllMigrations` fails until you do. The same applies when you add a column to an index.
+- Controller tests build their database with `AutoMigrate`, so `setupRouter` also runs the migration 41 SQL.
+
 ### Running Migrations
 
 Migrations run automatically on startup. To apply or roll back manually:
