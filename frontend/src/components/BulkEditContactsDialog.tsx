@@ -46,9 +46,14 @@ type ArchiveChoice = '' | 'archive' | 'unarchive';
 
 // Adds a typed but not yet confirmed circle name, so it isn't lost when Apply is
 // pressed without Enter first.
+function sameCircle(a: string, b: string): boolean {
+  return a.toLowerCase() === b.toLowerCase();
+}
+
 function withPending(values: string[], pending: string): string[] {
   const all = [...values, pending].map((v) => v.trim()).filter(Boolean);
-  return all.filter((v, i) => all.indexOf(v) === i);
+  // Names differing only in case are one circle, as everywhere else in the app
+  return all.filter((v, i) => all.findIndex((w) => sameCircle(v, w)) === i);
 }
 
 export default function BulkEditContactsDialog({
@@ -70,7 +75,7 @@ export default function BulkEditContactsDialog({
 
   const fields = BULK_FIELDS.filter((f) => enabledFields.has(f.enabledBy));
   const toAdd = withPending(addCircles, addInput);
-  const overlap = toAdd.filter((c) => removeCircles.includes(c));
+  const overlap = toAdd.filter((c) => removeCircles.some((r) => sameCircle(r, c)));
   const filledValues = Object.entries(values).filter(([, v]) => v && v.trim() !== '');
   const hasChange = toAdd.length > 0 || removeCircles.length > 0 || filledValues.length > 0 || archive !== '';
 

@@ -296,3 +296,18 @@ func TestBulkUpdateContacts_EmploymentFollowsImportSemantics(t *testing.T) {
 	assert.Equal(t, "Acme", jobs[1].Organization)
 	assert.Empty(t, jobs[1].EndDate, "a new current job is opened")
 }
+
+// Circle names that differ only in case are one circle, as a single contact save
+// (unique_circles) treats them.
+func TestBulkUpdateContacts_CirclesIgnoreCase(t *testing.T) {
+	db, router, user := setupBulkRouter(t)
+	ct := models.Contact{UserID: user.ID, Firstname: "A", Circles: []string{"friends", "Old Work"}}
+	require.NoError(t, db.Create(&ct).Error)
+
+	w := postBulk(router, gin.H{"contact_ids": []uint{ct.ID}, "add_circles": []string{"Friends", "gym", "GYM"}, "remove_circles": []string{"old work"}})
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.Equal(t, []string{"friends", "gym"}, loadContact(t, db, ct.ID).Circles)
+
+	w = postBulk(router, gin.H{"contact_ids": []uint{ct.ID}, "add_circles": []string{"Gym"}, "remove_circles": []string{"gym"}})
+	assert.Equal(t, http.StatusBadRequest, w.Code, "adding and removing one circle is rejected whatever its case")
+}

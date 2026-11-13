@@ -206,3 +206,30 @@ test('after a bulk edit the message says how many contacts changed, or that none
   fireEvent.click(screen.getByText('finish-0'));
   expect(await screen.findByText(/Nothing needed changing/)).toBeInTheDocument();
 });
+
+test('select all still applies when the page is turned while it collects', async () => {
+  mockList([contact(1, 'Ann')], 15);
+  let resolve!: (v: unknown) => void;
+  vi.mocked(getContacts).mockReturnValue(new Promise((r) => { resolve = r; }) as never);
+  renderAt('/contacts');
+
+  fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Select all 15' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Go to page 2' }));
+  await act(async () => resolve({ contacts: Array.from({ length: 15 }, (_, i) => contact(i + 1, 'X')), total: 15, page: 1, limit: 100 }));
+  expect(screen.getByText('15 selected')).toBeInTheDocument();
+});
+
+test('select all applies nothing when select mode is left while it collects', async () => {
+  mockList([contact(1, 'Ann')], 5);
+  let resolve!: (v: unknown) => void;
+  vi.mocked(getContacts).mockReturnValue(new Promise((r) => { resolve = r; }) as never);
+  renderAt('/contacts');
+
+  fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Select all 5' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+  await act(async () => resolve({ contacts: [1, 2, 3, 4, 5].map(id => contact(id, 'X')), total: 5, page: 1, limit: 100 }));
+  fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+  expect(screen.getByText('0 selected')).toBeInTheDocument();
+});

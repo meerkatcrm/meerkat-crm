@@ -94,27 +94,21 @@ export default function ContactsPage() {
     });
   }, [setSearchParams]);
 
-  // Memoize params to prevent infinite re-renders
-  const contactParams = useMemo(() => ({
-    page,
-    limit: pageSize,
+  // The list's filters and order without paging: what "select all" and the detail
+  // page's previous / next step through. Memoized to prevent infinite re-renders.
+  const listParams = useMemo(() => ({
     search: searchQuery,
     circle: selectedCircle,
     sort: sortField === 'relevance' ? undefined : sortField,
     order: sortField === 'relevance' ? undefined : sortOrder,
     includeArchived: showArchived,
-  }), [page, searchQuery, selectedCircle, sortField, sortOrder, showArchived]);
+  }), [searchQuery, selectedCircle, sortField, sortOrder, showArchived]);
 
-  // The list's filters and order without paging: what "select all" and the detail
-  // page's previous / next step through.
-  const listParams = useMemo(() => {
-    const { page: _page, limit: _limit, ...rest } = contactParams;
-    return rest;
-  }, [contactParams]);
+  const contactParams = useMemo(() => ({ ...listParams, page, limit: pageSize }), [listParams, page]);
 
-  // The list showing now, for async work that must not apply to a list changed meanwhile
-  const listParamsRef = useRef(listParams);
-  listParamsRef.current = listParams;
+  // Bumped whenever the selection is reset (other filters, leaving select mode), so a
+  // "select all" still collecting then knows its result is no longer wanted.
+  const selectionEpoch = useRef(0);
 
   // Use custom hook for fetching contacts
   const { contacts, total: totalContacts, loading, refetch } = useContacts(contactParams);
@@ -149,6 +143,7 @@ export default function ContactsPage() {
     ) {
       setPage(1);
       // A selection is made within one list: other filters would hide what it holds
+      selectionEpoch.current++;
       setSelectedIds(new Set());
       prevFiltersRef.current = { searchQuery, selectedCircle, activeSort, showArchived };
     }
@@ -203,7 +198,7 @@ export default function ContactsPage() {
   // Collects the IDs of every contact matching the current filters, a page of the
   // largest size the server allows at a time.
   const selectAllMatching = async () => {
-    const forList = listParams;
+    const epoch = selectionEpoch.current;
     setSelectingAll(true);
     try {
       const ids = new Set<number>();
@@ -214,8 +209,9 @@ export default function ContactsPage() {
         result.contacts.forEach(c => ids.add(c.ID));
         if (result.contacts.length < limit || p * limit >= result.total) break;
       }
-      // The filters changed while the IDs were collected: they belong to another list
-      if (listParamsRef.current !== forList) return;
+      // The filters changed or select mode was left while the IDs were collected.
+      // Turning the page doesn't matter: the IDs cover every page.
+      if (selectionEpoch.current !== epoch) return;
       setSelectedIds(ids);
     } catch (err) {
       showError(getErrorMessage(err));
@@ -225,6 +221,7 @@ export default function ContactsPage() {
   };
 
   const exitSelectMode = () => {
+    selectionEpoch.current++;
     setSelectMode(false);
     setSelectedIds(new Set());
   };

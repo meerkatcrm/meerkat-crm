@@ -81,3 +81,14 @@ test('an error from the server is shown and the dialog stays open', async () => 
   expect(await screen.findByText('Contact not found')).toBeInTheDocument();
   expect(onComplete).not.toHaveBeenCalled();
 });
+
+test('circle names differing only in case are one circle', async () => {
+  vi.mocked(bulkUpdateContacts).mockResolvedValue({ updated: 2 });
+  const { onComplete } = renderDialog();
+  fireEvent.mouseDown(screen.getByLabelText('Remove from circles'));
+  fireEvent.click(within(screen.getByRole('listbox')).getByText('work'));
+  fireEvent.change(screen.getByLabelText('Add to circles'), { target: { value: 'WORK' } });
+  expect(screen.getByText(/can't be added and removed at once: WORK/)).toBeInTheDocument();
+  expect(applyButton()).toBeDisabled();
+  expect(onComplete).not.toHaveBeenCalled();
+});

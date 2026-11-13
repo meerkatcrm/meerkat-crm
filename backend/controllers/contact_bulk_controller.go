@@ -80,7 +80,7 @@ func BulkUpdateContacts(c *gin.Context) {
 		return
 	}
 	for _, circle := range addCircles {
-		if slices.Contains(removeCircles, circle) {
+		if containsCircle(removeCircles, circle) {
 			apperrors.AbortWithError(c, apperrors.ErrInvalidInput("circles", "a circle can't be both added and removed"))
 			return
 		}
@@ -185,12 +185,19 @@ func bulkSnapshotOf(c *models.Contact) bulkSnapshot {
 	}
 }
 
+// containsCircle reports whether the list has the circle. Circle names that differ
+// only in case are the same circle, as the unique_circles validator of a single
+// contact save treats them: a bulk edit must not write a list that one rejects.
+func containsCircle(circles []string, circle string) bool {
+	return slices.ContainsFunc(circles, func(c string) bool { return strings.EqualFold(c, circle) })
+}
+
 // cleanCircles trims the names and drops blanks and repeats.
 func cleanCircles(circles []string) []string {
 	out := make([]string, 0, len(circles))
 	for _, circle := range circles {
 		circle = strings.TrimSpace(circle)
-		if circle != "" && !slices.Contains(out, circle) {
+		if circle != "" && !containsCircle(out, circle) {
 			out = append(out, circle)
 		}
 	}
@@ -198,16 +205,17 @@ func cleanCircles(circles []string) []string {
 }
 
 // applyCircleChanges keeps the contact's circles in their order, drops the removed
-// ones and appends the added ones it doesn't have yet.
+// ones and appends the added ones it doesn't have yet, keeping the casing a
+// circle already has on the contact.
 func applyCircleChanges(circles, add, remove []string) []string {
 	out := make([]string, 0, len(circles)+len(add))
 	for _, circle := range circles {
-		if !slices.Contains(remove, circle) && !slices.Contains(out, circle) {
+		if !containsCircle(remove, circle) && !containsCircle(out, circle) {
 			out = append(out, circle)
 		}
 	}
 	for _, circle := range add {
-		if !slices.Contains(out, circle) {
+		if !containsCircle(out, circle) {
 			out = append(out, circle)
 		}
 	}
