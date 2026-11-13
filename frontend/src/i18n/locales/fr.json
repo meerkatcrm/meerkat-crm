@@ -199,7 +199,9 @@
         "toCreate": "{{count}} à créer",
         "toUpdate": "{{count}} à mettre à jour",
         "toSkip": "{{count}} à ignorer",
-        "errors": "{{count}} avec erreurs"
+        "errors": "{{count}} avec erreurs",
+        "assignCircles": "Ajouter tous les contacts importés à des cercles",
+        "assignCirclesHelp": "Les contacts ajoutés ou mis à jour rejoignent ces cercles, en plus des cercles du fichier. Saisissez un nouveau nom pour créer un cercle."
       },
       "result": {
         "title": "Importation terminée",

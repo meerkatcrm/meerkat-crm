@@ -27,6 +27,8 @@ import {
   LinearProgress,
   IconButton,
   Tooltip,
+  Autocomplete,
+  TextField,
 } from '@mui/material';
 import AppDialog from './AppDialog';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
@@ -58,10 +60,19 @@ interface ImportContactsDialogProps {
   open: boolean;
   onClose: () => void;
   onImportComplete: () => void;
+  // Existing circle names, offered when choosing circles for the imported contacts
+  availableCircles?: string[];
 }
 
 type ImportStep = 'upload' | 'mapping' | 'preview' | 'result';
 type ImportType = 'csv' | 'vcf';
+
+// Adds a typed but not yet confirmed circle name, so it isn't lost when Import is
+// pressed without Enter first. Names differing only in case are one circle.
+function withPendingCircle(values: string[], pending: string): string[] {
+  const all = [...values, pending].map((v) => v.trim()).filter(Boolean);
+  return all.filter((v, i) => all.findIndex((w) => w.toLowerCase() === v.toLowerCase()) === i);
+}
 
 const CSV_STEP_KEYS = ['upload', 'mapColumns', 'review', 'done'] as const;
 const VCF_STEP_KEYS = ['upload', 'review', 'done'] as const;
@@ -70,6 +81,7 @@ export default function ImportContactsDialog({
   open,
   onClose,
   onImportComplete,
+  availableCircles = [],
 }: ImportContactsDialogProps) {
   const { t } = useTranslation();
   // Fields that also exist on the contact form reuse its translated label; the rest
@@ -92,6 +104,8 @@ export default function ImportContactsDialog({
   // Preview state
   const [previewResponse, setPreviewResponse] = useState<ImportPreviewResponse | null>(null);
   const [rowActions, setRowActions] = useState<Map<number, string>>(new Map());
+  const [assignCircles, setAssignCircles] = useState<string[]>([]);
+  const [circleInput, setCircleInput] = useState('');
 
   // Result state
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
@@ -110,6 +124,8 @@ export default function ImportContactsDialog({
     setMappings([]);
     setPreviewResponse(null);
     setRowActions(new Map());
+    setAssignCircles([]);
+    setCircleInput('');
     setImportResult(null);
     setLoading(false);
     setError(null);
@@ -267,9 +283,10 @@ export default function ImportContactsDialog({
       });
 
       // Use appropriate confirm endpoint based on import type
+      const circles = withPendingCircle(assignCircles, circleInput);
       const result = importType === 'vcf'
-        ? await confirmVCFImport(previewResponse.session_id, actions)
-        : await confirmImport(previewResponse.session_id, actions);
+        ? await confirmVCFImport(previewResponse.session_id, actions, circles)
+        : await confirmImport(previewResponse.session_id, actions, circles);
 
       setImportResult(result);
       setStep('result');
@@ -503,6 +520,32 @@ export default function ImportContactsDialog({
             />
           )}
         </Box>
+
+        {/* Circles every imported contact joins */}
+        <Autocomplete
+          multiple
+          freeSolo
+          size="small"
+          options={availableCircles}
+          value={assignCircles}
+          inputValue={circleInput}
+          onInputChange={(_, value) => setCircleInput(value)}
+          onChange={(_, value) => setAssignCircles(withPendingCircle(value as string[], ''))}
+          renderValue={(selected, getItemProps) =>
+            selected.map((option, index) => {
+              const { key, ...itemProps } = getItemProps({ index });
+              return <Chip key={key} label={option} size="small" {...itemProps} />;
+            })
+          }
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              label={t('contacts.import.preview.assignCircles')}
+              helperText={t('contacts.import.preview.assignCirclesHelp')}
+            />
+          )}
+          sx={{ mb: 2 }}
+        />
 
         {/* Preview table */}
         <TableContainer component={Paper} sx={{ maxHeight: 350 }}>

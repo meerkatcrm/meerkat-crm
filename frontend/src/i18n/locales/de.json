@@ -199,7 +199,9 @@
         "toCreate": "{{count}} zu erstellen",
         "toUpdate": "{{count}} zu aktualisieren",
         "toSkip": "{{count}} zu überspringen",
-        "errors": "{{count}} mit Fehlern"
+        "errors": "{{count}} mit Fehlern",
+        "assignCircles": "Alle importierten Kontakte zu Kreisen hinzufügen",
+        "assignCirclesHelp": "Hinzugefügte oder aktualisierte Kontakte kommen zusätzlich zu den Kreisen aus der Datei in diese Kreise. Gib einen neuen Namen ein, um einen Kreis anzulegen."
       },
       "result": {
         "title": "Import abgeschlossen",

@@ -173,16 +173,19 @@ export async function getImportPreview(
   });
 }
 
-// Confirm and execute the import (CSV)
+// Confirm and execute the import (CSV). Every added or updated contact also joins
+// `circles`, on top of any circles it brings from the file.
 export async function confirmImport(
   sessionId: string,
-  actions: RowImportAction[]
+  actions: RowImportAction[],
+  circles: string[] = []
 ): Promise<ImportResult> {
   return apiJson('/contacts/import/confirm', {
     method: 'POST',
     body: JSON.stringify({
       session_id: sessionId,
       actions,
+      circles,
     }),
   });
 }
@@ -203,13 +206,15 @@ export async function uploadVCFForImport(
 // Confirm and execute VCF import (with photo processing)
 export async function confirmVCFImport(
   sessionId: string,
-  actions: RowImportAction[]
+  actions: RowImportAction[],
+  circles: string[] = []
 ): Promise<ImportResult> {
   return apiJson('/contacts/import/vcf/confirm', {
     method: 'POST',
     body: JSON.stringify({
       session_id: sessionId,
       actions,
+      circles,
     }),
   });
 }

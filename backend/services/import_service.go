@@ -9,6 +9,7 @@ import (
 	"meerkat/middleware"
 	"meerkat/models"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -689,6 +690,30 @@ func ParseCircles(input string) []string {
 	}
 
 	return circles
+}
+
+// CleanCircles trims circle names and drops blanks and repeats. Names that differ only
+// in case are the same circle, as the unique_circles validator treats them.
+func CleanCircles(circles []string) []string {
+	return AddCircles(nil, circles)
+}
+
+// AddCircles returns circles with each of add appended that it doesn't already have,
+// keeping the existing order. It never modifies circles' backing array.
+func AddCircles(circles, add []string) []string {
+	if len(add) == 0 {
+		return circles
+	}
+	out := make([]string, 0, len(circles)+len(add))
+	out = append(out, circles...)
+	for _, circle := range add {
+		circle = strings.TrimSpace(circle)
+		if circle == "" || slices.ContainsFunc(out, func(c string) bool { return strings.EqualFold(c, circle) }) {
+			continue
+		}
+		out = append(out, circle)
+	}
+	return out
 }
 
 // addrEntry accumulates the components of one structured address while building a row.

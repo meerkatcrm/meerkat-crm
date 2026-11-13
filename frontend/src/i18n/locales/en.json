@@ -199,7 +199,9 @@
         "toCreate": "{{count}} to create",
         "toUpdate": "{{count}} to update",
         "toSkip": "{{count}} to skip",
-        "errors": "{{count}} with errors"
+        "errors": "{{count}} with errors",
+        "assignCircles": "Add all imported contacts to circles",
+        "assignCirclesHelp": "Contacts that are added or updated join these circles, in addition to any circles from the file. Type a new name to create a circle."
       },
       "result": {
         "title": "Import Complete",

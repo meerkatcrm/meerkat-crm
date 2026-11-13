@@ -199,7 +199,9 @@
         "toCreate": "{{count}} 项待创建",
         "toUpdate": "{{count}} 项待更新",
         "toSkip": "{{count}} 项待跳过",
-        "errors": "{{count}} 项有错误"
+        "errors": "{{count}} 项有错误",
+        "assignCircles": "将所有导入的联系人加入圈子",
+        "assignCirclesHelp": "新增或更新的联系人除文件中的圈子外，还会加入这些圈子。输入新名称即可创建圈子。"
       },
       "result": {
         "title": "导入完成",
