@@ -78,3 +78,13 @@ test('a step that resolves after the user left does not pull them back', async (
   await act(async () => resolve({ contacts: [{ ID: 9, firstname: 'Bo', lastname: '' }], total: 3, page: 2, limit: 1 }));
   expect(screen.getByTestId('where')).toHaveTextContent('/activities');
 });
+
+test('a list that shrank under the contact drops the buttons instead of dead-ending', async () => {
+  vi.mocked(getContacts).mockResolvedValue({ contacts: [], total: 2, page: 4, limit: 1 });
+  renderWith({ listNav: { params, index: 4, total: 5 } });
+
+  fireEvent.click(screen.getByRole('button', { name: 'Previous' }));
+  expect(await screen.findByText('That contact is no longer in the list')).toBeInTheDocument();
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'Previous' })).not.toBeInTheDocument());
+  expect(screen.getByTestId('where')).toHaveTextContent('/contacts/5 null');
+});

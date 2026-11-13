@@ -39,8 +39,11 @@ export default function ContactListNavigator() {
       if (!mounted.current) return;
       const next = result.contacts[0];
       if (!next) {
-        // The list shrank since it was opened: there is nothing at that position any more
+        // The list shrank since it was opened, so this contact's place in it is no longer
+        // known. Drop the list position (and the buttons) rather than offer steps that
+        // would keep landing on empty positions.
         showError(t('contactDetail.listNav.gone'));
+        navigate(location.pathname, { replace: true, state: null });
         return;
       }
       navigate(`/contacts/${next.ID}`, {
