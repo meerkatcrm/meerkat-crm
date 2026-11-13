@@ -80,3 +80,48 @@ func TestForeignKeyViolationsReportsOrphans(t *testing.T) {
 		t.Errorf("got %v, want one webhooks -> users violation", got)
 	}
 }
+
+// With foreign_keys=ON, hard-deleting a parent whose foreign key has no ON DELETE
+// action fails with "FOREIGN KEY constraint failed". Every foreign key must
+// therefore cascade, unless its parent is never hard-deleted.
+func TestEveryForeignKeyCascadesOnDelete(t *testing.T) {
+	sqlDB, err := sql.Open("sqlite", migrationDSN(filepath.Join(t.TempDir(), "schema.db")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sqlDB.Close()
+	if err := RunMigrations(sqlDB); err != nil {
+		t.Fatal(err)
+	}
+
+	// Contacts are only soft-deleted (deleted_at), so these never see a parent delete.
+	exempt := map[string]bool{
+		"relationships.contact_id -> contacts":         true,
+		"relationships.related_contact_id -> contacts": true,
+	}
+	rows, err := sqlDB.Query(`SELECT m.name, f."from", f."table", f.on_delete
+		FROM sqlite_master m, pragma_foreign_key_list(m.name) f
+		WHERE m.type = 'table'`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	seen := 0
+	for rows.Next() {
+		var table, column, parent, onDelete string
+		if err := rows.Scan(&table, &column, &parent, &onDelete); err != nil {
+			t.Fatal(err)
+		}
+		seen++
+		key := table + "." + column + " -> " + parent
+		if onDelete != "CASCADE" && !exempt[key] {
+			t.Errorf("%s has ON DELETE %s; add ON DELETE CASCADE in a migration", key, onDelete)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if seen == 0 {
+		t.Fatal("no foreign keys found; the query is broken")
+	}
+}

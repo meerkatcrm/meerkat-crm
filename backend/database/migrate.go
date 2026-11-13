@@ -108,9 +108,12 @@ func warnForeignKeyViolations(db *sql.DB) {
 		logger.Warn().Err(err).Msg("Could not run the foreign key check")
 		return
 	}
+	// The check runs on every start (it takes milliseconds on a CRM-sized database),
+	// so the warning repeats until the rows are cleaned up.
 	for relation, n := range counts {
 		logger.Warn().Str("relation", relation).Int("rows", n).
-			Msg("Rows reference a parent that no longer exists; changing them can fail now that foreign keys are enforced")
+			Msg(`Rows reference a parent that no longer exists; changing them can fail now that foreign keys are enforced. ` +
+				`List them with: sqlite3 <db> "PRAGMA foreign_key_check", then delete them or point them at an existing parent`)
 	}
 }
 
