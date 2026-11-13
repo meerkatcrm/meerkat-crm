@@ -3,7 +3,9 @@ package database
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -94,7 +96,11 @@ func TestEveryForeignKeyCascadesOnDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Contacts are only soft-deleted (deleted_at), so these never see a parent delete.
+	// No code path hard-deletes a contact: contact delete, merge and user delete all
+	// set deleted_at, and contacts have no foreign key to users that could cascade.
+	// A feature that hard-deletes contacts (say, purging a trash) must first delete
+	// or cascade the relationships pointing at them, or remove these exemptions
+	// with a migration that adds ON DELETE CASCADE.
 	exempt := map[string]bool{
 		"relationships.contact_id -> contacts":         true,
 		"relationships.related_contact_id -> contacts": true,
@@ -123,5 +129,23 @@ func TestEveryForeignKeyCascadesOnDelete(t *testing.T) {
 	}
 	if seen == 0 {
 		t.Fatal("no foreign keys found; the query is broken")
+	}
+}
+
+func TestStorageHint(t *testing.T) {
+	for _, msg := range []string{"disk I/O error (10)", "unable to open database file: out of memory (14)", "locking protocol (15)"} {
+		if storageHint(errors.New(msg)) == "" {
+			t.Errorf("no hint for %q", msg)
+		}
+	}
+	if got := storageHint(errors.New("no such table: users")); got != "" {
+		t.Errorf("unexpected hint %q", got)
+	}
+}
+
+func TestInitDBHintsAtStorageWhenTheDatabaseCannotBeOpened(t *testing.T) {
+	_, err := InitDB(filepath.Join(t.TempDir(), "missing-dir", "meerkat.db"))
+	if err == nil || !strings.Contains(err.Error(), "SQLITE_DB_PATH") {
+		t.Fatalf("got %v, want an error that mentions SQLITE_DB_PATH", err)
 	}
 }

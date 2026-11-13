@@ -28,7 +28,7 @@ func InitDB(dbPath string) (*gorm.DB, error) {
 
 	// Run migrations
 	if err := RunMigrations(sqlDB); err != nil {
-		return nil, fmt.Errorf("failed to run migrations: %w", err)
+		return nil, fmt.Errorf("failed to run migrations: %w%s", err, storageHint(err))
 	}
 	// Databases written while foreign keys were off may hold orphan rows.
 	warnForeignKeyViolations(sqlDB, dbPath)
@@ -80,6 +80,20 @@ func withDSNParams(dbPath string, params ...string) string {
 		sep = "&"
 	}
 	return dbPath + sep + strings.Join(params, "&")
+}
+
+// storageHint explains the errors SQLite gives when the database sits on a
+// filesystem without the shared memory and locking WAL needs (NFS, SMB). They
+// surface on the first query, which is the migration run.
+func storageHint(err error) string {
+	msg := strings.ToLower(err.Error())
+	for _, symptom := range []string{"disk i/o error", "unable to open database file", "locking protocol"} {
+		if strings.Contains(msg, symptom) {
+			return " (the database runs in WAL mode, which needs a local disk or Docker volume: " +
+				"if SQLITE_DB_PATH is on an NFS or SMB mount, move it; otherwise check that its directory exists and is writable)"
+		}
+	}
+	return ""
 }
 
 // foreignKeyViolations counts the rows PRAGMA foreign_key_check reports, per
