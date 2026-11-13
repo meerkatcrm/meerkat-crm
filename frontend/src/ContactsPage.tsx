@@ -48,8 +48,18 @@ export default function ContactsPage() {
   const [showArchived, setShowArchived] = useState(false);
   const pageSize = 10;
 
-  // Parse sort option into field and order
-  const [sortField, sortOrder] = sortOption.split('-');
+  // While searching, the default order is the best match first (the server ranks when no
+  // sort is sent). Another order can be picked; it holds for that search only.
+  const trimmedQuery = searchQuery.trim();
+  const searching = trimmedQuery !== '';
+  const [searchSort, setSearchSort] = useState({ query: trimmedQuery, option: 'relevance' });
+  // Any change of the search, even back to an earlier term, starts at Best match again
+  if (searchSort.query !== trimmedQuery) {
+    setSearchSort({ query: trimmedQuery, option: 'relevance' });
+  }
+  const searchSortOption = searchSort.query === trimmedQuery ? searchSort.option : 'relevance';
+  const activeSort = searching ? searchSortOption : sortOption;
+  const [sortField, sortOrder] = activeSort.split('-');
 
   // Persist sort option to localStorage
   useEffect(() => {
@@ -75,8 +85,8 @@ export default function ContactsPage() {
     limit: pageSize,
     search: searchQuery,
     circle: selectedCircle,
-    sort: sortField,
-    order: sortOrder,
+    sort: sortField === 'relevance' ? undefined : sortField,
+    order: sortField === 'relevance' ? undefined : sortOrder,
     includeArchived: showArchived,
   }), [page, searchQuery, selectedCircle, sortField, sortOrder, showArchived]);
 
@@ -102,19 +112,19 @@ export default function ContactsPage() {
   }, []);
 
   // Reset to page 1 when search, filter, sort or the archived toggle changes (but not on initial mount)
-  const prevFiltersRef = useRef({ searchQuery, selectedCircle, sortOption, showArchived });
+  const prevFiltersRef = useRef({ searchQuery, selectedCircle, activeSort, showArchived });
   useEffect(() => {
     const prev = prevFiltersRef.current;
     if (
       prev.searchQuery !== searchQuery ||
       prev.selectedCircle !== selectedCircle ||
-      prev.sortOption !== sortOption ||
+      prev.activeSort !== activeSort ||
       prev.showArchived !== showArchived
     ) {
       setPage(1);
-      prevFiltersRef.current = { searchQuery, selectedCircle, sortOption, showArchived };
+      prevFiltersRef.current = { searchQuery, selectedCircle, activeSort, showArchived };
     }
-  }, [searchQuery, selectedCircle, sortOption, showArchived, setPage]);
+  }, [searchQuery, selectedCircle, activeSort, showArchived, setPage]);
 
   // Filter contacts by selected circle
   // With backend pagination, contacts are already filtered
@@ -167,10 +177,11 @@ export default function ContactsPage() {
           <InputLabel id="sort-select-label">{t('contacts.sortBy')}</InputLabel>
           <Select
             labelId="sort-select-label"
-            value={sortOption}
+            value={activeSort}
             label={t('contacts.sortBy')}
-            onChange={e => setSortOption(e.target.value)}
+            onChange={e => (searching ? setSearchSort({ query: trimmedQuery, option: e.target.value }) : setSortOption(e.target.value))}
           >
+            {searching && <MenuItem value="relevance">{t('contacts.sort.relevance')}</MenuItem>}
             <MenuItem value="id-desc">{t('contacts.sort.recentlyAdded')}</MenuItem>
             <MenuItem value="id-asc">{t('contacts.sort.oldestFirst')}</MenuItem>
             <MenuItem value="firstname-asc">{t('contacts.sort.nameAZ')}</MenuItem>

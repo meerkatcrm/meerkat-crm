@@ -133,11 +133,19 @@ func GetActivities(c *gin.Context) {
 		}
 	}
 
-	if search != "" {
+	if match, ok := ftsMatch(search); ok {
+		// The activity's own text, or the name of a contact linked to it
+		baseQuery = baseQuery.Where(
+			"activities.id IN (SELECT rowid FROM activities_fts WHERE activities_fts MATCH ?)"+
+				" OR activities.id IN (SELECT activity_contacts.activity_id FROM activity_contacts"+
+				" JOIN contacts ON contacts.id = activity_contacts.contact_id AND contacts.user_id = ? AND contacts.deleted_at IS NULL"+
+				" WHERE contacts.id IN (SELECT rowid FROM contacts_fts WHERE contacts_fts MATCH ?))",
+			match, userID, "{firstname lastname nickname} : ("+match+")")
+	} else if search != "" {
 		baseQuery = baseQuery.
 			Select("DISTINCT activities.*").
 			Joins("LEFT JOIN activity_contacts ON activity_contacts.activity_id = activities.id").
-			Joins("LEFT JOIN contacts ON contacts.id = activity_contacts.contact_id AND contacts.user_id = ?", userID).
+			Joins("LEFT JOIN contacts ON contacts.id = activity_contacts.contact_id AND contacts.user_id = ? AND contacts.deleted_at IS NULL", userID).
 			Where(likeAny(
 				"LOWER(activities.title)",
 				"LOWER(activities.description)",

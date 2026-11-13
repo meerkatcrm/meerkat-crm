@@ -196,7 +196,8 @@ func TestGetNotesSearchLiteralWildcards(t *testing.T) {
 	db.Create(&models.Note{UserID: user.ID, Content: "Discount 50% off"})
 	db.Create(&models.Note{UserID: user.ID, Content: "Discount 500 off"})
 
-	req, _ := http.NewRequest("GET", "/notes?search="+url.QueryEscape("50%"), nil)
+	// "%" has no letters or digits, so it is a LIKE search, and must match only a literal %
+	req, _ := http.NewRequest("GET", "/notes?search="+url.QueryEscape("%"), nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 

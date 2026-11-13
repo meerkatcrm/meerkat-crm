@@ -27,6 +27,8 @@ Activities appear on each linked contact's detail page in the **Timeline** tab, 
 
 The global **Activities** page lists every activity across all contacts and offers searching and a date range filter.
 
+Searching contacts, activities and notes ignores case and accents and matches the start of each word you type, so `zoe mül` finds `Zoë Müller`, but `ller` does not. The names of people stored only as a relationship (a child without a contact of their own) are matched anywhere, and find the contact they belong to. Phone numbers (`795550` finds `+41795550101`, as long as you type only the number) and text in scripts written without spaces between words (Chinese, Japanese, Korean, Thai, Lao, Khmer, Myanmar, Tibetan) are matched anywhere. While searching, the contact list offers **Best match** as its order. Search terms are cut at 200 characters and 32 words.
+
 
 ## Notes
 

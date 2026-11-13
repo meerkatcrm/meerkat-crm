@@ -133,9 +133,9 @@ func TestGetContactsSearchMultiValue(t *testing.T) {
 	assert.Equal(t, 0, search("nomatch"), "unrelated term should match nothing")
 }
 
-// TestGetContactsSearchLiteralWildcards verifies that LIKE wildcards in a search term
-// match literally in every searched column: names, the combined name, and the
-// emails/phones JSON arrays, and relationship names.
+// TestGetContactsSearchLiteralWildcards verifies that LIKE wildcards match literally where
+// the search still uses LIKE: relationship names, and terms the full-text index does not
+// handle (no letters or digits). Elsewhere %, _ and \ are word separators.
 func TestGetContactsSearchLiteralWildcards(t *testing.T) {
 	db, router := setupRouter()
 
@@ -186,13 +186,15 @@ func TestGetContactsSearchLiteralWildcards(t *testing.T) {
 		return int(body["total"].(float64))
 	}
 
-	assert.Equal(t, 1, search("Fifty%"), "% should match only a literal percent sign")
-	assert.Equal(t, 1, search("a_b"), "_ should match only a literal underscore")
-	assert.Equal(t, 1, search("Fifty% Percent"), "combined name should match % literally")
-	assert.Equal(t, 1, search("555_01"), "secondary phone should match _ literally")
+	assert.Equal(t, 2, search("Fifty%"), "% separates words: both Fifty contacts match")
+	assert.Equal(t, 2, search("Fifty% Percent"), "a term spanning firstname and lastname matches both words")
+	assert.Equal(t, 1, search("a_b"), "_ separates words: a_b matches, axb does not")
+	assert.Equal(t, 1, search("555_01"), "secondary phone is searched word by word")
 	assert.Equal(t, 1, search("Kid_one"), "relationship name should match _ literally")
+	assert.Equal(t, 0, search("Kid%one"), "relationship name should match % literally")
 	assert.Equal(t, 0, search("%_"), "wildcard-only term should match nothing literal")
-	assert.Equal(t, 1, search(`k\s`), "backslash should match literally")
+	assert.Equal(t, 1, search("%"), "punctuation-only term matches the literal percent sign")
+	assert.Equal(t, 1, search(`\`), "backslash should match literally")
 }
 
 func TestGetContact(t *testing.T) {
