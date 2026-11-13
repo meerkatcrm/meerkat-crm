@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"errors"
 	apperrors "meerkat/errors"
 	"meerkat/middleware"
 	"meerkat/models"
@@ -123,7 +124,8 @@ func BulkUpdateContacts(c *gin.Context) {
 		return nil
 	})
 	if err != nil {
-		if ae, ok := err.(*apperrors.AppError); ok {
+		var ae *apperrors.AppError
+		if errors.As(err, &ae) {
 			apperrors.AbortWithError(c, ae)
 		} else {
 			apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to update contacts").WithError(err))

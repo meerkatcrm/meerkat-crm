@@ -131,6 +131,16 @@ func TestBulkUpdateContacts_OtherUsersContactChangesNothing(t *testing.T) {
 	assert.Empty(t, got.FoodPreference)
 }
 
+// The validate tag's max and models.MaxBulkContacts must agree: exactly the cap is accepted.
+func TestBulkUpdateContacts_AcceptsUpToTheCap(t *testing.T) {
+	db, router, user := setupBulkRouter(t)
+	ct := models.Contact{UserID: user.ID, Firstname: "A"}
+	require.NoError(t, db.Create(&ct).Error)
+
+	w := postBulk(router, gin.H{"contact_ids": slices.Repeat([]uint{ct.ID}, models.MaxBulkContacts), "city": "x"})
+	assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
+}
+
 func TestBulkUpdateContacts_RejectsBadInput(t *testing.T) {
 	db, router, user := setupBulkRouter(t)
 	ct := models.Contact{UserID: user.ID, Firstname: "A"}
