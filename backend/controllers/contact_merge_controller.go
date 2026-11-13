@@ -120,8 +120,8 @@ func MergeContact(c *gin.Context) {
 	logger.FromContext(c).Info().Uint("target_id", targetID).Uint("source_id", result.SourceID).Msg("Merged contacts")
 
 	cfg := currentConfig(c)
-	go services.TriggerWebhooks(db, cfg, userID, "contact.updated", result.Contact)
-	go services.TriggerWebhooks(db, cfg, userID, "contact.deleted", gin.H{"id": result.SourceID})
+	go services.TriggerWebhooks(db, cfg, userID, "contact.updated", result.Contact, middleware.RequestClock(c))
+	go services.TriggerWebhooks(db, cfg, userID, "contact.deleted", gin.H{"id": result.SourceID}, middleware.RequestClock(c))
 	c.JSON(http.StatusOK, result.Contact)
 }
 

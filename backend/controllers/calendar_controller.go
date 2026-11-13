@@ -192,7 +192,7 @@ func SyncCalendarSubscription(c *gin.Context) {
 
 	cfg := currentConfig(c)
 	service := services.NewCalendarSyncService(cfg.CalDAVBlockPrivateURLs)
-	stats, err := service.SyncSubscription(c.Request.Context(), db, cfg, &subscription)
+	stats, err := service.SyncSubscription(c.Request.Context(), db, cfg, &subscription, middleware.RequestClock(c))
 	if err != nil {
 		logger.FromContext(c).Warn().Err(err).Uint("subscription_id", subscription.ID).Msg("Manual calendar sync failed")
 		apperrors.AbortWithError(c, calendarSyncError(err))

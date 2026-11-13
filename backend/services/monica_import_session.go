@@ -5,11 +5,13 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"meerkat/clock"
 	"slices"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode"
 
@@ -99,19 +101,28 @@ func (s *monicaImportSession) fail(msg string) {
 type MonicaImportManager struct {
 	mu       sync.RWMutex
 	sessions map[string]*monicaImportSession
+	clock    atomic.Pointer[clock.Clock]
 }
 
 // NewMonicaImportManager creates an empty manager.
 func NewMonicaImportManager() *MonicaImportManager {
-	return &MonicaImportManager{sessions: make(map[string]*monicaImportSession)}
+	m := &MonicaImportManager{sessions: make(map[string]*monicaImportSession)}
+	m.SetClock(clock.Real())
+	return m
 }
+
+// SetClock replaces the clock the manager reads (set once at startup). Atomic, because
+// the cleanup goroutine may read it concurrently.
+func (m *MonicaImportManager) SetClock(c clock.Clock) { m.clock.Store(&c) }
+
+func (m *MonicaImportManager) now() time.Time { return (*m.clock.Load()).Now() }
 
 // CleanupExpired removes expired sessions and cancels their running fetches.
 // Safe to call from a goroutine.
 func (m *MonicaImportManager) CleanupExpired() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	now := time.Now()
+	now := m.now()
 	for id, s := range m.sessions {
 		s.mu.Lock()
 		expired := now.After(s.expiresAt)
@@ -138,7 +149,7 @@ func (m *MonicaImportManager) get(sessionID string, userID uint) (*monicaImportS
 		return nil, apperrors.ErrUnauthorized("Session does not belong to current user")
 	}
 	s.mu.Lock()
-	now := time.Now()
+	now := m.now()
 	expired := now.After(s.expiresAt) || now.After(s.hardExpiry)
 	if !expired {
 		s.expiresAt = now.Add(monicaSessionExpiry)
@@ -228,7 +239,7 @@ func (m *MonicaImportManager) Connect(ctx context.Context, userID uint, req mode
 	}
 
 	sessionID := generateSessionID()
-	now := time.Now()
+	now := m.now()
 	session := &monicaImportSession{
 		id:         sessionID,
 		userID:     userID,
@@ -433,7 +444,7 @@ func (m *MonicaImportManager) buildPreview(db *gorm.DB, s *monicaImportSession, 
 	people := monicaPeople(snapshot)
 	partialOwners := monicaPartialOwners(snapshot, people)
 	birthdays := birthdayMonthDayByMonicaID(people)
-	now := time.Now()
+	now := m.now()
 	for _, reminder := range snapshot.Reminders {
 		if reminder.Contact != nil {
 			ownerID := reminder.Contact.ID
@@ -493,8 +504,9 @@ func (m *MonicaImportManager) buildPreview(db *gorm.DB, s *monicaImportSession, 
 
 	mapped := make([]MonicaMappedContact, 0, len(snapshot.Contacts))
 	previews := make([]models.MonicaImportRowPreview, 0, len(snapshot.Contacts))
+	// now (above) is read once per import, not per row
 	for rowIdx, mc := range snapshot.Contacts {
-		mappedContact := MapMonicaContact(mc)
+		mappedContact := MapMonicaContact(mc, now)
 		mapped = append(mapped, mappedContact)
 
 		preview := models.MonicaImportRowPreview{
@@ -1144,9 +1156,10 @@ func (m *MonicaImportManager) createImportedNote(tx *gorm.DB, userID uint, entit
 }
 
 func (m *MonicaImportManager) importNotes(tx *gorm.DB, userID uint, snapshot *monica.Snapshot, idMap map[int]uint, seen importKeySet, result *models.MonicaImportResult) {
+	now := m.now() // once per import, not per row
 	for _, mn := range snapshot.Notes {
 		m.importNoteLike(tx, userID, "note", mn.Contact, monicaExcerpt(mn.Body), idMap, seen, result, func() (models.Note, int, bool) {
-			return MapMonicaNote(mn)
+			return MapMonicaNote(mn, now)
 		})
 	}
 }
@@ -1200,7 +1213,7 @@ func (m *MonicaImportManager) importReminders(tx *gorm.DB, userID uint, snapshot
 	people := monicaPeople(snapshot)
 	birthdays := birthdayMonthDayByMonicaID(people)
 	partialOwners := monicaPartialOwners(snapshot, people)
-	now := time.Now()
+	now := m.now()
 	for _, mr := range snapshot.Reminders {
 		birthdayMonthDay, personName := "", monicaRefName(mr.Contact)
 		if mr.Contact != nil {
@@ -1292,19 +1305,20 @@ func containsWords(text, phrase string) bool {
 
 // importExtraNotes converts calls, tasks, gifts and debts into dated notes.
 func (m *MonicaImportManager) importExtraNotes(tx *gorm.DB, userID uint, lang string, snapshot *monica.Snapshot, idMap map[int]uint, seen importKeySet, result *models.MonicaImportResult) {
+	now := m.now() // once per import, not per row
 	for _, call := range snapshot.Calls {
 		m.importNoteLike(tx, userID, "call", call.Contact, monicaExcerpt(call.Content), idMap, seen, result, func() (models.Note, int, bool) {
-			return MapMonicaCall(call, lang)
+			return MapMonicaCall(call, lang, now)
 		})
 	}
 	for _, task := range snapshot.Tasks {
 		m.importNoteLike(tx, userID, "task", task.Contact, monicaExcerpt(task.Title), idMap, seen, result, func() (models.Note, int, bool) {
-			return MapMonicaTask(task, lang)
+			return MapMonicaTask(task, lang, now)
 		})
 	}
 	for _, gift := range snapshot.Gifts {
 		m.importNoteLike(tx, userID, "gift", gift.Contact, monicaExcerpt(gift.Name), idMap, seen, result, func() (models.Note, int, bool) {
-			return MapMonicaGift(gift, lang)
+			return MapMonicaGift(gift, lang, now)
 		})
 	}
 	for _, debt := range snapshot.Debts {
@@ -1313,7 +1327,7 @@ func (m *MonicaImportManager) importExtraNotes(tx *gorm.DB, userID uint, lang st
 			label = monicaExcerpt(debt.Reason)
 		}
 		m.importNoteLike(tx, userID, "debt", debt.Contact, label, idMap, seen, result, func() (models.Note, int, bool) {
-			return MapMonicaDebt(debt, lang)
+			return MapMonicaDebt(debt, lang, now)
 		})
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"meerkat/config"
 	"meerkat/models"
 	"testing"
+	"time"
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/stretchr/testify/assert"
@@ -41,7 +42,7 @@ func TestGenerateToken(t *testing.T) {
 		Username: "testuser",
 	}
 
-	tokenString, err := GenerateToken(user, &config)
+	tokenString, err := GenerateToken(user, &config, time.Now())
 	assert.NoError(t, err)
 	assert.NotEmpty(t, tokenString)
 
@@ -67,7 +68,7 @@ func TestGenerateToken_Error(t *testing.T) {
 	}
 
 	// Attempts to generate a token should fail
-	_, err := GenerateToken(user, &config)
+	_, err := GenerateToken(user, &config, time.Now())
 
 	assert.Error(t, err)
 }

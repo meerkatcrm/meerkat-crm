@@ -163,8 +163,8 @@ func TestClaimEmailIsExclusive(t *testing.T) {
 	db := emailDB(t)
 	e := models.EmailOutbox{ToAddr: "a", Subject: "s", HTML: "h", Status: models.OutboxPending, NextAttemptAt: time.Now()}
 	require.NoError(t, db.Create(&e).Error)
-	assert.True(t, claimEmail(db, e))
-	assert.False(t, claimEmail(db, e))
+	assert.True(t, claimEmail(db, e, time.Now()))
+	assert.False(t, claimEmail(db, e, time.Now()))
 }
 
 // The job loaded the row (attempts 0) before the immediate send failed and released it; its
@@ -177,22 +177,22 @@ func TestClaimEmailRejectsAStaleCopyAfterARelease(t *testing.T) {
 	var jobCopy models.EmailOutbox
 	require.NoError(t, db.First(&jobCopy).Error)
 
-	require.True(t, claimEmail(db, jobCopy))
+	require.True(t, claimEmail(db, jobCopy, time.Now()))
 	sendQueuedEmail(db, emailCfg, jobCopy) // fails, released with attempts=1 and a backoff
 
-	assert.False(t, claimEmail(db, jobCopy), "retry time is in the future")
+	assert.False(t, claimEmail(db, jobCopy, time.Now()), "retry time is in the future")
 	require.NoError(t, db.Model(&models.EmailOutbox{}).Where("id = ?", jobCopy.ID).Update("next_attempt_at", time.Now().Add(-time.Second)).Error)
-	assert.False(t, claimEmail(db, jobCopy), "attempts changed since the copy was loaded")
+	assert.False(t, claimEmail(db, jobCopy, time.Now()), "attempts changed since the copy was loaded")
 	var fresh models.EmailOutbox
 	require.NoError(t, db.First(&fresh).Error)
-	assert.True(t, claimEmail(db, fresh))
+	assert.True(t, claimEmail(db, fresh, time.Now()))
 }
 
 func TestClaimEmailWaitsForTheRetryTime(t *testing.T) {
 	db := emailDB(t)
 	e := models.EmailOutbox{ToAddr: "a", Subject: "s", HTML: "h", Status: models.OutboxPending, NextAttemptAt: time.Now().Add(time.Hour)}
 	require.NoError(t, db.Create(&e).Error)
-	assert.False(t, claimEmail(db, e))
+	assert.False(t, claimEmail(db, e, time.Now()))
 }
 
 func TestProcessEmailOutboxClaimsInsideTheConcurrencyLimit(t *testing.T) {

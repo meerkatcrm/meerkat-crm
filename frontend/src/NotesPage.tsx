@@ -34,6 +34,7 @@ import EditTimelineItemDialog from './components/EditTimelineItemDialog';
 import { handleError } from './utils/errorHandler';
 import { useDateFormat } from './DateFormatProvider';
 import { useSnackbar } from './context/SnackbarContext';
+import { now } from './utils/now';
 
 const NotesPage: React.FC = () => {
   const { t } = useTranslation();
@@ -139,7 +140,7 @@ const NotesPage: React.FC = () => {
     try {
       await updateNote(editingNote.ID, {
         content: editValues.noteContent,
-        date: parsedDate ? new Date(parsedDate).toISOString() : new Date().toISOString(),
+        date: parsedDate ? new Date(parsedDate).toISOString() : now().toISOString(),
       });
       await applyImageChange('notes', editingNote.ID, editValues.imageChange);
       setEditingNote(null);

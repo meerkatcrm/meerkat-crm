@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"fmt"
+	"meerkat/clock"
 	"meerkat/config"
 	apperrors "meerkat/errors"
 	"meerkat/logger"
@@ -18,6 +19,13 @@ import (
 // importSessions owns all in-progress import wizard state. Controllers only validate
 // HTTP input and delegate to the manager.
 var importSessions = services.NewImportSessionManager()
+
+// SetImportClock gives the import session managers the application clock (set once at
+// startup, before serving).
+func SetImportClock(c clock.Clock) {
+	importSessions.SetClock(c)
+	monicaImportSessions.SetClock(c)
+}
 
 // UploadCSVForImport handles CSV file upload and returns headers with suggested mappings
 func UploadCSVForImport(c *gin.Context) {

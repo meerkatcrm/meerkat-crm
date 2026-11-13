@@ -38,6 +38,7 @@ import { Reminder } from '../api/reminders';
 import { ContactFieldKey, resolveEnabledFields } from '../contactFields';
 import { useDateFormat, calculateAgeAtDate } from '../DateFormatProvider';
 import { findBirthdayReminder } from '../utils/birthdayReminder';
+import { now } from '../utils/now';
 
 interface ContactInformationProps {
   contact: Partial<Contact>;
@@ -393,9 +394,9 @@ export default function ContactInformation({
                   <DatePicker
                     label={t('contactDetail.deceasedDate')}
                     format={getDateFnsFormat()}
-                    value={draft.deceasedDate ? parse(draft.deceasedDate, 'yyyy-MM-dd', new Date()) : null}
-                    maxDate={new Date()}
-                    minDate={contact.birthday && !contact.birthday.startsWith('--') ? parse(contact.birthday, 'yyyy-MM-dd', new Date()) : undefined}
+                    value={draft.deceasedDate ? parse(draft.deceasedDate, 'yyyy-MM-dd', now()) : null}
+                    maxDate={now()}
+                    minDate={contact.birthday && !contact.birthday.startsWith('--') ? parse(contact.birthday, 'yyyy-MM-dd', now()) : undefined}
                     onChange={(date) =>
                       setDraft({
                         ...draft,

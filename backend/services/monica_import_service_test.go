@@ -69,7 +69,7 @@ func contactFieldType(name, protocol, kind string) struct {
 }
 
 func TestMapMonicaContactFullMapping(t *testing.T) {
-	mapped := MapMonicaContact(monicaTestContact())
+	mapped := MapMonicaContact(monicaTestContact(), time.Now())
 
 	assert.Equal(t, 42, mapped.MonicaID)
 	c := mapped.Contact
@@ -107,19 +107,19 @@ func TestMapMonicaContactFullMapping(t *testing.T) {
 }
 
 func TestMapMonicaContactNameFallbacks(t *testing.T) {
-	mapped := MapMonicaContact(monica.Contact{Nickname: "Smithy"})
+	mapped := MapMonicaContact(monica.Contact{Nickname: "Smithy"}, time.Now())
 	assert.Equal(t, "Smithy", mapped.Contact.Firstname)
 
-	mapped = MapMonicaContact(monica.Contact{LastName: "Smith"})
+	mapped = MapMonicaContact(monica.Contact{LastName: "Smith"}, time.Now())
 	assert.Equal(t, "Smith", mapped.Contact.Firstname)
 	assert.Empty(t, mapped.Contact.Lastname)
 }
 
 func TestMapMonicaContactGenderFallback(t *testing.T) {
-	assert.Equal(t, "male", MapMonicaContact(monica.Contact{GenderType: "M"}).Contact.Gender)
-	assert.Equal(t, "other", MapMonicaContact(monica.Contact{GenderType: "O"}).Contact.Gender)
-	assert.Equal(t, "male", MapMonicaContact(monica.Contact{Gender: "Male"}).Contact.Gender)
-	assert.Equal(t, "", MapMonicaContact(monica.Contact{Gender: "Genderqueer"}).Contact.Gender)
+	assert.Equal(t, "male", MapMonicaContact(monica.Contact{GenderType: "M"}, time.Now()).Contact.Gender)
+	assert.Equal(t, "other", MapMonicaContact(monica.Contact{GenderType: "O"}, time.Now()).Contact.Gender)
+	assert.Equal(t, "male", MapMonicaContact(monica.Contact{Gender: "Male"}, time.Now()).Contact.Gender)
+	assert.Equal(t, "", MapMonicaContact(monica.Contact{Gender: "Genderqueer"}, time.Now()).Contact.Gender)
 }
 
 func TestMapMonicaContactSpecialDates(t *testing.T) {
@@ -127,31 +127,31 @@ func TestMapMonicaContactSpecialDates(t *testing.T) {
 	mc := monica.Contact{FirstName: "A"}
 	date := "1900-04-20T00:00:00Z"
 	mc.Information.Dates.Birthdate = monica.SpecialDate{Date: &date, IsYearUnknown: true}
-	assert.Equal(t, "--04-20", MapMonicaContact(mc).Contact.Birthday)
+	assert.Equal(t, "--04-20", MapMonicaContact(mc, time.Now()).Contact.Birthday)
 
 	// Age-based → no birthday, approximate age custom field
 	born := time.Now().AddDate(-30, 0, 0).Format(time.RFC3339)
 	mc.Information.Dates.Birthdate = monica.SpecialDate{Date: &born, IsAgeBased: true}
-	mapped := MapMonicaContact(mc)
+	mapped := MapMonicaContact(mc, time.Now())
 	assert.Empty(t, mapped.Contact.Birthday)
 	assert.Equal(t, "30", mapped.Contact.CustomFields["Approximate age"])
 
 	// No date at all
 	mc.Information.Dates.Birthdate = monica.SpecialDate{}
-	assert.Empty(t, MapMonicaContact(mc).Contact.Birthday)
+	assert.Empty(t, MapMonicaContact(mc, time.Now()).Contact.Birthday)
 }
 
 func TestMapMonicaContactDeceased(t *testing.T) {
 	mc := monica.Contact{FirstName: "A", IsDead: true}
 	deceased := "2020-01-15T00:00:00Z"
 	mc.Information.Dates.DeceasedDate = monica.SpecialDate{Date: &deceased}
-	mapped := MapMonicaContact(mc).Contact
+	mapped := MapMonicaContact(mc, time.Now()).Contact
 	assert.True(t, mapped.IsDeceased)
 	assert.Equal(t, "2020-01-15", mapped.DeceasedDate)
 	assert.NotContains(t, mapped.CustomFields, "Deceased")
 
 	mc.Information.Dates.DeceasedDate = monica.SpecialDate{}
-	mapped = MapMonicaContact(mc).Contact
+	mapped = MapMonicaContact(mc, time.Now()).Contact
 	assert.True(t, mapped.IsDeceased)
 	assert.Equal(t, "", mapped.DeceasedDate)
 	assert.NotContains(t, mapped.CustomFields, "Deceased")
@@ -161,14 +161,14 @@ func TestMapMonicaContactDeceased_YearUnknownDateDroppedButFlagged(t *testing.T)
 	mc := monica.Contact{FirstName: "A", IsDead: true}
 	deceased := "2020-01-15T00:00:00Z"
 	mc.Information.Dates.DeceasedDate = monica.SpecialDate{Date: &deceased, IsYearUnknown: true}
-	mapped := MapMonicaContact(mc).Contact
+	mapped := MapMonicaContact(mc, time.Now()).Contact
 	assert.True(t, mapped.IsDeceased)
 	assert.Equal(t, "", mapped.DeceasedDate)
 }
 
 func TestMapMonicaContactNotDeceased(t *testing.T) {
 	mc := monica.Contact{FirstName: "A", IsDead: false}
-	mapped := MapMonicaContact(mc).Contact
+	mapped := MapMonicaContact(mc, time.Now()).Contact
 	assert.False(t, mapped.IsDeceased)
 	assert.Equal(t, "", mapped.DeceasedDate)
 }
@@ -177,21 +177,21 @@ func TestMapMonicaContactSkipsGeneratedAvatars(t *testing.T) {
 	mc := monica.Contact{FirstName: "A"}
 	mc.Information.Avatar.URL = strPtr("https://monica.example.com/avatar.png")
 	mc.Information.Avatar.Source = strPtr("default")
-	assert.Empty(t, MapMonicaContact(mc).AvatarURL)
+	assert.Empty(t, MapMonicaContact(mc, time.Now()).AvatarURL)
 
 	mc.Information.Avatar.Source = strPtr("adorable")
-	assert.Empty(t, MapMonicaContact(mc).AvatarURL)
+	assert.Empty(t, MapMonicaContact(mc, time.Now()).AvatarURL)
 
 	mc.Information.Avatar.Source = strPtr("gravatar")
-	assert.Equal(t, "https://monica.example.com/avatar.png", MapMonicaContact(mc).AvatarURL)
+	assert.Equal(t, "https://monica.example.com/avatar.png", MapMonicaContact(mc, time.Now()).AvatarURL)
 
 	// The source decides how the photo is fetched: Monica-hosted photos need
 	// the API, gravatars are plain public URLs.
-	assert.Equal(t, avatarSourceGravatar, MapMonicaContact(mc).AvatarSource)
+	assert.Equal(t, avatarSourceGravatar, MapMonicaContact(mc, time.Now()).AvatarSource)
 	mc.Information.Avatar.Source = strPtr("photo")
-	assert.Equal(t, avatarSourcePhoto, MapMonicaContact(mc).AvatarSource)
+	assert.Equal(t, avatarSourcePhoto, MapMonicaContact(mc, time.Now()).AvatarSource)
 	mc.Information.Avatar.Source = strPtr("default")
-	assert.Empty(t, MapMonicaContact(mc).AvatarSource)
+	assert.Empty(t, MapMonicaContact(mc, time.Now()).AvatarSource)
 }
 
 func TestMapMonicaActivity(t *testing.T) {
@@ -233,15 +233,15 @@ func TestMapMonicaNote(t *testing.T) {
 		Body:      "Remember the milk",
 		CreatedAt: "2023-01-02T10:00:00Z",
 		Contact:   &monica.ContactRef{ID: 5},
-	})
+	}, time.Now())
 	assert.True(t, ok)
 	assert.Equal(t, "Remember the milk", note.Content)
 	assert.Equal(t, 5, contactID)
 	assert.Equal(t, 2023, note.Date.Year())
 
-	_, _, ok = MapMonicaNote(monica.Note{Body: "", Contact: &monica.ContactRef{ID: 5}})
+	_, _, ok = MapMonicaNote(monica.Note{Body: "", Contact: &monica.ContactRef{ID: 5}}, time.Now())
 	assert.False(t, ok)
-	_, _, ok = MapMonicaNote(monica.Note{Body: "orphan"})
+	_, _, ok = MapMonicaNote(monica.Note{Body: "orphan"}, time.Now())
 	assert.False(t, ok)
 }
 
@@ -314,7 +314,7 @@ func TestExtraNoteRendering(t *testing.T) {
 	note, contactID, ok := MapMonicaCall(monica.Call{
 		Content: "Talked about the project", CalledAt: "2023-04-01 12:00:00",
 		Contact: &monica.ContactRef{ID: 7},
-	}, "en")
+	}, "en", time.Now())
 	assert.True(t, ok)
 	assert.Equal(t, 7, contactID)
 	assert.Contains(t, note.Content, "Call on 2023-04-01 (imported from Monica):")
@@ -324,18 +324,18 @@ func TestExtraNoteRendering(t *testing.T) {
 	note, _, _ = MapMonicaCall(monica.Call{
 		Content: "Projekt besprochen", CalledAt: "2023-04-01 12:00:00",
 		Contact: &monica.ContactRef{ID: 7},
-	}, "de")
+	}, "de", time.Now())
 	assert.Contains(t, note.Content, "Anruf am 2023-04-01 (aus Monica importiert):")
 
 	// Content-less calls are skipped
-	_, _, ok = MapMonicaCall(monica.Call{Contact: &monica.ContactRef{ID: 7}}, "en")
+	_, _, ok = MapMonicaCall(monica.Call{Contact: &monica.ContactRef{ID: 7}}, "en", time.Now())
 	assert.False(t, ok)
 
 	note, _, ok = MapMonicaTask(monica.Task{
 		Title: "Buy gift", Description: "Something nice", Completed: true,
 		CompletedAt: strPtr("2023-02-01 09:00:00"), CreatedAt: "2023-01-01 09:00:00",
 		Contact: &monica.ContactRef{ID: 7},
-	}, "en")
+	}, "en", time.Now())
 	assert.True(t, ok)
 	assert.Contains(t, note.Content, "Completed task (imported from Monica): Buy gift")
 	assert.Contains(t, note.Content, "Something nice")
@@ -344,7 +344,7 @@ func TestExtraNoteRendering(t *testing.T) {
 	note, _, ok = MapMonicaGift(monica.Gift{
 		Name: "Book", Comment: "Loves sci-fi", Status: "idea",
 		CreatedAt: "2023-01-01 09:00:00", Contact: &monica.ContactRef{ID: 7},
-	}, "en")
+	}, "en", time.Now())
 	assert.True(t, ok)
 	assert.Contains(t, note.Content, "Gift (idea, imported from Monica): Book")
 	assert.Contains(t, note.Content, "Loves sci-fi")
@@ -353,13 +353,13 @@ func TestExtraNoteRendering(t *testing.T) {
 	note, _, _ = MapMonicaGift(monica.Gift{
 		Name: "Wine", HasBeenReceived: boolPtr(true),
 		CreatedAt: "2023-01-01 09:00:00", Contact: &monica.ContactRef{ID: 7},
-	}, "en")
+	}, "en", time.Now())
 	assert.Contains(t, note.Content, "Gift (received, imported from Monica): Wine")
 
 	note, _, ok = MapMonicaDebt(monica.Debt{
 		InDebt: "yes", AmountWithCurrency: "€50.00", Reason: "Dinner",
 		CreatedAt: "2023-01-01 09:00:00", Contact: &monica.ContactRef{ID: 7},
-	}, "en")
+	}, "en", time.Now())
 	assert.True(t, ok)
 	assert.Contains(t, note.Content, "I owe €50.00")
 	assert.Contains(t, note.Content, "Dinner")
@@ -367,7 +367,7 @@ func TestExtraNoteRendering(t *testing.T) {
 	note, _, _ = MapMonicaDebt(monica.Debt{
 		InDebt: "no", Amount: 25, CreatedAt: "2023-01-01 09:00:00",
 		Contact: &monica.ContactRef{ID: 7},
-	}, "en")
+	}, "en", time.Now())
 	assert.Contains(t, note.Content, "owes me 25.00")
 }
 

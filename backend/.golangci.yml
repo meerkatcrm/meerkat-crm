@@ -14,6 +14,7 @@ linters:
     - staticcheck
     - bodyclose
     - sqlclosecheck
+    - forbidigo
   settings:
     errcheck:
       exclude-functions:
@@ -33,6 +34,15 @@ linters:
         - crypto/rand.Read
         # Builder method that returns its receiver; the result is not an error.
         - (*meerkat/errors.AppError).WithDetails
+    forbidigo:
+      # Resolve names through types, so an aliased import (tm "time") is caught too
+      analyze-types: true
+      forbid:
+        - pattern: ^time\.Now$
+          msg: >-
+            Do not read the wall clock in business code: take now as a parameter (handlers:
+            middleware.RequestNow(c); jobs: the clock main.go passes in). See
+            docs/development/backend.md#time.
     staticcheck:
       checks:
         - all
@@ -53,3 +63,10 @@ linters:
       - path: _test\.go
         linters:
           - errcheck
+          - forbidigo
+      # The places that may read the clock (docs/development/backend.md#time): the
+      # composition root, the clock itself, middleware (request time, rate limits, request
+      # durations), metrics (durations only) and one-off CLI tools.
+      - path: ^(main\.go|clock/|middleware/|metrics/|cmd/)
+        linters:
+          - forbidigo

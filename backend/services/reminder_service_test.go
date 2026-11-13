@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"meerkat/clock"
 	"meerkat/config"
 	"meerkat/models"
 	"testing"
@@ -205,7 +206,7 @@ func TestCalculateNextReminderTimeMonthlyEdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := CalculateNextReminderTime(tt.reminder)
+			result := CalculateNextReminderTime(tt.reminder, time.Now())
 			assert.Equal(t, tt.expected, result, "Expected %v but got %v", tt.expected, result)
 		})
 	}
@@ -225,7 +226,7 @@ func TestCalculateNextReminderTimeUTCConsistency(t *testing.T) {
 		ReoccurFromCompletion: &reoccurFalse,
 	}
 
-	result := CalculateNextReminderTime(reminder)
+	result := CalculateNextReminderTime(reminder, time.Now())
 
 	// Result should be in UTC
 	assert.Equal(t, time.UTC, result.Location(), "Result should be in UTC")
@@ -272,7 +273,7 @@ func TestSendReminders(t *testing.T) {
 	)
 
 	originalSender := sendReminderEmailFn
-	sendReminderEmailFn = func(u models.User, reminders []models.Reminder, cfg config.Config, db *gorm.DB) error {
+	sendReminderEmailFn = func(u models.User, reminders []models.Reminder, cfg config.Config, db *gorm.DB, _ clock.Clock) error {
 		calledUser = u
 		calledReminders = reminders
 		callCount++
@@ -289,7 +290,7 @@ func TestSendReminders(t *testing.T) {
 		ReminderTime:    "12:00",
 	}
 
-	err := SendReminders(db, config)
+	err := SendReminders(db, config, clock.Real())
 	assert.NoError(t, err)
 
 	assert.Equal(t, 1, callCount)
@@ -337,7 +338,7 @@ func TestSendRemindersWithRateLimit_FirstRun(t *testing.T) {
 
 	callCount := 0
 	originalSender := sendReminderEmailFn
-	sendReminderEmailFn = func(u models.User, reminders []models.Reminder, cfg config.Config, db *gorm.DB) error {
+	sendReminderEmailFn = func(u models.User, reminders []models.Reminder, cfg config.Config, db *gorm.DB, _ clock.Clock) error {
 		callCount++
 		return nil
 	}
@@ -351,7 +352,7 @@ func TestSendRemindersWithRateLimit_FirstRun(t *testing.T) {
 	}
 
 	// First run should execute
-	err := SendRemindersWithRateLimit(db, cfg)
+	err := SendRemindersWithRateLimit(db, cfg, clock.Real())
 	assert.NoError(t, err)
 	assert.Equal(t, 1, callCount, "First run should send reminders")
 
@@ -393,7 +394,7 @@ func TestSendRemindersWithRateLimit_RateLimited(t *testing.T) {
 
 	callCount := 0
 	originalSender := sendReminderEmailFn
-	sendReminderEmailFn = func(u models.User, reminders []models.Reminder, cfg config.Config, db *gorm.DB) error {
+	sendReminderEmailFn = func(u models.User, reminders []models.Reminder, cfg config.Config, db *gorm.DB, _ clock.Clock) error {
 		callCount++
 		return nil
 	}
@@ -407,12 +408,12 @@ func TestSendRemindersWithRateLimit_RateLimited(t *testing.T) {
 	}
 
 	// First run should execute
-	err := SendRemindersWithRateLimit(db, cfg)
+	err := SendRemindersWithRateLimit(db, cfg, clock.Real())
 	assert.NoError(t, err)
 	assert.Equal(t, 1, callCount, "First run should send reminders")
 
 	// Second run immediately after should be rate limited
-	err = SendRemindersWithRateLimit(db, cfg)
+	err = SendRemindersWithRateLimit(db, cfg, clock.Real())
 	assert.NoError(t, err)
 	assert.Equal(t, 1, callCount, "Second run should be rate limited - no additional sends")
 }
@@ -448,7 +449,7 @@ func TestSendRemindersWithRateLimit_AllowsAfterInterval(t *testing.T) {
 
 	callCount := 0
 	originalSender := sendReminderEmailFn
-	sendReminderEmailFn = func(u models.User, reminders []models.Reminder, cfg config.Config, db *gorm.DB) error {
+	sendReminderEmailFn = func(u models.User, reminders []models.Reminder, cfg config.Config, db *gorm.DB, _ clock.Clock) error {
 		callCount++
 		return nil
 	}
@@ -462,7 +463,7 @@ func TestSendRemindersWithRateLimit_AllowsAfterInterval(t *testing.T) {
 	}
 
 	// First run
-	err := SendRemindersWithRateLimit(db, cfg)
+	err := SendRemindersWithRateLimit(db, cfg, clock.Real())
 	assert.NoError(t, err)
 	assert.Equal(t, 1, callCount)
 
@@ -486,7 +487,7 @@ func TestSendRemindersWithRateLimit_AllowsAfterInterval(t *testing.T) {
 	db.Create(&reminder2)
 
 	// Should now be allowed to run again
-	err = SendRemindersWithRateLimit(db, cfg)
+	err = SendRemindersWithRateLimit(db, cfg, clock.Real())
 	assert.NoError(t, err)
 	assert.Equal(t, 2, callCount, "Should allow run after interval passes")
 
@@ -539,7 +540,7 @@ func TestSendReminders_DueOnCalendarDate(t *testing.T) {
 
 			var sent []string
 			originalSender := sendReminderEmailFn
-			sendReminderEmailFn = func(_ models.User, reminders []models.Reminder, _ config.Config, _ *gorm.DB) error {
+			sendReminderEmailFn = func(_ models.User, reminders []models.Reminder, _ config.Config, _ *gorm.DB, _ clock.Clock) error {
 				for _, reminder := range reminders {
 					sent = append(sent, reminder.Message)
 				}
@@ -547,7 +548,7 @@ func TestSendReminders_DueOnCalendarDate(t *testing.T) {
 			}
 			defer func() { sendReminderEmailFn = originalSender }()
 
-			require.NoError(t, SendReminders(db, cfg))
+			require.NoError(t, SendReminders(db, cfg, clock.Real()))
 			assert.ElementsMatch(t, []string{"yesterday", "today"}, sent)
 		})
 	}
@@ -572,7 +573,7 @@ func TestSendRemindersWithRateLimit_SecondRunOfTheDaySkipsDailyEvents(t *testing
 
 	mailed := 0
 	originalSender := sendReminderEmailFn
-	sendReminderEmailFn = func(u models.User, reminders []models.Reminder, cfg config.Config, db *gorm.DB) error {
+	sendReminderEmailFn = func(u models.User, reminders []models.Reminder, cfg config.Config, db *gorm.DB, _ clock.Clock) error {
 		if u.ID == user.ID {
 			mailed++
 		}
@@ -582,15 +583,15 @@ func TestSendRemindersWithRateLimit_SecondRunOfTheDaySkipsDailyEvents(t *testing
 
 	cfg := config.Config{UseResend: true, ResendAPIKey: "test_api_key", ResendFromEmail: "noreply@example.com", ReminderTimezone: "UTC"}
 
-	require.NoError(t, SendRemindersWithRateLimit(db, cfg))
+	require.NoError(t, SendRemindersWithRateLimit(db, cfg, clock.Real()))
 	assert.Equal(t, 1, mailed, "the first run of the day sends the birthday mail")
 
 	time.Sleep(5 * time.Millisecond)
-	require.NoError(t, SendRemindersWithRateLimit(db, cfg))
+	require.NoError(t, SendRemindersWithRateLimit(db, cfg, clock.Real()))
 	assert.Equal(t, 1, mailed, "a second run on the same day must not send it again")
 
 	// A manual trigger is explicit and still sends.
-	require.NoError(t, SendReminders(db, cfg))
+	require.NoError(t, SendReminders(db, cfg, clock.Real()))
 	assert.Equal(t, 2, mailed)
 }
 
@@ -600,11 +601,11 @@ func TestNextOccurrenceAfterToday_UsesTheGivenTimezone(t *testing.T) {
 	loc := time.FixedZone("east", 14*3600)
 	no := false
 	reminder := models.Reminder{
-		RemindAt:              TodayIn(loc).AddDate(0, 0, -7),
+		RemindAt:              TodayIn(time.Now(), loc).AddDate(0, 0, -7),
 		Recurrence:            "weekly",
 		ReoccurFromCompletion: &no,
 	}
-	next := NextOccurrenceAfterToday(reminder, loc)
-	assert.True(t, next.After(TodayIn(loc)), "next occurrence %s must be after today in the reminder timezone %s", next, TodayIn(loc))
-	assert.Equal(t, TodayIn(loc).AddDate(0, 0, 7), next)
+	next := NextOccurrenceAfterToday(reminder, time.Now(), loc)
+	assert.True(t, next.After(TodayIn(time.Now(), loc)), "next occurrence %s must be after today in the reminder timezone %s", next, TodayIn(time.Now(), loc))
+	assert.Equal(t, TodayIn(time.Now(), loc).AddDate(0, 0, 7), next)
 }

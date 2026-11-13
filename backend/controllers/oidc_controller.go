@@ -4,6 +4,7 @@ import (
 	"crypto/subtle"
 	"errors"
 	apperrors "meerkat/errors"
+	"meerkat/middleware"
 	"net/http"
 
 	"meerkat/config"
@@ -130,7 +131,7 @@ func OIDCCallbackHandler(provider *services.OIDCProvider, cfg *config.Config) gi
 			return
 		}
 
-		tokenString, err := services.GenerateToken(*user, cfg)
+		tokenString, err := services.GenerateToken(*user, cfg, middleware.RequestNow(c))
 		if err != nil {
 			log.Error().Err(err).Uint("user_id", user.ID).Msg("OIDC: failed to generate JWT")
 			c.Redirect(http.StatusFound, "/login?error=oidc_error")
