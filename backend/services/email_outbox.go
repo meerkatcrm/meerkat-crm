@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"meerkat/clock"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -35,8 +36,8 @@ func init() {
 // also after a restart. Like SendEmail it does nothing when no email channel is configured
 // or the recipient is empty. userID (optional) ties the row to its owner, so deleting the
 // user removes it. The body is cleared once the row is delivered or dead.
-func QueueEmail(db *gorm.DB, cfg config.Config, userID *uint, msg EmailMessage) error {
-	return QueueEmailUntil(db, cfg, userID, msg, time.Time{})
+func QueueEmail(db *gorm.DB, cfg config.Config, userID *uint, msg EmailMessage, clk clock.Clock) error {
+	return QueueEmailUntil(db, cfg, userID, msg, time.Time{}, clk)
 }
 
 // StubEmailDelivery replaces the background immediate try (tests of other packages); the
@@ -49,7 +50,7 @@ func StubEmailDelivery(f func(func())) (restore func()) {
 // QueueEmailUntil is QueueEmail for a message that is useless after expires (a password
 // reset link): it is not sent later and goes dead with its body cleared. A zero expires
 // means it never expires.
-func QueueEmailUntil(db *gorm.DB, cfg config.Config, userID *uint, msg EmailMessage, expires time.Time) error {
+func QueueEmailUntil(db *gorm.DB, cfg config.Config, userID *uint, msg EmailMessage, expires time.Time, clk clock.Clock) error {
 	if msg.To == "" {
 		logger.Warn().Msg("Skipping email because recipient address is empty")
 		return nil
@@ -63,7 +64,7 @@ func QueueEmailUntil(db *gorm.DB, cfg config.Config, userID *uint, msg EmailMess
 	}
 	e := models.EmailOutbox{
 		UserID: userID, ToAddr: msg.To, Subject: msg.Subject, HTML: msg.HTML,
-		Status: models.OutboxPending, NextAttemptAt: time.Now(),
+		Status: models.OutboxPending, NextAttemptAt: clk.Now(),
 	}
 	if !expires.IsZero() {
 		e.ExpiresAt = &expires
@@ -74,8 +75,8 @@ func QueueEmailUntil(db *gorm.DB, cfg config.Config, userID *uint, msg EmailMess
 	(*startEmailDelivery.Load())(func() {
 		emailSem <- struct{}{}
 		defer func() { <-emailSem }()
-		if claimEmail(db, e) {
-			sendQueuedEmail(db, cfg, e)
+		if claimEmail(db, e, clk.Now()) {
+			sendQueuedEmail(db, cfg, e, clk)
 		}
 	})
 	return nil
@@ -83,8 +84,7 @@ func QueueEmailUntil(db *gorm.DB, cfg config.Config, userID *uint, msg EmailMess
 
 // claimEmail takes a pending email for this worker unless another holds a fresh claim, the
 // row is not due, or it changed since e was loaded (see claimWebhookDelivery).
-func claimEmail(db *gorm.DB, e models.EmailOutbox) bool {
-	now := time.Now()
+func claimEmail(db *gorm.DB, e models.EmailOutbox, now time.Time) bool {
 	res := db.Model(&models.EmailOutbox{}).
 		Where("id = ? AND status = ? AND attempts = ? AND next_attempt_at <= ? AND (locked_at IS NULL OR locked_at < ?)",
 			e.ID, models.OutboxPending, e.Attempts, now, now.Add(-outboxLockTimeout)).
@@ -94,14 +94,14 @@ func claimEmail(db *gorm.DB, e models.EmailOutbox) bool {
 
 // sendQueuedEmail makes one try for a claimed row and records the outcome on it. A row that
 // is delivered or dead keeps no body (it may hold a reset token).
-func sendQueuedEmail(db *gorm.DB, cfg config.Config, e models.EmailOutbox) {
-	if e.ExpiresAt != nil && !time.Now().Before(*e.ExpiresAt) {
+func sendQueuedEmail(db *gorm.DB, cfg config.Config, e models.EmailOutbox, clk clock.Clock) {
+	if e.ExpiresAt != nil && !clk.Now().Before(*e.ExpiresAt) {
 		expireEmail(db, e)
 		return
 	}
 	err := emailSender(cfg, EmailMessage{To: e.ToAddr, Subject: e.Subject, HTML: e.HTML})
 	attempt := e.Attempts + 1
-	now := time.Now()
+	now := clk.Now() // after the send, which can take long: the outcome and the next try are stamped from here
 	upd := map[string]any{"attempts": attempt, "locked_at": nil}
 	switch {
 	case err == nil:
@@ -137,13 +137,13 @@ func expireEmail(db *gorm.DB, e models.EmailOutbox) {
 // ProcessEmailOutbox sends every pending email that is due: first tries that a restart
 // interrupted and retries after a failure. Nothing happens (and no try is counted) while
 // no email channel is configured.
-func ProcessEmailOutbox(db *gorm.DB, cfg config.Config) {
-	expireEmails(db)
+func ProcessEmailOutbox(db *gorm.DB, cfg config.Config, clk clock.Clock) {
+	now := clk.Now()
+	expireEmails(db, now)
 	if !cfg.EmailEnabled() {
 		return
 	}
 	var due []models.EmailOutbox
-	now := time.Now()
 	if err := db.Where("status = ? AND next_attempt_at <= ? AND (locked_at IS NULL OR locked_at < ?)",
 		models.OutboxPending, now, now.Add(-outboxLockTimeout)).
 		Order("next_attempt_at").Limit(100).Find(&due).Error; err != nil {
@@ -158,8 +158,8 @@ func ProcessEmailOutbox(db *gorm.DB, cfg config.Config) {
 			emailSem <- struct{}{}
 			defer func() { <-emailSem }()
 			// Claim inside the slot: a claim made up front would age while queued.
-			if claimEmail(db, e) {
-				sendQueuedEmail(db, cfg, e)
+			if claimEmail(db, e, clk.Now()) {
+				sendQueuedEmail(db, cfg, e, clk)
 			}
 		}()
 	}
@@ -168,8 +168,7 @@ func ProcessEmailOutbox(db *gorm.DB, cfg config.Config) {
 
 // expireEmails gives up on pending emails past their expiry, whether or not a channel is
 // configured, so their bodies do not linger.
-func expireEmails(db *gorm.DB) {
-	now := time.Now()
+func expireEmails(db *gorm.DB, now time.Time) {
 	res := db.Model(&models.EmailOutbox{}).
 		Where("status = ? AND expires_at IS NOT NULL AND expires_at <= ? AND (locked_at IS NULL OR locked_at < ?)",
 			models.OutboxPending, now, now.Add(-outboxLockTimeout)).

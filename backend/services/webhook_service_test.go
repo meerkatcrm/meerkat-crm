@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"meerkat/clock"
 	"meerkat/config"
 	"meerkat/models"
 
@@ -105,10 +106,10 @@ func TestComputeSignatureIsHMACSHA256Hex(t *testing.T) {
 // attempt enqueues a delivery and runs one try on it, like the outbox worker does.
 func attempt(t *testing.T, db *gorm.DB, cfg config.Config, wh models.Webhook, body []byte) models.WebhookDelivery {
 	t.Helper()
-	d, err := enqueueWebhookDelivery(db, wh.ID, "e", body)
+	d, err := enqueueWebhookDelivery(db, wh.ID, "e", body, time.Now())
 	require.NoError(t, err)
-	require.True(t, claimWebhookDelivery(db, d))
-	return deliverWebhook(db, cfg, wh, d)
+	require.True(t, claimWebhookDelivery(db, d, time.Now()))
+	return deliverWebhook(db, cfg, wh, d, clock.Real())
 }
 
 func TestDeliverWebhookSignsAndRecordsSuccess(t *testing.T) {
@@ -125,12 +126,12 @@ func TestDeliverWebhookSignsAndRecordsSuccess(t *testing.T) {
 	wh := models.Webhook{UserID: 1, URL: srv.URL, Secret: "s3cret"}
 	require.NoError(t, db.Create(&wh).Error)
 	body := []byte(`{"event":"contact.created"}`)
-	d, err := enqueueWebhookDelivery(db, wh.ID, "contact.created", body)
+	d, err := enqueueWebhookDelivery(db, wh.ID, "contact.created", body, time.Now())
 	require.NoError(t, err)
 	assert.Equal(t, models.OutboxPending, d.Status)
 	assert.Zero(t, d.Attempts)
-	require.True(t, claimWebhookDelivery(db, d))
-	d = deliverWebhook(db, config.Config{}, wh, d)
+	require.True(t, claimWebhookDelivery(db, d, time.Now()))
+	d = deliverWebhook(db, config.Config{}, wh, d, clock.Real())
 
 	assert.Equal(t, "sha256="+computeSignature("s3cret", body), gotSig)
 	assert.Equal(t, "contact.created", gotEvent)
@@ -156,11 +157,11 @@ func TestDeliverWebhookBackoffThenDead(t *testing.T) {
 	wh := models.Webhook{UserID: 1, URL: srv.URL, Secret: "s"}
 	require.NoError(t, db.Create(&wh).Error)
 
-	d, err := enqueueWebhookDelivery(db, wh.ID, "e", []byte("{}"))
+	d, err := enqueueWebhookDelivery(db, wh.ID, "e", []byte("{}"), time.Now())
 	require.NoError(t, err)
 	for n := 1; n < maxOutboxAttempts; n++ {
-		require.True(t, claimWebhookDelivery(db, d))
-		d = deliverWebhook(db, config.Config{}, wh, d)
+		require.True(t, claimWebhookDelivery(db, d, time.Now()))
+		d = deliverWebhook(db, config.Config{}, wh, d, clock.Real())
 		assert.Equal(t, n, d.Attempts)
 		assert.Equal(t, models.OutboxPending, d.Status)
 		require.NotNil(t, d.NextRetryAt)
@@ -168,8 +169,8 @@ func TestDeliverWebhookBackoffThenDead(t *testing.T) {
 		assert.NotNil(t, d.Error)
 		d = makeDue(t, db, d)
 	}
-	require.True(t, claimWebhookDelivery(db, d))
-	d = deliverWebhook(db, config.Config{}, wh, d)
+	require.True(t, claimWebhookDelivery(db, d, time.Now()))
+	d = deliverWebhook(db, config.Config{}, wh, d, clock.Real())
 	assert.Equal(t, maxOutboxAttempts, d.Attempts)
 	assert.Equal(t, models.OutboxDead, d.Status, "dead letter after the last try")
 	assert.Nil(t, d.NextRetryAt)
@@ -198,15 +199,15 @@ func TestClaimWebhookDeliveryIsExclusiveUntilTheLockIsStale(t *testing.T) {
 	db := webhookDB(t)
 	wh := models.Webhook{UserID: 1, URL: "http://x", Secret: "s"}
 	require.NoError(t, db.Create(&wh).Error)
-	d, err := enqueueWebhookDelivery(db, wh.ID, "e", []byte("{}"))
+	d, err := enqueueWebhookDelivery(db, wh.ID, "e", []byte("{}"), time.Now())
 	require.NoError(t, err)
 
-	assert.True(t, claimWebhookDelivery(db, d))
-	assert.False(t, claimWebhookDelivery(db, d), "a second worker cannot take it")
+	assert.True(t, claimWebhookDelivery(db, d, time.Now()))
+	assert.False(t, claimWebhookDelivery(db, d, time.Now()), "a second worker cannot take it")
 
 	stale := time.Now().Add(-2 * outboxLockTimeout)
 	require.NoError(t, db.Model(&models.WebhookDelivery{}).Where("id = ?", d.ID).Update("locked_at", stale).Error)
-	assert.True(t, claimWebhookDelivery(db, d), "a crashed worker's lock expires")
+	assert.True(t, claimWebhookDelivery(db, d, time.Now()), "a crashed worker's lock expires")
 }
 
 func TestDeliverWebhookBlocksPrivateTargets(t *testing.T) {
@@ -268,7 +269,7 @@ func TestTriggerWebhooksFiltersByUserEventAndActive(t *testing.T) {
 	mk("/inactive", 1, []string{"contact.created"}, false)
 	mk("/other-user", 2, []string{"contact.created"}, true)
 
-	TriggerWebhooks(db, config.Config{}, 1, "contact.created", map[string]string{"k": "v"})
+	TriggerWebhooks(db, config.Config{}, 1, "contact.created", map[string]string{"k": "v"}, clock.Real())
 	require.Eventually(t, func() bool { mu.Lock(); defer mu.Unlock(); return hits["/match"] == 1 }, 5*time.Second, 20*time.Millisecond)
 	time.Sleep(100 * time.Millisecond)
 	mu.Lock()
@@ -305,7 +306,7 @@ func TestProcessWebhookOutbox(t *testing.T) {
 	stale := time.Now().Add(-time.Hour)
 	crashed := mk(`{"id":"crashed"}`, models.OutboxPending, &past, 0, &stale)
 
-	ProcessWebhookOutbox(db, config.Config{})
+	ProcessWebhookOutbox(db, config.Config{}, clock.Real())
 
 	mu.Lock()
 	assert.ElementsMatch(t, []string{`{"id":"due"}`, `{"id":"crashed"}`}, got, "only due, unlocked (or stale-locked) rows are sent, with the original payload")
@@ -331,7 +332,7 @@ func TestProcessWebhookOutboxKillsDeliveriesOfInactiveWebhook(t *testing.T) {
 	d := models.WebhookDelivery{WebhookID: wh.ID, EventType: "e", Payload: "{}", Attempts: 1, NextRetryAt: &past, Status: models.OutboxPending}
 	require.NoError(t, db.Create(&d).Error)
 
-	ProcessWebhookOutbox(db, config.Config{})
+	ProcessWebhookOutbox(db, config.Config{}, clock.Real())
 
 	var reloaded models.WebhookDelivery
 	require.NoError(t, db.First(&reloaded, d.ID).Error)
@@ -350,7 +351,7 @@ func TestTriggerWebhooksQueuesBeforeSending(t *testing.T) {
 	startDelivery = func(f func()) { go func() { <-stop; f() }() } // hold the send back
 	defer func() { startDelivery = old; close(stop) }()
 
-	TriggerWebhooks(db, config.Config{}, 1, "contact.created", map[string]string{"k": "v"})
+	TriggerWebhooks(db, config.Config{}, 1, "contact.created", map[string]string{"k": "v"}, clock.Real())
 
 	var rows []models.WebhookDelivery
 	require.NoError(t, db.Find(&rows).Error)
@@ -376,19 +377,19 @@ func TestClaimWebhookDeliveryRejectsAStaleCopyAfterARelease(t *testing.T) {
 	defer srv.Close()
 	wh := models.Webhook{UserID: 1, URL: srv.URL, Secret: "s"}
 	require.NoError(t, db.Create(&wh).Error)
-	d, err := enqueueWebhookDelivery(db, wh.ID, "e", []byte("{}"))
+	d, err := enqueueWebhookDelivery(db, wh.ID, "e", []byte("{}"), time.Now())
 	require.NoError(t, err)
 
 	jobCopy := d // loaded by the job before the immediate send started
-	require.True(t, claimWebhookDelivery(db, d))
-	deliverWebhook(db, config.Config{}, wh, d) // fails, released with attempts=1 and a backoff
+	require.True(t, claimWebhookDelivery(db, d, time.Now()))
+	deliverWebhook(db, config.Config{}, wh, d, clock.Real()) // fails, released with attempts=1 and a backoff
 
-	assert.False(t, claimWebhookDelivery(db, jobCopy), "stale copy must not claim a released row")
+	assert.False(t, claimWebhookDelivery(db, jobCopy, time.Now()), "stale copy must not claim a released row")
 
 	// even once the backoff has passed, the old copy (attempts 0) is stale
 	fresh := makeDue(t, db, d)
-	assert.False(t, claimWebhookDelivery(db, jobCopy))
-	assert.True(t, claimWebhookDelivery(db, fresh))
+	assert.False(t, claimWebhookDelivery(db, jobCopy, time.Now()))
+	assert.True(t, claimWebhookDelivery(db, fresh, time.Now()))
 }
 
 func TestClaimWebhookDeliveryWaitsForTheRetryTime(t *testing.T) {
@@ -396,7 +397,7 @@ func TestClaimWebhookDeliveryWaitsForTheRetryTime(t *testing.T) {
 	future := time.Now().Add(time.Hour)
 	d := models.WebhookDelivery{WebhookID: 1, Payload: "{}", EventType: "e", Status: models.OutboxPending, NextRetryAt: &future}
 	require.NoError(t, db.Create(&d).Error)
-	assert.False(t, claimWebhookDelivery(db, d))
+	assert.False(t, claimWebhookDelivery(db, d, time.Now()))
 }
 
 func TestPurgeWebhookDeliveries(t *testing.T) {
@@ -450,13 +451,13 @@ func TestProcessWebhookOutboxClaimsInsideTheConcurrencyLimit(t *testing.T) {
 	defer srv.Close()
 	wh := models.Webhook{UserID: 1, URL: srv.URL, Secret: "s", IsActive: true}
 	require.NoError(t, db.Create(&wh).Error)
-	d, err := enqueueWebhookDelivery(db, wh.ID, "e", []byte("{}"))
+	d, err := enqueueWebhookDelivery(db, wh.ID, "e", []byte("{}"), time.Now())
 	require.NoError(t, err)
 	for i := 0; i < cap(deliverySem); i++ {
 		deliverySem <- struct{}{}
 	}
 	done := make(chan struct{})
-	go func() { ProcessWebhookOutbox(db, config.Config{}); close(done) }()
+	go func() { ProcessWebhookOutbox(db, config.Config{}, clock.Real()); close(done) }()
 	time.Sleep(200 * time.Millisecond)
 	var stored models.WebhookDelivery
 	require.NoError(t, db.First(&stored, d.ID).Error)

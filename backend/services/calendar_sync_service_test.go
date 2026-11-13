@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"meerkat/clock"
 	"meerkat/config"
 	"meerkat/i18n"
 	"meerkat/models"
@@ -124,7 +125,7 @@ func TestCalendarSyncCreatesUpdatesAndSkips(t *testing.T) {
 	sub := newTestSubscription(t, db, cfg, user.ID, server.URL+"/calendars/test/", "calendar", "secret")
 	service := NewCalendarSyncService(false)
 
-	stats, err := service.SyncSubscription(context.Background(), db, cfg, sub)
+	stats, err := service.SyncSubscription(context.Background(), db, cfg, sub, clock.Real())
 	require.NoError(t, err)
 	assert.True(t, sawReport, "should use CalDAV REPORT")
 	assert.True(t, sawAuth, "should send basic auth credentials")
@@ -143,13 +144,13 @@ func TestCalendarSyncCreatesUpdatesAndSkips(t *testing.T) {
 	assert.Empty(t, activities[1].Contacts)
 
 	// Second sync with identical data: everything is skipped.
-	stats, err = service.SyncSubscription(context.Background(), db, cfg, sub)
+	stats, err = service.SyncSubscription(context.Background(), db, cfg, sub, clock.Real())
 	require.NoError(t, err)
 	assert.Equal(t, CalendarSyncStats{Skipped: 2}, stats)
 
 	// Changing an event upstream updates the linked activity instead of duplicating it.
 	summary = "Dinner instead"
-	stats, err = service.SyncSubscription(context.Background(), db, cfg, sub)
+	stats, err = service.SyncSubscription(context.Background(), db, cfg, sub, clock.Real())
 	require.NoError(t, err)
 	assert.Equal(t, CalendarSyncStats{Updated: 1, Skipped: 1}, stats)
 
@@ -171,7 +172,7 @@ func TestCalendarSyncEmptyCalendarSucceeds(t *testing.T) {
 	defer server.Close()
 
 	sub := newTestSubscription(t, db, cfg, user.ID, server.URL+"/calendars/test/", "", "")
-	stats, err := NewCalendarSyncService(false).SyncSubscription(context.Background(), db, cfg, sub)
+	stats, err := NewCalendarSyncService(false).SyncSubscription(context.Background(), db, cfg, sub, clock.Real())
 	require.NoError(t, err, "an empty calendar is not an error")
 	assert.Equal(t, CalendarSyncStats{}, stats)
 	assert.Equal(t, models.CalendarSyncStatusSuccess, sub.LastSyncStatus)
@@ -190,7 +191,7 @@ func TestCalendarSyncWithoutCredentialsSendsNoAuthHeader(t *testing.T) {
 	defer server.Close()
 
 	sub := newTestSubscription(t, db, cfg, user.ID, server.URL+"/public.ics", "", "")
-	stats, err := NewCalendarSyncService(false).SyncSubscription(context.Background(), db, cfg, sub)
+	stats, err := NewCalendarSyncService(false).SyncSubscription(context.Background(), db, cfg, sub, clock.Real())
 	require.NoError(t, err)
 	assert.Equal(t, CalendarSyncStats{Created: 1}, stats)
 }
@@ -206,7 +207,7 @@ func TestCalendarSyncUnauthorizedReturnsSentinel(t *testing.T) {
 	defer server.Close()
 
 	sub := newTestSubscription(t, db, cfg, user.ID, server.URL+"/calendars/test/", "user", "wrong")
-	_, err := NewCalendarSyncService(false).SyncSubscription(context.Background(), db, cfg, sub)
+	_, err := NewCalendarSyncService(false).SyncSubscription(context.Background(), db, cfg, sub, clock.Real())
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrCalendarUnauthorized)
 	assert.Equal(t, models.CalendarSyncStatusError, sub.LastSyncStatus)
@@ -237,7 +238,7 @@ func TestCalendarSyncFallsBackToPlainICS(t *testing.T) {
 	defer server.Close()
 
 	sub := newTestSubscription(t, db, cfg, user.ID, server.URL+"/export", "", "")
-	stats, err := NewCalendarSyncService(false).SyncSubscription(context.Background(), db, cfg, sub)
+	stats, err := NewCalendarSyncService(false).SyncSubscription(context.Background(), db, cfg, sub, clock.Real())
 	require.NoError(t, err)
 	assert.True(t, sawGet, "should fall back to GET when REPORT is not allowed")
 	assert.Equal(t, CalendarSyncStats{Created: 1}, stats, "past/future events outside the window are filtered out")
@@ -263,7 +264,7 @@ func TestCalendarSyncRespectsUserDeletedActivities(t *testing.T) {
 	sub := newTestSubscription(t, db, cfg, user.ID, server.URL+"/cal.ics", "", "")
 	service := NewCalendarSyncService(false)
 
-	stats, err := service.SyncSubscription(context.Background(), db, cfg, sub)
+	stats, err := service.SyncSubscription(context.Background(), db, cfg, sub, clock.Real())
 	require.NoError(t, err)
 	assert.Equal(t, CalendarSyncStats{Created: 1}, stats)
 
@@ -272,7 +273,7 @@ func TestCalendarSyncRespectsUserDeletedActivities(t *testing.T) {
 
 	// Upstream event changes; the deleted activity must not come back.
 	summary = "Meeting v2"
-	stats, err = service.SyncSubscription(context.Background(), db, cfg, sub)
+	stats, err = service.SyncSubscription(context.Background(), db, cfg, sub, clock.Real())
 	require.NoError(t, err)
 	assert.Equal(t, CalendarSyncStats{Skipped: 1}, stats)
 
@@ -304,12 +305,12 @@ func TestCalendarSyncMatchesByContentWhenUIDsChange(t *testing.T) {
 	sub := newTestSubscription(t, db, cfg, user.ID, server.URL+"/cal.ics", "", "")
 	service := NewCalendarSyncService(false)
 
-	stats, err := service.SyncSubscription(context.Background(), db, cfg, sub)
+	stats, err := service.SyncSubscription(context.Background(), db, cfg, sub, clock.Real())
 	require.NoError(t, err)
 	assert.Equal(t, CalendarSyncStats{Created: 2}, stats)
 
 	// Second sync: all UIDs changed, but the content did not.
-	stats, err = service.SyncSubscription(context.Background(), db, cfg, sub)
+	stats, err = service.SyncSubscription(context.Background(), db, cfg, sub, clock.Real())
 	require.NoError(t, err)
 	assert.Equal(t, CalendarSyncStats{Skipped: 2}, stats, "unchanged events with new UIDs must not duplicate")
 
@@ -328,7 +329,7 @@ func TestCalendarSyncMatchesByContentWhenUIDsChange(t *testing.T) {
 	// A changed event under yet another UID cannot be recognized; it becomes a
 	// new activity (the duplication case the settings dialog warns about).
 	eventStart = icalDate(4)
-	stats, err = service.SyncSubscription(context.Background(), db, cfg, sub)
+	stats, err = service.SyncSubscription(context.Background(), db, cfg, sub, clock.Real())
 	require.NoError(t, err)
 	assert.Equal(t, CalendarSyncStats{Created: 1, Skipped: 1}, stats)
 }
@@ -347,7 +348,7 @@ func TestCalendarSyncLocalizesUntitledEvents(t *testing.T) {
 	defer server.Close()
 
 	sub := newTestSubscription(t, db, cfg, user.ID, server.URL+"/cal.ics", "", "")
-	stats, err := NewCalendarSyncService(false).SyncSubscription(context.Background(), db, cfg, sub)
+	stats, err := NewCalendarSyncService(false).SyncSubscription(context.Background(), db, cfg, sub, clock.Real())
 	require.NoError(t, err)
 	assert.Equal(t, CalendarSyncStats{Created: 1}, stats)
 
@@ -373,7 +374,7 @@ func TestCalendarSyncSkipsCancelledAndImportsOverrides(t *testing.T) {
 	defer server.Close()
 
 	sub := newTestSubscription(t, db, cfg, user.ID, server.URL+"/cal.ics", "", "")
-	stats, err := NewCalendarSyncService(false).SyncSubscription(context.Background(), db, cfg, sub)
+	stats, err := NewCalendarSyncService(false).SyncSubscription(context.Background(), db, cfg, sub, clock.Real())
 	require.NoError(t, err)
 	assert.Equal(t, CalendarSyncStats{Created: 2}, stats, "the base event and the override instance are imported, the cancelled one is not")
 
@@ -412,7 +413,7 @@ func TestCalendarSyncExpandsRecurringEvents(t *testing.T) {
 	sub := newTestSubscription(t, db, cfg, user.ID, server.URL+"/cal.ics", "", "")
 	service := NewCalendarSyncService(false)
 
-	stats, err := service.SyncSubscription(context.Background(), db, cfg, sub)
+	stats, err := service.SyncSubscription(context.Background(), db, cfg, sub, clock.Real())
 	require.NoError(t, err)
 	assert.Equal(t, CalendarSyncStats{Created: 16}, stats,
 		"17 occurrences in the window, minus one EXDATE and one overridden occurrence, plus the override instance")
@@ -427,7 +428,7 @@ func TestCalendarSyncExpandsRecurringEvents(t *testing.T) {
 	assert.EqualValues(t, 0, excluded, "EXDATE occurrences are not imported")
 
 	// Re-syncing must not duplicate occurrences.
-	stats, err = service.SyncSubscription(context.Background(), db, cfg, sub)
+	stats, err = service.SyncSubscription(context.Background(), db, cfg, sub, clock.Real())
 	require.NoError(t, err)
 	assert.Equal(t, CalendarSyncStats{Skipped: 16}, stats)
 }
@@ -451,13 +452,13 @@ func TestCalendarSyncRelinksContactsWhenAttendeesChange(t *testing.T) {
 	sub := newTestSubscription(t, db, cfg, user.ID, server.URL+"/cal.ics", "", "")
 	service := NewCalendarSyncService(false)
 
-	stats, err := service.SyncSubscription(context.Background(), db, cfg, sub)
+	stats, err := service.SyncSubscription(context.Background(), db, cfg, sub, clock.Real())
 	require.NoError(t, err)
 	assert.Equal(t, CalendarSyncStats{Created: 1}, stats)
 
 	// The only upstream change is a newly invited attendee.
 	attendees = "\nATTENDEE:mailto:grace@example.com"
-	stats, err = service.SyncSubscription(context.Background(), db, cfg, sub)
+	stats, err = service.SyncSubscription(context.Background(), db, cfg, sub, clock.Real())
 	require.NoError(t, err)
 	assert.Equal(t, CalendarSyncStats{Updated: 1}, stats, "an attendee change must be detected as an update")
 
@@ -533,7 +534,7 @@ func TestSyncAllCalendarsRecordsErrorsPerSubscription(t *testing.T) {
 	disabledSub := newTestSubscription(t, db, cfg, user.ID, brokenServer.URL+"/cal.ics", "", "")
 	require.NoError(t, db.Model(disabledSub).Update("sync_enabled", false).Error)
 
-	SyncAllCalendars(db, cfg)
+	SyncAllCalendars(db, cfg, clock.Real())
 
 	var refreshedOk, refreshedBroken, refreshedDisabled models.CalendarSubscription
 	require.NoError(t, db.First(&refreshedOk, okSub.ID).Error)
@@ -551,7 +552,7 @@ func TestSyncAllCalendarsRecordsErrorsPerSubscription(t *testing.T) {
 
 	// Errors are wiped again after a successful sync.
 	require.NoError(t, db.Model(&models.CalendarSubscription{}).Where("id = ?", brokenSub.ID).Update("url", okServer.URL+"/cal.ics").Error)
-	SyncAllCalendars(db, cfg)
+	SyncAllCalendars(db, cfg, clock.Real())
 	require.NoError(t, db.First(&refreshedBroken, brokenSub.ID).Error)
 	assert.Equal(t, models.CalendarSyncStatusSuccess, refreshedBroken.LastSyncStatus)
 	assert.Empty(t, refreshedBroken.LastSyncError)

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"meerkat/clock"
 	"meerkat/config"
 	"meerkat/models"
 
@@ -47,7 +48,7 @@ func TestQueueEmailWritesRowBeforeSending(t *testing.T) {
 	db := emailDB(t)
 	noKick(t)
 	uid := uint(7)
-	require.NoError(t, QueueEmail(db, emailCfg, &uid, EmailMessage{To: "a@example.com", Subject: "s", HTML: "<p>x</p>"}))
+	require.NoError(t, QueueEmail(db, emailCfg, &uid, EmailMessage{To: "a@example.com", Subject: "s", HTML: "<p>x</p>"}, clock.Real()))
 
 	var rows []models.EmailOutbox
 	require.NoError(t, db.Find(&rows).Error)
@@ -62,8 +63,8 @@ func TestQueueEmailWritesRowBeforeSending(t *testing.T) {
 func TestQueueEmailNoopWithoutChannelOrRecipient(t *testing.T) {
 	db := emailDB(t)
 	noKick(t)
-	require.NoError(t, QueueEmail(db, config.Config{}, nil, EmailMessage{To: "a@example.com", Subject: "s"}))
-	require.NoError(t, QueueEmail(db, emailCfg, nil, EmailMessage{To: "", Subject: "s"}))
+	require.NoError(t, QueueEmail(db, config.Config{}, nil, EmailMessage{To: "a@example.com", Subject: "s"}, clock.Real()))
+	require.NoError(t, QueueEmail(db, emailCfg, nil, EmailMessage{To: "", Subject: "s"}, clock.Real()))
 	var n int64
 	db.Model(&models.EmailOutbox{}).Count(&n)
 	assert.Zero(t, n)
@@ -72,8 +73,8 @@ func TestQueueEmailNoopWithoutChannelOrRecipient(t *testing.T) {
 func TestQueueEmailRefusesLineBreaks(t *testing.T) {
 	db := emailDB(t)
 	noKick(t)
-	assert.Error(t, QueueEmail(db, emailCfg, nil, EmailMessage{To: "a@example.com\r\nBcc: x@y.z", Subject: "s"}))
-	assert.Error(t, QueueEmail(db, emailCfg, nil, EmailMessage{To: "a@example.com", Subject: "s\nBcc: x"}))
+	assert.Error(t, QueueEmail(db, emailCfg, nil, EmailMessage{To: "a@example.com\r\nBcc: x@y.z", Subject: "s"}, clock.Real()))
+	assert.Error(t, QueueEmail(db, emailCfg, nil, EmailMessage{To: "a@example.com", Subject: "s\nBcc: x"}, clock.Real()))
 	var n int64
 	db.Model(&models.EmailOutbox{}).Count(&n)
 	assert.Zero(t, n)
@@ -83,9 +84,9 @@ func TestProcessEmailOutboxSends(t *testing.T) {
 	db := emailDB(t)
 	noKick(t)
 	sent := fakeSender(t)
-	require.NoError(t, QueueEmail(db, emailCfg, nil, EmailMessage{To: "a@example.com", Subject: "s", HTML: "h"}))
+	require.NoError(t, QueueEmail(db, emailCfg, nil, EmailMessage{To: "a@example.com", Subject: "s", HTML: "h"}, clock.Real()))
 
-	ProcessEmailOutbox(db, emailCfg)
+	ProcessEmailOutbox(db, emailCfg, clock.Real())
 
 	require.Len(t, *sent, 1)
 	assert.Equal(t, EmailMessage{To: "a@example.com", Subject: "s", HTML: "h"}, (*sent)[0])
@@ -96,7 +97,7 @@ func TestProcessEmailOutboxSends(t *testing.T) {
 	assert.NotNil(t, row.SentAt)
 	assert.Nil(t, row.LockedAt)
 
-	ProcessEmailOutbox(db, emailCfg)
+	ProcessEmailOutbox(db, emailCfg, clock.Real())
 	assert.Len(t, *sent, 1, "a sent email is never sent again")
 }
 
@@ -109,10 +110,10 @@ func TestProcessEmailOutboxBackoffThenDead(t *testing.T) {
 		errs[i] = boom
 	}
 	sent := fakeSender(t, errs...)
-	require.NoError(t, QueueEmail(db, emailCfg, nil, EmailMessage{To: "a@example.com", Subject: "s", HTML: "h"}))
+	require.NoError(t, QueueEmail(db, emailCfg, nil, EmailMessage{To: "a@example.com", Subject: "s", HTML: "h"}, clock.Real()))
 
 	for n := 1; n <= maxOutboxAttempts; n++ {
-		ProcessEmailOutbox(db, emailCfg)
+		ProcessEmailOutbox(db, emailCfg, clock.Real())
 		var row models.EmailOutbox
 		require.NoError(t, db.First(&row).Error)
 		assert.Equal(t, n, row.Attempts)
@@ -121,14 +122,14 @@ func TestProcessEmailOutboxBackoffThenDead(t *testing.T) {
 			assert.Equal(t, models.OutboxPending, row.Status)
 			assert.WithinDuration(t, time.Now().Add(outboxBackoff[n-1]), row.NextAttemptAt, time.Minute)
 			// not due yet: nothing happens
-			ProcessEmailOutbox(db, emailCfg)
+			ProcessEmailOutbox(db, emailCfg, clock.Real())
 			assert.Len(t, *sent, n)
 			require.NoError(t, db.Model(&row).Update("next_attempt_at", time.Now().Add(-time.Second)).Error)
 		} else {
 			assert.Equal(t, models.OutboxDead, row.Status)
 		}
 	}
-	ProcessEmailOutbox(db, emailCfg)
+	ProcessEmailOutbox(db, emailCfg, clock.Real())
 	assert.Len(t, *sent, maxOutboxAttempts, "a dead email is not tried again")
 }
 
@@ -136,9 +137,9 @@ func TestProcessEmailOutboxWaitsWhileEmailIsNotConfigured(t *testing.T) {
 	db := emailDB(t)
 	noKick(t)
 	sent := fakeSender(t)
-	require.NoError(t, QueueEmail(db, emailCfg, nil, EmailMessage{To: "a@example.com", Subject: "s", HTML: "h"}))
+	require.NoError(t, QueueEmail(db, emailCfg, nil, EmailMessage{To: "a@example.com", Subject: "s", HTML: "h"}, clock.Real()))
 
-	ProcessEmailOutbox(db, config.Config{})
+	ProcessEmailOutbox(db, config.Config{}, clock.Real())
 	assert.Empty(t, *sent)
 	var row models.EmailOutbox
 	require.NoError(t, db.First(&row).Error)
@@ -155,7 +156,7 @@ func TestProcessEmailOutboxResumesAfterCrashButSkipsFreshClaims(t *testing.T) {
 	for _, locked := range []*time.Time{&fresh, &stale} {
 		require.NoError(t, db.Create(&models.EmailOutbox{ToAddr: "a@example.com", Subject: "s", HTML: "h", Status: models.OutboxPending, NextAttemptAt: past, LockedAt: locked}).Error)
 	}
-	ProcessEmailOutbox(db, emailCfg)
+	ProcessEmailOutbox(db, emailCfg, clock.Real())
 	assert.Len(t, *sent, 1)
 }
 
@@ -163,8 +164,8 @@ func TestClaimEmailIsExclusive(t *testing.T) {
 	db := emailDB(t)
 	e := models.EmailOutbox{ToAddr: "a", Subject: "s", HTML: "h", Status: models.OutboxPending, NextAttemptAt: time.Now()}
 	require.NoError(t, db.Create(&e).Error)
-	assert.True(t, claimEmail(db, e))
-	assert.False(t, claimEmail(db, e))
+	assert.True(t, claimEmail(db, e, time.Now()))
+	assert.False(t, claimEmail(db, e, time.Now()))
 }
 
 // The job loaded the row (attempts 0) before the immediate send failed and released it; its
@@ -173,38 +174,38 @@ func TestClaimEmailRejectsAStaleCopyAfterARelease(t *testing.T) {
 	db := emailDB(t)
 	noKick(t)
 	fakeSender(t, errors.New("down"))
-	require.NoError(t, QueueEmail(db, emailCfg, nil, EmailMessage{To: "a@example.com", Subject: "s", HTML: "h"}))
+	require.NoError(t, QueueEmail(db, emailCfg, nil, EmailMessage{To: "a@example.com", Subject: "s", HTML: "h"}, clock.Real()))
 	var jobCopy models.EmailOutbox
 	require.NoError(t, db.First(&jobCopy).Error)
 
-	require.True(t, claimEmail(db, jobCopy))
-	sendQueuedEmail(db, emailCfg, jobCopy) // fails, released with attempts=1 and a backoff
+	require.True(t, claimEmail(db, jobCopy, time.Now()))
+	sendQueuedEmail(db, emailCfg, jobCopy, clock.Real()) // fails, released with attempts=1 and a backoff
 
-	assert.False(t, claimEmail(db, jobCopy), "retry time is in the future")
+	assert.False(t, claimEmail(db, jobCopy, time.Now()), "retry time is in the future")
 	require.NoError(t, db.Model(&models.EmailOutbox{}).Where("id = ?", jobCopy.ID).Update("next_attempt_at", time.Now().Add(-time.Second)).Error)
-	assert.False(t, claimEmail(db, jobCopy), "attempts changed since the copy was loaded")
+	assert.False(t, claimEmail(db, jobCopy, time.Now()), "attempts changed since the copy was loaded")
 	var fresh models.EmailOutbox
 	require.NoError(t, db.First(&fresh).Error)
-	assert.True(t, claimEmail(db, fresh))
+	assert.True(t, claimEmail(db, fresh, time.Now()))
 }
 
 func TestClaimEmailWaitsForTheRetryTime(t *testing.T) {
 	db := emailDB(t)
 	e := models.EmailOutbox{ToAddr: "a", Subject: "s", HTML: "h", Status: models.OutboxPending, NextAttemptAt: time.Now().Add(time.Hour)}
 	require.NoError(t, db.Create(&e).Error)
-	assert.False(t, claimEmail(db, e))
+	assert.False(t, claimEmail(db, e, time.Now()))
 }
 
 func TestProcessEmailOutboxClaimsInsideTheConcurrencyLimit(t *testing.T) {
 	db := emailDB(t)
 	noKick(t)
 	sent := fakeSender(t)
-	require.NoError(t, QueueEmail(db, emailCfg, nil, EmailMessage{To: "a@example.com", Subject: "s", HTML: "h"}))
+	require.NoError(t, QueueEmail(db, emailCfg, nil, EmailMessage{To: "a@example.com", Subject: "s", HTML: "h"}, clock.Real()))
 	for i := 0; i < cap(emailSem); i++ {
 		emailSem <- struct{}{}
 	}
 	done := make(chan struct{})
-	go func() { ProcessEmailOutbox(db, emailCfg); close(done) }()
+	go func() { ProcessEmailOutbox(db, emailCfg, clock.Real()); close(done) }()
 	time.Sleep(200 * time.Millisecond)
 	var row models.EmailOutbox
 	require.NoError(t, db.First(&row).Error)
@@ -220,8 +221,8 @@ func TestEmailBodyIsClearedOnceDeliveredOrDead(t *testing.T) {
 	db := emailDB(t)
 	noKick(t)
 	fakeSender(t)
-	require.NoError(t, QueueEmail(db, emailCfg, nil, EmailMessage{To: "a@example.com", Subject: "s", HTML: "token"}))
-	ProcessEmailOutbox(db, emailCfg)
+	require.NoError(t, QueueEmail(db, emailCfg, nil, EmailMessage{To: "a@example.com", Subject: "s", HTML: "token"}, clock.Real()))
+	ProcessEmailOutbox(db, emailCfg, clock.Real())
 	var row models.EmailOutbox
 	require.NoError(t, db.First(&row).Error)
 	assert.Equal(t, models.OutboxDelivered, row.Status)
@@ -235,9 +236,9 @@ func TestEmailBodyIsClearedOnceDeliveredOrDead(t *testing.T) {
 	fakeSender(t, errs...)
 	require.NoError(t, db.Delete(&models.EmailOutbox{}, row.ID).Error)
 	row = models.EmailOutbox{}
-	require.NoError(t, QueueEmail(db, emailCfg, nil, EmailMessage{To: "a@example.com", Subject: "s", HTML: "token"}))
+	require.NoError(t, QueueEmail(db, emailCfg, nil, EmailMessage{To: "a@example.com", Subject: "s", HTML: "token"}, clock.Real()))
 	for n := 1; n <= maxOutboxAttempts; n++ {
-		ProcessEmailOutbox(db, emailCfg)
+		ProcessEmailOutbox(db, emailCfg, clock.Real())
 		require.NoError(t, db.Model(&models.EmailOutbox{}).Where("1 = 1").Update("next_attempt_at", time.Now().Add(-time.Second)).Error)
 	}
 	require.NoError(t, db.First(&row).Error)
@@ -250,9 +251,9 @@ func TestExpiredEmailIsNeverSentAndLosesItsBody(t *testing.T) {
 	db := emailDB(t)
 	noKick(t)
 	sent := fakeSender(t)
-	require.NoError(t, QueueEmailUntil(db, emailCfg, nil, EmailMessage{To: "a@example.com", Subject: "s", HTML: "token"}, time.Now().Add(-time.Minute)))
+	require.NoError(t, QueueEmailUntil(db, emailCfg, nil, EmailMessage{To: "a@example.com", Subject: "s", HTML: "token"}, time.Now().Add(-time.Minute), clock.Real()))
 
-	ProcessEmailOutbox(db, emailCfg)
+	ProcessEmailOutbox(db, emailCfg, clock.Real())
 
 	assert.Empty(t, *sent)
 	var row models.EmailOutbox
@@ -268,16 +269,16 @@ func TestEmailStopsRetryingWhenTheNextTryWouldBeAfterExpiry(t *testing.T) {
 	noKick(t)
 	sent := fakeSender(t, errors.New("down"), errors.New("down"))
 	// first retry (1 min) fits, the second (5 min) does not
-	require.NoError(t, QueueEmailUntil(db, emailCfg, nil, EmailMessage{To: "a@example.com", Subject: "s", HTML: "token"}, time.Now().Add(2*time.Minute)))
+	require.NoError(t, QueueEmailUntil(db, emailCfg, nil, EmailMessage{To: "a@example.com", Subject: "s", HTML: "token"}, time.Now().Add(2*time.Minute), clock.Real()))
 
-	ProcessEmailOutbox(db, emailCfg)
+	ProcessEmailOutbox(db, emailCfg, clock.Real())
 	var row models.EmailOutbox
 	require.NoError(t, db.First(&row).Error)
 	assert.Equal(t, models.OutboxPending, row.Status)
 	assert.Equal(t, "token", row.HTML)
 
 	require.NoError(t, db.Model(&row).Update("next_attempt_at", time.Now().Add(-time.Second)).Error)
-	ProcessEmailOutbox(db, emailCfg)
+	ProcessEmailOutbox(db, emailCfg, clock.Real())
 	require.NoError(t, db.First(&row).Error)
 	assert.Len(t, *sent, 2)
 	assert.Equal(t, models.OutboxDead, row.Status)

@@ -228,7 +228,7 @@ func SyncCardDAVConnection(c *gin.Context) {
 		return
 	}
 
-	if !services.StartContactSync(db, currentConfig(c), conn) {
+	if !services.StartContactSync(db, currentConfig(c), conn, middleware.RequestClock(c)) {
 		apperrors.AbortWithError(c, apperrors.ErrConflict("a contact sync is already running for this connection"))
 		return
 	}

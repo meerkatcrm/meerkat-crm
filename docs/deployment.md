@@ -250,6 +250,17 @@ of those into a file (safe to repeat; it logs how many it moved). The old column
 so rolling back loses nothing; a later release drops it. Contact lists carry a thumbnail URL with
 the file name as version, which the browser caches.
 
+## Fake clock for demos and tests
+
+`FAKE_NOW` (an RFC 3339 time such as `2026-12-24T12:00:00Z`) starts the server clock at that instant and lets it run, so a demo or a manual test can walk through time: a birthday next week, a reminder due tomorrow, a password reset link about to expire. **Do not set it on a real instance.** The server logs a warning at startup. While it is set:
+
+- the delivery queue purge is skipped, because a clock set into the future would delete data for good;
+- the schedule of the background jobs still follows the real time: the fake clock changes what a job does, not when it starts;
+- stored timestamps (`created_at`, `updated_at`, sync times) use the fake time, so contact sync against a real CardDAV server compares real remote revisions with fake local ones;
+- the browser does not follow it: dates the web app computes itself (the default date of a new note, "overdue") use the browser clock.
+
+How the clock is wired is described in [Backend development](development/backend.md#time).
+
 ## Upgrades
 
 ```sh

@@ -32,7 +32,7 @@ type MonicaMappedContact struct {
 
 // MapMonicaContact converts a Monica contact. The avatar URL is returned
 // separately because photos are downloaded after the import transaction.
-func MapMonicaContact(mc monica.Contact) MonicaMappedContact {
+func MapMonicaContact(mc monica.Contact, now time.Time) MonicaMappedContact {
 	contact := models.Contact{
 		Firstname: strings.TrimSpace(mc.FirstName),
 		Lastname:  strings.TrimSpace(mc.LastName),
@@ -63,7 +63,7 @@ func MapMonicaContact(mc monica.Contact) MonicaMappedContact {
 	contact.CustomFields = map[string]string{}
 	contact.Birthday = mapMonicaSpecialDate(mc.Information.Dates.Birthdate)
 	if mc.Information.Dates.Birthdate.IsAgeBased {
-		if age, ok := monicaAgeFromDate(mc.Information.Dates.Birthdate, time.Now()); ok {
+		if age, ok := monicaAgeFromDate(mc.Information.Dates.Birthdate, now); ok {
 			contact.CustomFields[monicaFieldApproximateAge] = fmt.Sprintf("%d", age)
 		}
 	}
@@ -274,14 +274,14 @@ func MapMonicaActivity(ma monica.Activity, lang string) (activity models.Activit
 }
 
 // MapMonicaNote converts a note. ok is false for empty or orphaned notes.
-func MapMonicaNote(mn monica.Note) (note models.Note, monicaContactID int, ok bool) {
+func MapMonicaNote(mn monica.Note, now time.Time) (note models.Note, monicaContactID int, ok bool) {
 	body := strings.TrimSpace(mn.Body)
 	if body == "" || mn.Contact == nil {
 		return models.Note{}, 0, false
 	}
 	date, parsed := monicaParseTime(mn.CreatedAt)
 	if !parsed {
-		date = time.Now()
+		date = now
 	}
 	return models.Note{Content: truncateRunes(body, 5000), Date: date}, mn.Contact.ID, true
 }
@@ -565,14 +565,14 @@ func MapMonicaRelationship(rel monica.Relationship, related *monica.Contact) (re
 
 // MapMonicaCall converts a logged call into a note; calls without content
 // carry no information and are skipped.
-func MapMonicaCall(mc monica.Call, lang string) (note models.Note, monicaContactID int, ok bool) {
+func MapMonicaCall(mc monica.Call, lang string, now time.Time) (note models.Note, monicaContactID int, ok bool) {
 	content := strings.TrimSpace(mc.Content)
 	if content == "" || mc.Contact == nil {
 		return models.Note{}, 0, false
 	}
 	date, parsed := monicaParseTime(mc.CalledAt)
 	if !parsed {
-		date = time.Now()
+		date = now
 	}
 	body := i18n.T(lang, "monicaImport.note.call", map[string]string{
 		"date":    date.Format("2006-01-02"),
@@ -582,7 +582,7 @@ func MapMonicaCall(mc monica.Call, lang string) (note models.Note, monicaContact
 }
 
 // MapMonicaTask converts a task into a note.
-func MapMonicaTask(mt monica.Task, lang string) (note models.Note, monicaContactID int, ok bool) {
+func MapMonicaTask(mt monica.Task, lang string, now time.Time) (note models.Note, monicaContactID int, ok bool) {
 	title := strings.TrimSpace(mt.Title)
 	if title == "" || mt.Contact == nil {
 		return models.Note{}, 0, false
@@ -597,7 +597,7 @@ func MapMonicaTask(mt monica.Task, lang string) (note models.Note, monicaContact
 	}
 	date, parsed := monicaParseTime(mt.CreatedAt)
 	if !parsed {
-		date = time.Now()
+		date = now
 	}
 	if mt.CompletedAt != nil {
 		if completed, okDate := monicaParseTime(*mt.CompletedAt); okDate {
@@ -608,7 +608,7 @@ func MapMonicaTask(mt monica.Task, lang string) (note models.Note, monicaContact
 }
 
 // MapMonicaGift converts a gift (idea/offered/received) into a note.
-func MapMonicaGift(mg monica.Gift, lang string) (note models.Note, monicaContactID int, ok bool) {
+func MapMonicaGift(mg monica.Gift, lang string, now time.Time) (note models.Note, monicaContactID int, ok bool) {
 	name := strings.TrimSpace(mg.Name)
 	if name == "" || mg.Contact == nil {
 		return models.Note{}, 0, false
@@ -635,7 +635,7 @@ func MapMonicaGift(mg monica.Gift, lang string) (note models.Note, monicaContact
 	if giftURL := strings.TrimSpace(mg.URL); giftURL != "" {
 		body += "\n" + giftURL
 	}
-	date := time.Now()
+	date := now
 	if mg.Date != nil {
 		if d, okDate := monicaParseTime(*mg.Date); okDate {
 			date = d
@@ -647,7 +647,7 @@ func MapMonicaGift(mg monica.Gift, lang string) (note models.Note, monicaContact
 }
 
 // MapMonicaDebt converts a debt into a note.
-func MapMonicaDebt(md monica.Debt, lang string) (note models.Note, monicaContactID int, ok bool) {
+func MapMonicaDebt(md monica.Debt, lang string, now time.Time) (note models.Note, monicaContactID int, ok bool) {
 	if md.Contact == nil {
 		return models.Note{}, 0, false
 	}
@@ -665,7 +665,7 @@ func MapMonicaDebt(md monica.Debt, lang string) (note models.Note, monicaContact
 	}
 	date, parsed := monicaParseTime(md.CreatedAt)
 	if !parsed {
-		date = time.Now()
+		date = now
 	}
 	return models.Note{Content: truncateRunes(body, 5000), Date: date}, md.Contact.ID, true
 }

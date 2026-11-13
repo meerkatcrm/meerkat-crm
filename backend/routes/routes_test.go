@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
@@ -185,7 +186,7 @@ func TestRoutes_AdminGroupIsClosedToOtherAuthenticatedUsers(t *testing.T) {
 	router, db := newRouter(t, cfg, nil)
 	user := models.User{Username: "regular", Email: "regular@example.com", Password: "x"}
 	require.NoError(t, db.Create(&user).Error)
-	token, err := middleware.GenerateToken(user, cfg)
+	token, err := middleware.GenerateToken(user, cfg, time.Now())
 	require.NoError(t, err)
 	asUser := func(r *http.Request) { r.Header.Set("Authorization", "Bearer "+token) }
 
@@ -223,7 +224,7 @@ func TestRoutes_NonNumericIDsAreRejected(t *testing.T) {
 	router, db := newRouter(t, cfg, nil)
 	user := models.User{Username: "regular", Email: "regular@example.com", Password: "x"}
 	require.NoError(t, db.Create(&user).Error)
-	token, err := middleware.GenerateToken(user, cfg)
+	token, err := middleware.GenerateToken(user, cfg, time.Now())
 	require.NoError(t, err)
 	asUser := func(r *http.Request) { r.Header.Set("Authorization", "Bearer "+token) }
 

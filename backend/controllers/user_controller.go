@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"errors"
+	"meerkat/clock"
 	"net/http"
 	"slices"
 	"strings"
@@ -78,10 +79,10 @@ func RegisterUser(cfg *config.Config) gin.HandlerFunc {
 }
 
 // accountLockedError is the 429 for a login that is locked out after repeated failures.
-func accountLockedError(retryAfterSecs int) *apperrors.AppError {
+func accountLockedError(retryAfterSecs int, now time.Time) *apperrors.AppError {
 	return apperrors.NewError(apperrors.ErrCodeRateLimitExceeded, "Too many failed login attempts. Please try again later.", http.StatusTooManyRequests).
 		WithDetails("retry_after", retryAfterSecs).
-		WithDetails("retry_after_at", time.Now().Add(time.Duration(retryAfterSecs)*time.Second).Format(time.RFC3339))
+		WithDetails("retry_after_at", now.Add(time.Duration(retryAfterSecs)*time.Second).Format(time.RFC3339))
 }
 
 // LoginInput represents the DTO for login requests
@@ -123,7 +124,7 @@ func LoginUser(context *gin.Context, cfg *config.Config) {
 	// Check per-account rate limiting before attempting authentication
 	accountLimiter := middleware.GetAccountRateLimiter()
 	if isLocked, remainingSecs := accountLimiter.IsLocked(identifier); isLocked {
-		apperrors.AbortWithError(context, accountLockedError(remainingSecs))
+		apperrors.AbortWithError(context, accountLockedError(remainingSecs, middleware.RequestNow(context)))
 		return
 	}
 
@@ -155,7 +156,7 @@ func LoginUser(context *gin.Context, cfg *config.Config) {
 		// Record failed attempt for password mismatch
 		isLocked, lockoutSecs := accountLimiter.RecordFailedAttempt(identifier)
 		if isLocked {
-			apperrors.AbortWithError(context, accountLockedError(lockoutSecs))
+			apperrors.AbortWithError(context, accountLockedError(lockoutSecs, middleware.RequestNow(context)))
 			return
 		}
 		apperrors.AbortWithError(context, apperrors.ErrInvalidCredentials())
@@ -166,7 +167,7 @@ func LoginUser(context *gin.Context, cfg *config.Config) {
 	accountLimiter.RecordSuccessfulLogin(identifier)
 
 	// Create JWT token
-	tokenString, err := services.GenerateToken(foundUser, cfg)
+	tokenString, err := services.GenerateToken(foundUser, cfg, middleware.RequestNow(context))
 	if err != nil {
 		apperrors.AbortWithError(context, apperrors.ErrInternal("Could not generate token").WithError(err))
 		return
@@ -247,9 +248,10 @@ func RequestPasswordReset(context *gin.Context, cfg *config.Config) {
 	// the same response in the same time, including when the lookup or the mail provider fails.
 	select {
 	case passwordResetSlots <- struct{}{}:
+		clk := middleware.RequestClock(context)
 		go func() {
 			defer func() { <-passwordResetSlots }()
-			processPasswordResetRequest(db, cfg, log, email)
+			processPasswordResetRequest(db, cfg, log, email, clk)
 		}()
 	default:
 		log.Warn().Msg("Password reset request dropped: too many in progress")
@@ -260,7 +262,7 @@ func RequestPasswordReset(context *gin.Context, cfg *config.Config) {
 
 // processPasswordResetRequest stores a new reset token and emails it. Failures are only logged,
 // since the caller has already been answered.
-func processPasswordResetRequest(db *gorm.DB, cfg *config.Config, log *zerolog.Logger, email string) {
+func processPasswordResetRequest(db *gorm.DB, cfg *config.Config, log *zerolog.Logger, email string, clk clock.Clock) {
 	// This runs outside Gin's recovery middleware, so a panic would take the server down.
 	defer func() {
 		if r := recover(); r != nil {
@@ -276,7 +278,7 @@ func processPasswordResetRequest(db *gorm.DB, cfg *config.Config, log *zerolog.L
 		return
 	}
 
-	now := time.Now()
+	now := clk.Now()
 	if user.PasswordResetRequestedAt != nil && now.Sub(*user.PasswordResetRequestedAt) < passwordResetCooldown {
 		log.Info().Uint("user_id", user.ID).Msg("Password reset request ignored during cooldown")
 		return
@@ -290,14 +292,14 @@ func processPasswordResetRequest(db *gorm.DB, cfg *config.Config, log *zerolog.L
 
 	if err := db.Model(&models.User{}).Where("id = ?", user.ID).Updates(map[string]any{
 		"password_reset_token_hash":   hash,
-		"password_reset_expires_at":   services.PasswordResetExpiry(),
+		"password_reset_expires_at":   services.PasswordResetExpiry(now),
 		"password_reset_requested_at": now,
 	}).Error; err != nil {
 		log.Error().Err(err).Uint("user_id", user.ID).Msg("Failed to persist password reset token")
 		return
 	}
 
-	if err := services.SendPasswordResetEmail(db, user.ID, user.Email, token, user.Language, cfg); err != nil {
+	if err := services.SendPasswordResetEmail(db, user.ID, user.Email, token, user.Language, cfg, clk); err != nil {
 		log.Error().Err(err).Uint("user_id", user.ID).Msg("Failed to queue password reset email")
 		// Nothing was delivered, so a retry should not have to wait out the cooldown
 		if err := db.Model(&models.User{}).Where("id = ?", user.ID).Update("password_reset_requested_at", nil).Error; err != nil {
@@ -338,7 +340,7 @@ func ConfirmPasswordReset(context *gin.Context) {
 		return
 	}
 
-	if user.PasswordResetExpiresAt == nil || time.Now().After(*user.PasswordResetExpiresAt) {
+	if user.PasswordResetExpiresAt == nil || middleware.RequestNow(context).After(*user.PasswordResetExpiresAt) {
 		user.PasswordResetTokenHash = nil
 		user.PasswordResetExpiresAt = nil
 		user.PasswordResetRequestedAt = nil
@@ -361,7 +363,7 @@ func ConfirmPasswordReset(context *gin.Context) {
 	}
 
 	user.Password = hashedPassword
-	passwordChangedAt := time.Now()
+	passwordChangedAt := middleware.RequestNow(context)
 	user.PasswordChangedAt = &passwordChangedAt
 	user.PasswordResetTokenHash = nil
 	user.PasswordResetExpiresAt = nil
@@ -733,7 +735,7 @@ func ChangePassword(context *gin.Context) {
 	}
 
 	user.Password = hashedPassword
-	passwordChangedAt := time.Now()
+	passwordChangedAt := middleware.RequestNow(context)
 	user.PasswordChangedAt = &passwordChangedAt
 	user.PasswordResetTokenHash = nil
 	user.PasswordResetExpiresAt = nil

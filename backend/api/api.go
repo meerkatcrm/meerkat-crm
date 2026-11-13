@@ -232,6 +232,6 @@ func errorTransformer(ctx huma.Context, _ string, v any) (any, error) {
 	c := humagin.Unwrap(ctx)
 	apperrors.LogError(c, e.app)
 	e.RequestID = c.GetString("request_id")
-	e.Timestamp = time.Now().UTC().Format(time.RFC3339)
+	e.Timestamp = middleware.RequestNow(c).UTC().Format(time.RFC3339)
 	return e, nil
 }

@@ -92,7 +92,7 @@ func CreateRelationship(c *gin.Context) {
 		apperrors.AbortWithError(c, validationErr)
 		return
 	}
-	if err := validatePeriodDates(input.StartDate, input.EndDate); err != nil {
+	if err := validatePeriodDates(input.StartDate, input.EndDate, middleware.RequestNow(c)); err != nil {
 		apperrors.AbortWithError(c, err)
 		return
 	}
@@ -161,7 +161,7 @@ func UpdateRelationship(c *gin.Context) {
 		apperrors.AbortWithError(c, err)
 		return
 	}
-	if err := validatePeriodDates(input.StartDate, input.EndDate); err != nil {
+	if err := validatePeriodDates(input.StartDate, input.EndDate, middleware.RequestNow(c)); err != nil {
 		apperrors.AbortWithError(c, err)
 		return
 	}

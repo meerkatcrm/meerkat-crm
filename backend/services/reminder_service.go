@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 	"fmt"
+	"meerkat/clock"
 	"meerkat/config"
 	"meerkat/i18n"
 	"meerkat/logger"
@@ -40,8 +41,7 @@ func getInstanceID() string {
 // Returns true if the lock was acquired, false if the job was run recently
 // or is currently locked by another instance. A database failure is returned as
 // an error, because the job did not run and the caller should say so.
-func acquireJobLock(db *gorm.DB, jobName string, minInterval time.Duration) (bool, error) {
-	now := time.Now()
+func acquireJobLock(db *gorm.DB, jobName string, minInterval time.Duration, now time.Time) (bool, error) {
 	instanceID := getInstanceID()
 	lockTimeout := 5 * time.Minute // Consider locks stale after 5 minutes
 
@@ -121,8 +121,7 @@ func acquireJobLock(db *gorm.DB, jobName string, minInterval time.Duration) (boo
 }
 
 // releaseJobLock releases the lock and updates the last run time
-func releaseJobLock(db *gorm.DB, jobName string, success bool) error {
-	now := time.Now()
+func releaseJobLock(db *gorm.DB, jobName string, success bool, now time.Time) error {
 	instanceID := getInstanceID()
 
 	return db.Transaction(func(tx *gorm.DB) error {
@@ -155,22 +154,22 @@ func releaseJobLock(db *gorm.DB, jobName string, success bool) error {
 // reminderJobRanToday reports whether the daily job last succeeded on today's
 // date in the reminder timezone. Unknown (no record, or a read error) counts as
 // not run, so events are sent rather than lost.
-func reminderJobRanToday(db *gorm.DB, cfg config.Config) bool {
+func reminderJobRanToday(db *gorm.DB, cfg config.Config, now time.Time) bool {
 	var job models.JobExecution
 	if err := db.Where("job_name = ?", models.JobNameDailyReminders).First(&job).Error; err != nil {
 		return false
 	}
 	loc := cfg.GetReminderLocation()
-	return job.LastRunAt.In(loc).Format(time.DateOnly) == time.Now().In(loc).Format(time.DateOnly)
+	return job.LastRunAt.In(loc).Format(time.DateOnly) == now.In(loc).Format(time.DateOnly)
 }
 
 // SendRemindersWithRateLimit wraps SendReminders with distributed locking
 // to prevent duplicate sends during rapid restarts
-func SendRemindersWithRateLimit(db *gorm.DB, cfg config.Config) error {
+func SendRemindersWithRateLimit(db *gorm.DB, cfg config.Config, clk clock.Clock) error {
 	// Read before the lock is taken: acquiring it for the first time stamps LastRunAt.
-	dailyEvents := !reminderJobRanToday(db, cfg)
+	dailyEvents := !reminderJobRanToday(db, cfg, clk.Now())
 
-	acquired, err := acquireJobLock(db, models.JobNameDailyReminders, ReminderMinInterval)
+	acquired, err := acquireJobLock(db, models.JobNameDailyReminders, ReminderMinInterval, clk.Now())
 	if err != nil {
 		logger.Error().Err(err).Msg("Error checking job lock")
 		metrics.JobResult(JobReminders, metrics.ResultFailure)
@@ -184,10 +183,10 @@ func SendRemindersWithRateLimit(db *gorm.DB, cfg config.Config) error {
 	}
 
 	// Run the actual reminder logic
-	err = sendReminders(db, cfg, dailyEvents)
+	err = sendReminders(db, cfg, dailyEvents, clk)
 
 	// Release the lock, marking success if no error
-	if releaseErr := releaseJobLock(db, models.JobNameDailyReminders, err == nil); releaseErr != nil {
+	if releaseErr := releaseJobLock(db, models.JobNameDailyReminders, err == nil, clk.Now()); releaseErr != nil {
 		logger.Error().Err(releaseErr).Msg("Error releasing job lock")
 	}
 	metrics.JobDone(JobReminders, err)
@@ -197,8 +196,8 @@ func SendRemindersWithRateLimit(db *gorm.DB, cfg config.Config) error {
 
 // SendReminders runs the daily reminder job unconditionally, including its
 // once-a-day events. The scheduled path goes through SendRemindersWithRateLimit.
-func SendReminders(db *gorm.DB, config config.Config) error {
-	return sendReminders(db, config, true)
+func SendReminders(db *gorm.DB, config config.Config, clk clock.Clock) error {
+	return sendReminders(db, config, true, clk)
 }
 
 // sendReminders emails due reminders. dailyEvents is false on a second run within
@@ -206,12 +205,12 @@ func SendReminders(db *gorm.DB, config config.Config) error {
 // things that have no "already done" marker of their own are then skipped, namely
 // the reminder.triggered and birthday.occurred webhooks and the email to users who
 // only have a birthday today. Reminder emails are safe to retry: email_sent guards them.
-func sendReminders(db *gorm.DB, config config.Config, dailyEvents bool) error {
+func sendReminders(db *gorm.DB, config config.Config, dailyEvents bool, clk clock.Clock) error {
 	logger.Info().Bool("daily_events", dailyEvents).Msg("Sending reminders...")
 	var reminders []models.Reminder
 	// Get the current time in the configured reminder timezone
 	loc := config.GetReminderLocation()
-	now := time.Now().In(loc)
+	now := clk.Now().In(loc)
 	// remind_at holds a calendar date at midnight UTC, so today's date in the reminder
 	// timezone is compared as a UTC bound too. An offset here would make the query depend
 	// on SQLite comparing these columns as text, and send a day early west of UTC if not.
@@ -301,7 +300,7 @@ func sendReminders(db *gorm.DB, config config.Config, dailyEvents bool) error {
 		// so they are picked up again once email is configured.
 		emailedNow := false
 		if config.EmailEnabled() {
-			if err := sendReminderEmailFn(user, userReminders, config, db); err != nil {
+			if err := sendReminderEmailFn(user, userReminders, config, db, clk); err != nil {
 				logger.Error().Err(err).Uint("user_id", user.ID).Msg("Error sending daily email, skipping reminder mutations for this user")
 				sendErrors++
 			} else {
@@ -311,7 +310,7 @@ func sendReminders(db *gorm.DB, config config.Config, dailyEvents bool) error {
 					// Only these two columns: the row was loaded before the emails went
 					// out, and saving all of it would undo an edit made in the meantime.
 					if err := db.Model(&models.Reminder{}).Where("id = ?", reminder.ID).
-						Updates(map[string]any{"email_sent": true, "last_sent": time.Now()}).Error; err != nil {
+						Updates(map[string]any{"email_sent": true, "last_sent": clk.Now()}).Error; err != nil {
 						logger.Error().Err(err).Uint("reminder_id", reminder.ID).Msg("Failed to update reminder after sending email")
 					} else {
 						logger.Info().Uint("reminder_id", reminder.ID).Msg("Marked reminder as email_sent")
@@ -328,7 +327,7 @@ func sendReminders(db *gorm.DB, config config.Config, dailyEvents bool) error {
 		// nothing marks the reminder, so it fires on the first run of the day only.
 		if emailedNow || (!config.EmailEnabled() && dailyEvents) {
 			for _, reminder := range userReminders {
-				go TriggerWebhooks(db, config, reminder.UserID, "reminder.triggered", reminder)
+				go TriggerWebhooks(db, config, reminder.UserID, "reminder.triggered", reminder, clk)
 			}
 		}
 
@@ -344,7 +343,7 @@ func sendReminders(db *gorm.DB, config config.Config, dailyEvents bool) error {
 			for _, bday := range todayBirthdays {
 				if DaysUntilBirthday(bday.Birthday, now) == 0 {
 					bday := bday
-					go TriggerWebhooks(db, config, userID, "birthday.occurred", bday)
+					go TriggerWebhooks(db, config, userID, "birthday.occurred", bday, clk)
 				}
 			}
 		}
@@ -412,7 +411,7 @@ func formatBirthdayForUser(birthday string, dateFormat string) string {
 }
 
 // Send email using Resend with daily reminders and upcoming birthdays
-func sendReminderEmail(user models.User, reminders []models.Reminder, config config.Config, db *gorm.DB) error {
+func sendReminderEmail(user models.User, reminders []models.Reminder, config config.Config, db *gorm.DB, clk clock.Clock) error {
 	if user.Email == "" {
 		logger.Warn().Uint("user_id", user.ID).Msg("Skipping reminder email because user email is missing")
 		return nil
@@ -448,7 +447,7 @@ func sendReminderEmail(user models.User, reminders []models.Reminder, config con
 	}
 
 	// Build birthday items
-	now := time.Now().In(config.GetReminderLocation())
+	now := clk.Now().In(config.GetReminderLocation())
 	birthdays, birthdayErr := GetUpcomingBirthdays(db, user.ID, now)
 	if birthdayErr != nil {
 		logger.Warn().Err(birthdayErr).Uint("user_id", user.ID).Msg("Failed to fetch birthdays for email, continuing without them")
@@ -500,7 +499,7 @@ func sendReminderEmail(user models.User, reminders []models.Reminder, config con
 		To:      user.Email,
 		Subject: i18n.T(lang, "email.reminder.subject"),
 		HTML:    htmlContent,
-	}); err != nil {
+	}, clk); err != nil {
 		logger.Error().Err(err).Uint("user_id", user.ID).Msg("Failed to queue reminder email")
 		return err
 	}
@@ -544,8 +543,8 @@ func addYears(t time.Time, years int) time.Time {
 
 // TodayIn returns today's calendar date in loc as midnight UTC, the same form
 // remind_at is stored in.
-func TodayIn(loc *time.Location) time.Time {
-	now := time.Now().In(loc)
+func TodayIn(now time.Time, loc *time.Location) time.Time {
+	now = now.In(loc)
 	return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 }
 
@@ -553,8 +552,8 @@ func TodayIn(loc *time.Location) time.Time {
 // one that is several periods overdue does not mail it again straight away. "Today" is
 // the date in loc, the timezone the daily job uses to decide what is due: with UTC
 // here, a reminder completed east of UTC could land on a date that is already due.
-func NextOccurrenceAfterToday(reminder models.Reminder, loc *time.Location) time.Time {
-	today := TodayIn(loc)
+func NextOccurrenceAfterToday(reminder models.Reminder, now time.Time, loc *time.Location) time.Time {
+	today := TodayIn(now, loc)
 	for {
 		next := nextReminderTime(reminder, today)
 		if next.After(today) || next.Equal(reminder.RemindAt) {
@@ -566,8 +565,8 @@ func NextOccurrenceAfterToday(reminder models.Reminder, loc *time.Location) time
 
 // CalculateNextReminderTime determines the next reminder date based on recurrence
 // settings, taking today's date in UTC.
-func CalculateNextReminderTime(reminder models.Reminder) time.Time {
-	return nextReminderTime(reminder, TodayIn(time.UTC))
+func CalculateNextReminderTime(reminder models.Reminder, now time.Time) time.Time {
+	return nextReminderTime(reminder, TodayIn(now, time.UTC))
 }
 
 // nextReminderTime is CalculateNextReminderTime for a given "today" (midnight UTC

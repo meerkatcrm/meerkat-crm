@@ -166,7 +166,7 @@ func TestWebhook(c *gin.Context) {
 		return
 	}
 
-	delivery := services.TestWebhookDelivery(db, currentConfig(c), wh)
+	delivery := services.TestWebhookDelivery(db, currentConfig(c), wh, middleware.RequestClock(c))
 	c.JSON(http.StatusOK, gin.H{"delivery": toDeliveryResponse(delivery)})
 }
 

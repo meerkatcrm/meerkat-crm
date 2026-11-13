@@ -32,6 +32,7 @@ import { isReminderOverdue } from './utils/reminderDue';
 import { useSnackbar } from './context/SnackbarContext';
 import { useConfirm } from './components/ConfirmDialog';
 import { thumbnailSrc } from './utils/thumbnail';
+import { now } from './utils/now';
 
 function DashboardPage() {
   const { t } = useTranslation();
@@ -132,7 +133,7 @@ function DashboardPage() {
     const month = parseInt(parts[parts.length - 2], 10);
     const day = parseInt(parts[parts.length - 1], 10);
     if (isNaN(month) || isNaN(day)) return false;
-    const today = new Date();
+    const today = now();
     return today.getMonth() + 1 === month && today.getDate() === day;
   };
 
@@ -148,7 +149,7 @@ function DashboardPage() {
       if (parts.length === 3 && parts[0].length === 4) {
         const birthYear = parseInt(parts[0], 10);
         if (!isNaN(birthYear)) {
-          const currentYear = new Date().getFullYear();
+          const currentYear = now().getFullYear();
           const age = currentYear - birthYear;
           // Remove the year from the formatted date for dashboard display (just show DD.MM. or MM/DD)
           const dateWithoutYear = formatBirthdayDate(`--${parts[1]}-${parts[2]}`);

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	mcarddav "meerkat/carddav"
+	"meerkat/clock"
 	"meerkat/config"
 	"meerkat/logger"
 	"meerkat/metrics"
@@ -407,13 +408,13 @@ func canonicalVCardHash(card vcard.Card) string {
 var contactConnectionLocks sync.Map // connection ID → *sync.Mutex
 
 // SyncConnection syncs the connection and updates its last-sync bookkeeping.
-func (s *ContactSyncService) SyncConnection(ctx context.Context, db *gorm.DB, cfg config.Config, conn *models.CardDAVConnection) (ContactSyncStats, error) {
+func (s *ContactSyncService) SyncConnection(ctx context.Context, db *gorm.DB, cfg config.Config, conn *models.CardDAVConnection, clk clock.Clock) (ContactSyncStats, error) {
 	lock, _ := contactConnectionLocks.LoadOrStore(conn.ID, &sync.Mutex{})
 	mutex := lock.(*sync.Mutex)
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	run, err := s.syncConnection(ctx, db, cfg, conn)
+	run, err := s.syncConnection(ctx, db, cfg, conn, clk)
 
 	var stats ContactSyncStats
 	var itemErr error
@@ -421,8 +422,8 @@ func (s *ContactSyncService) SyncConnection(ctx context.Context, db *gorm.DB, cf
 		stats, itemErr = run.stats, run.firstErr
 	}
 
-	now := time.Now().UTC()
-	conn.LastSyncedAt = &now
+	syncedAt := clk.Now().UTC() // after the sync, which can take long
+	conn.LastSyncedAt = &syncedAt
 	switch {
 	case err != nil:
 		conn.LastSyncStatus = models.CardDAVSyncStatusError
@@ -474,7 +475,7 @@ func IsContactSyncRunning(connectionID uint) bool {
 // request, so callers start the run here and poll the connection for its
 // outcome. The run takes its own context and its own copy of the connection for
 // exactly that reason: it must outlive the request that started it.
-func StartContactSync(db *gorm.DB, cfg config.Config, conn models.CardDAVConnection) bool {
+func StartContactSync(db *gorm.DB, cfg config.Config, conn models.CardDAVConnection, clk clock.Clock) bool {
 	if _, alreadyRunning := activeContactSyncs.LoadOrStore(conn.ID, struct{}{}); alreadyRunning {
 		return false
 	}
@@ -491,7 +492,7 @@ func StartContactSync(db *gorm.DB, cfg config.Config, conn models.CardDAVConnect
 		db := db.WithContext(context.Background())
 
 		service := NewContactSyncService(cfg.CardDAVBlockPrivateURLs)
-		stats, err := service.SyncConnection(ctx, db, cfg, &conn)
+		stats, err := service.SyncConnection(ctx, db, cfg, &conn, clk)
 		if err != nil {
 			// The failure is already recorded on the connection for the UI.
 			logger.Warn().Err(err).Uint("connection_id", conn.ID).Uint("user_id", conn.UserID).
@@ -530,6 +531,7 @@ type contactSyncRun struct {
 	ctx      context.Context
 	db       *gorm.DB
 	cfg      config.Config
+	clock    clock.Clock // read where a timestamp is written: a run can take long
 	conn     *models.CardDAVConnection
 	client   *carddav.Client
 	remote   *remoteState
@@ -591,7 +593,7 @@ func (r *contactSyncRun) recordItemError(err error, msg string, fields map[strin
 	event.Msg(msg)
 }
 
-func (s *ContactSyncService) syncConnection(ctx context.Context, db *gorm.DB, cfg config.Config, conn *models.CardDAVConnection) (*contactSyncRun, error) {
+func (s *ContactSyncService) syncConnection(ctx context.Context, db *gorm.DB, cfg config.Config, conn *models.CardDAVConnection, clk clock.Clock) (*contactSyncRun, error) {
 	// Normalizing here also strips any inline credentials from rows stored
 	// before NormalizeCardDAVURL did so.
 	parsed, err := NormalizeCardDAVURL(conn.BaseURL)
@@ -610,7 +612,7 @@ func (s *ContactSyncService) syncConnection(ctx context.Context, db *gorm.DB, cf
 	}
 
 	run := &contactSyncRun{
-		ctx: ctx, db: db, cfg: cfg, conn: conn, client: client,
+		ctx: ctx, db: db, cfg: cfg, clock: clk, conn: conn, client: client,
 		localHashes: map[uint]string{},
 	}
 
@@ -1012,7 +1014,7 @@ func (r *contactSyncRun) pullCreate(obj *remoteObject, link *models.CardDAVConta
 		if err := tx.Create(contact).Error; err != nil {
 			return err
 		}
-		now := time.Now().UTC()
+		now := r.clock.Now().UTC()
 		if link == nil {
 			link = &models.CardDAVContactLink{
 				ConnectionID: r.conn.ID,
@@ -1054,7 +1056,7 @@ func (r *contactSyncRun) pullUpdate(obj *remoteObject, link *models.CardDAVConta
 		if err := tx.Save(updated).Error; err != nil {
 			return err
 		}
-		now := time.Now().UTC()
+		now := r.clock.Now().UTC()
 		hash = canonicalVCardHash(mcarddav.ContactToVCard(updated, r.cfg.ProfilePhotoDir))
 		link.ContactID = updated.ID
 		link.RemoteETag = obj.ETag
@@ -1276,7 +1278,7 @@ func (r *contactSyncRun) pushContact(contact *models.Contact, link *models.CardD
 		}
 	}
 
-	now := time.Now().UTC()
+	now := r.clock.Now().UTC()
 	link.RemoteETag = etag
 	link.LocalHash = canonicalVCardHash(card)
 	link.SyncedAt = &now
@@ -1322,7 +1324,7 @@ func (r *contactSyncRun) markLinkDropped(link *models.CardDAVContactLink) {
 
 // SyncAllContactConnections syncs every enabled connection. Failures on one
 // connection are recorded on it and do not stop the others.
-func SyncAllContactConnections(db *gorm.DB, cfg config.Config) {
+func SyncAllContactConnections(db *gorm.DB, cfg config.Config, clk clock.Clock) {
 	var connections []models.CardDAVConnection
 	if err := db.Where("sync_enabled = ? AND user_id IN (SELECT id FROM users WHERE deleted_at IS NULL)", true).Find(&connections).Error; err != nil {
 		logger.Error().Err(err).Msg("Failed to load CardDAV connections for scheduled sync")
@@ -1336,7 +1338,7 @@ func SyncAllContactConnections(db *gorm.DB, cfg config.Config) {
 	for i := range connections {
 		conn := &connections[i]
 		ctx, cancel := context.WithTimeout(context.Background(), contactSyncRunTimeout)
-		stats, err := service.SyncConnection(ctx, db, cfg, conn)
+		stats, err := service.SyncConnection(ctx, db, cfg, conn, clk)
 		cancel()
 		if err != nil {
 			logger.Warn().Err(err).Uint("connection_id", conn.ID).Uint("user_id", conn.UserID).
@@ -1353,13 +1355,13 @@ func SyncAllContactConnections(db *gorm.DB, cfg config.Config) {
 
 // SyncContactsWithRateLimit wraps SyncAllContactConnections with the shared
 // job lock so rapid restarts or multiple instances don't sync repeatedly.
-func SyncContactsWithRateLimit(db *gorm.DB, cfg config.Config) {
+func SyncContactsWithRateLimit(db *gorm.DB, cfg config.Config, clk clock.Clock) {
 	minInterval := time.Duration(cfg.CardDAVSyncIntervalHours)*time.Hour - 30*time.Minute
 	if minInterval < 30*time.Minute {
 		minInterval = 30 * time.Minute
 	}
 
-	acquired, err := acquireJobLock(db, models.JobNameContactSync, minInterval)
+	acquired, err := acquireJobLock(db, models.JobNameContactSync, minInterval, clk.Now())
 	if err != nil {
 		logger.Error().Err(err).Msg("Error checking contact sync job lock")
 		metrics.JobResult(JobContactSync, metrics.ResultFailure)
@@ -1371,9 +1373,9 @@ func SyncContactsWithRateLimit(db *gorm.DB, cfg config.Config) {
 		return
 	}
 
-	SyncAllContactConnections(db, cfg)
+	SyncAllContactConnections(db, cfg, clk)
 
-	if err := releaseJobLock(db, models.JobNameContactSync, true); err != nil {
+	if err := releaseJobLock(db, models.JobNameContactSync, true, clk.Now()); err != nil {
 		logger.Error().Err(err).Msg("Error releasing contact sync job lock")
 	}
 	metrics.JobResult(JobContactSync, metrics.ResultSuccess)

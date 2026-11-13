@@ -93,7 +93,11 @@ export default [
       "no-regex-spaces": "warn",
       "no-restricted-globals": ["error", "addEventListener", "blur", "close", "closed", "confirm", "defaultStatus", "defaultstatus", "event", "external", "find", "focus", "frameElement", "frames", "history", "innerHeight", "innerWidth", "length", "location", "locationbar", "menubar", "moveBy", "moveTo", "name", "onblur", "onerror", "onfocus", "onload", "onresize", "onunload", "open", "opener", "opera", "outerHeight", "outerWidth", "pageXOffset", "pageYOffset", "parent", "print", "removeEventListener", "resizeBy", "resizeTo", "screen", "screenLeft", "screenTop", "screenX", "screenY", "scroll", "scrollbars", "scrollBy", "scrollTo", "scrollX", "scrollY", "self", "status", "statusbar", "stop", "toolbar", "top"],
       "no-restricted-properties": ["error", {"object": "require", "property": "ensure", "message": "Please use import() instead. More info: https://facebook.github.io/create-react-app/docs/code-splitting"}, {"object": "System", "property": "import", "message": "Please use import() instead. More info: https://facebook.github.io/create-react-app/docs/code-splitting"}],
-      "no-restricted-syntax": ["warn", "WithStatement"],
+      "no-restricted-syntax": ["warn", "WithStatement",
+        // One clock read, in src/utils/now.ts (docs/development/frontend.md)
+        {"selector": "NewExpression[callee.name='Date'][arguments.length=0]", "message": "Do not read the clock directly: use now() from src/utils/now.ts."},
+        {"selector": "CallExpression[callee.name='Date']", "message": "Date() without new reads the clock: use now() from src/utils/now.ts."},
+        {"selector": "CallExpression[callee.object.name='Date'][callee.property.name='now']", "message": "Do not read the clock directly: use now() from src/utils/now.ts."}],
       "no-script-url": "warn",
       "no-self-assign": "warn",
       "no-self-compare": "warn",
@@ -136,5 +140,10 @@ export default [
       "use-isnan": "warn",
       "valid-typeof": "warn",
     },
+  },
+  {
+    // Tests may read the clock
+    files: ['src/**/*.test.{ts,tsx}'],
+    rules: { 'no-restricted-syntax': ['warn', 'WithStatement'] },
   },
 ];

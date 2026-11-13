@@ -76,7 +76,7 @@ func TestAcquireJobLock_ConcurrentJobsAllAcquire(t *testing.T) {
 				var fns []func()
 				for _, jobName := range jobNames {
 					fns = append(fns, func() {
-						acquired, err := acquireJobLock(db, jobName, time.Hour)
+						acquired, err := acquireJobLock(db, jobName, time.Hour, time.Now())
 						assert.NoError(t, err, jobName)
 						assert.True(t, acquired, jobName)
 					})
@@ -121,7 +121,7 @@ func TestAcquireJobLock_ReportsDatabaseError(t *testing.T) {
 	db := setupFileDB(t)
 	require.NoError(t, db.Migrator().DropTable(&models.JobExecution{}))
 
-	acquired, err := acquireJobLock(db, "job_a", time.Hour)
+	acquired, err := acquireJobLock(db, "job_a", time.Hour, time.Now())
 
 	assert.Error(t, err)
 	assert.False(t, acquired)
@@ -130,11 +130,11 @@ func TestAcquireJobLock_ReportsDatabaseError(t *testing.T) {
 func TestAcquireJobLock_SkipIsNotAnError(t *testing.T) {
 	db := setupFileDB(t)
 
-	acquired, err := acquireJobLock(db, "job_a", time.Hour)
+	acquired, err := acquireJobLock(db, "job_a", time.Hour, time.Now())
 	require.NoError(t, err)
 	require.True(t, acquired)
 
-	acquired, err = acquireJobLock(db, "job_a", time.Hour)
+	acquired, err = acquireJobLock(db, "job_a", time.Hour, time.Now())
 	assert.NoError(t, err)
 	assert.False(t, acquired)
 }
@@ -149,7 +149,7 @@ func TestAcquireJobLock_SkipsWhileAnotherInstanceHoldsLock(t *testing.T) {
 		LockedBy:  "other-instance",
 	}).Error)
 
-	acquired, err := acquireJobLock(db, "job_a", time.Hour)
+	acquired, err := acquireJobLock(db, "job_a", time.Hour, time.Now())
 
 	assert.NoError(t, err)
 	assert.False(t, acquired)

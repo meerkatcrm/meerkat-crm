@@ -226,7 +226,7 @@ func GetUpcomingReminders(c *gin.Context) {
 		return
 	}
 
-	sevenDaysFromNow := time.Now().AddDate(0, 0, 7)
+	sevenDaysFromNow := middleware.RequestNow(c).AddDate(0, 0, 7)
 
 	// Get reminders due (or overdue) within the next 7 days
 	var remindersNext7Days []models.Reminder
@@ -280,7 +280,7 @@ func CompleteReminder(c *gin.Context) {
 	// Mark as completed
 	reminder.Completed = true
 	reminder.LastSent = new(time.Time)
-	*reminder.LastSent = time.Now()
+	*reminder.LastSent = middleware.RequestNow(c)
 
 	// Create a completion record for the timeline (unless skipping)
 	if !skip {
@@ -289,7 +289,7 @@ func CompleteReminder(c *gin.Context) {
 			ReminderID:  &reminder.ID,
 			ContactID:   *reminder.ContactID,
 			Message:     reminder.Message,
-			CompletedAt: time.Now(),
+			CompletedAt: middleware.RequestNow(c),
 		}
 		if err := db.Create(&completion).Error; err != nil {
 			logger.FromContext(c).Error().Err(err).Msg("Failed to create reminder completion record")
@@ -305,7 +305,7 @@ func CompleteReminder(c *gin.Context) {
 	// Recurring reminders always come back, on a date that is not already due.
 	if reminder.Recurrence != "once" {
 		cfg := currentConfig(c)
-		reminder.RemindAt = services.NextOccurrenceAfterToday(reminder, cfg.GetReminderLocation())
+		reminder.RemindAt = services.NextOccurrenceAfterToday(reminder, middleware.RequestNow(c), cfg.GetReminderLocation())
 		// Reset completed and email_sent flags for recurring reminders
 		reminder.Completed = false
 		reminder.EmailSent = false

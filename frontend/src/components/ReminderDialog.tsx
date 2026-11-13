@@ -17,6 +17,7 @@ import AppDialog from './AppDialog';
 import { Reminder, ReminderFormData } from '../api/reminders';
 import { getErrorMessage } from '../utils/errorHandler';
 import { useDateFormat } from '../DateFormatProvider';
+import { now } from '../utils/now';
 
 interface InitialReminderValues {
   message?: string;
@@ -52,7 +53,7 @@ export default function ReminderDialog({
 
   const getDateForRecurrence = (rec: ReminderFormData['recurrence']): string => {
     // date-fns stays in the target month (31 Jan + 1 month is 28 Feb), and format uses the local day.
-    const today = new Date();
+    const today = now();
     switch (rec) {
       case 'weekly':      return format(addDays(today, 7), 'yyyy-MM-dd');
       case 'monthly':     return format(addMonths(today, 1), 'yyyy-MM-dd');

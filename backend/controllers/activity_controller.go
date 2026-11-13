@@ -69,7 +69,7 @@ func CreateActivity(c *gin.Context) {
 		return
 	}
 
-	go services.TriggerWebhooks(db, currentConfig(c), userID, "activity.created", activity)
+	go services.TriggerWebhooks(db, currentConfig(c), userID, "activity.created", activity, middleware.RequestClock(c))
 	c.JSON(http.StatusOK, gin.H{"message": "Activity created successfully", "activity": activity})
 }
 
@@ -246,7 +246,7 @@ func UpdateActivity(c *gin.Context) {
 		return
 	}
 
-	go services.TriggerWebhooks(db, currentConfig(c), userID, "activity.updated", activity)
+	go services.TriggerWebhooks(db, currentConfig(c), userID, "activity.updated", activity, middleware.RequestClock(c))
 	c.JSON(http.StatusOK, activity)
 }
 
@@ -272,7 +272,7 @@ func DeleteActivity(c *gin.Context) {
 
 	carddav.RemoveContactPhotoFile(currentConfig(c).ProfilePhotoDir, activity.Image)
 
-	go services.TriggerWebhooks(db, currentConfig(c), userID, "activity.deleted", gin.H{"id": activity.ID})
+	go services.TriggerWebhooks(db, currentConfig(c), userID, "activity.deleted", gin.H{"id": activity.ID}, middleware.RequestClock(c))
 	c.JSON(http.StatusOK, gin.H{"message": "Activity deleted"})
 }
 

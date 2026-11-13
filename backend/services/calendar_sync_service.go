@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"meerkat/clock"
 	"meerkat/config"
 	"meerkat/i18n"
 	"meerkat/logger"
@@ -143,17 +144,17 @@ var calendarSubscriptionLocks sync.Map // subscription ID → *sync.Mutex
 
 // SyncSubscription fetches the calendar and imports its events as activities.
 // It updates the subscription's last-sync bookkeeping fields in the database.
-func (s *CalendarSyncService) SyncSubscription(ctx context.Context, db *gorm.DB, cfg config.Config, sub *models.CalendarSubscription) (CalendarSyncStats, error) {
+func (s *CalendarSyncService) SyncSubscription(ctx context.Context, db *gorm.DB, cfg config.Config, sub *models.CalendarSubscription, clk clock.Clock) (CalendarSyncStats, error) {
 	lock, _ := calendarSubscriptionLocks.LoadOrStore(sub.ID, &sync.Mutex{})
 	mutex := lock.(*sync.Mutex)
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	stats, err := s.syncSubscription(ctx, db, cfg, sub)
+	stats, err := s.syncSubscription(ctx, db, cfg, sub, clk.Now())
 	err = redactURLPassword(err, sub.URL)
 
-	now := time.Now().UTC()
-	sub.LastSyncedAt = &now
+	syncedAt := clk.Now().UTC() // after the fetch, which can take long
+	sub.LastSyncedAt = &syncedAt
 	if err != nil {
 		sub.LastSyncStatus = models.CalendarSyncStatusError
 		sub.LastSyncError = clampRunes(err.Error(), 500)
@@ -201,7 +202,7 @@ type redactedError struct {
 func (e *redactedError) Error() string { return e.message }
 func (e *redactedError) Unwrap() error { return e.cause }
 
-func (s *CalendarSyncService) syncSubscription(ctx context.Context, db *gorm.DB, cfg config.Config, sub *models.CalendarSubscription) (CalendarSyncStats, error) {
+func (s *CalendarSyncService) syncSubscription(ctx context.Context, db *gorm.DB, cfg config.Config, sub *models.CalendarSubscription, now time.Time) (CalendarSyncStats, error) {
 	parsedURL, err := NormalizeCalendarURL(sub.URL)
 	if err != nil {
 		return CalendarSyncStats{}, err
@@ -212,8 +213,8 @@ func (s *CalendarSyncService) syncSubscription(ctx context.Context, db *gorm.DB,
 		return CalendarSyncStats{}, fmt.Errorf("%w: %v", ErrCalendarUnauthorized, err)
 	}
 
-	windowStart := time.Now().AddDate(0, 0, -sub.PastDays).UTC()
-	windowEnd := time.Now().AddDate(0, 0, sub.FutureDays).UTC()
+	windowStart := now.AddDate(0, 0, -sub.PastDays).UTC()
+	windowEnd := now.AddDate(0, 0, sub.FutureDays).UTC()
 
 	events, err := s.fetchEvents(ctx, parsedURL, sub.Username, password, windowStart, windowEnd)
 	if err != nil {
@@ -719,7 +720,7 @@ func clampRunes(value string, maxRunes int) string {
 
 // SyncAllCalendars syncs every enabled subscription. Failures on one
 // subscription are recorded on it and do not stop the others.
-func SyncAllCalendars(db *gorm.DB, cfg config.Config) {
+func SyncAllCalendars(db *gorm.DB, cfg config.Config, clk clock.Clock) {
 	var subscriptions []models.CalendarSubscription
 	if err := db.Where("sync_enabled = ? AND user_id IN (SELECT id FROM users WHERE deleted_at IS NULL)", true).Find(&subscriptions).Error; err != nil {
 		logger.Error().Err(err).Msg("Failed to load calendar subscriptions for scheduled sync")
@@ -733,7 +734,7 @@ func SyncAllCalendars(db *gorm.DB, cfg config.Config) {
 	for i := range subscriptions {
 		sub := &subscriptions[i]
 		ctx, cancel := context.WithTimeout(context.Background(), calendarRequestTimeout)
-		stats, err := service.SyncSubscription(ctx, db, cfg, sub)
+		stats, err := service.SyncSubscription(ctx, db, cfg, sub, clk)
 		cancel()
 		if err != nil {
 			logger.Warn().Err(err).Uint("subscription_id", sub.ID).Uint("user_id", sub.UserID).
@@ -748,13 +749,13 @@ func SyncAllCalendars(db *gorm.DB, cfg config.Config) {
 
 // SyncCalendarsWithRateLimit wraps SyncAllCalendars with the shared job lock so
 // rapid restarts or multiple instances don't sync repeatedly.
-func SyncCalendarsWithRateLimit(db *gorm.DB, cfg config.Config) {
+func SyncCalendarsWithRateLimit(db *gorm.DB, cfg config.Config, clk clock.Clock) {
 	minInterval := time.Duration(cfg.CalDAVSyncIntervalHours)*time.Hour - 30*time.Minute
 	if minInterval < 30*time.Minute {
 		minInterval = 30 * time.Minute
 	}
 
-	acquired, err := acquireJobLock(db, models.JobNameCalendarSync, minInterval)
+	acquired, err := acquireJobLock(db, models.JobNameCalendarSync, minInterval, clk.Now())
 	if err != nil {
 		logger.Error().Err(err).Msg("Error checking calendar sync job lock")
 		metrics.JobResult(JobCalendarSync, metrics.ResultFailure)
@@ -766,9 +767,9 @@ func SyncCalendarsWithRateLimit(db *gorm.DB, cfg config.Config) {
 		return
 	}
 
-	SyncAllCalendars(db, cfg)
+	SyncAllCalendars(db, cfg, clk)
 
-	if err := releaseJobLock(db, models.JobNameCalendarSync, true); err != nil {
+	if err := releaseJobLock(db, models.JobNameCalendarSync, true, clk.Now()); err != nil {
 		logger.Error().Err(err).Msg("Error releasing calendar sync job lock")
 	}
 	metrics.JobResult(JobCalendarSync, metrics.ResultSuccess)
