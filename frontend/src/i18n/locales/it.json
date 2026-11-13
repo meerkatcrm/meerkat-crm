@@ -87,7 +87,9 @@
     "registerButton": "Registrati",
     "registering": "Registrazione in corso...",
     "registrationFailed": "Registrazione fallita",
-    "registrationSuccess": "Registrazione completata! Ora puoi accedere."
+    "registrationSuccess": "Registrazione completata! Ora puoi accedere.",
+    "disabled": "La registrazione è disattivata su questa istanza. Chiedi un account al tuo amministratore.",
+    "backToLogin": "Torna al login"
   },
   "contacts": {
     "title": "Contatti",

@@ -2,6 +2,7 @@ package errors
 
 import (
 	"fmt"
+	"meerkat/clock"
 	"meerkat/logger"
 	"runtime/debug"
 	"time"
@@ -73,7 +74,7 @@ func RespondWithError(c *gin.Context, err *AppError) {
 			Details: err.Details,
 		},
 		RequestID: requestIDStr,
-		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Timestamp: clock.RequestTime(c).UTC().Format(time.RFC3339),
 	}
 
 	// Log the error with context

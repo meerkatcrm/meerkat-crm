@@ -1,4 +1,5 @@
 import { Reminder, ReminderFormData } from '../api/reminders';
+import { now } from './now';
 
 // Extracts month (0-indexed) and day from a stored birthday, which is either
 // a full ISO date ("YYYY-MM-DD") or a year-less date ("--MM-DD").
@@ -41,11 +42,11 @@ export function computeNextBirthdayOccurrence(birthdayISO: string): Date | undef
   const monthDay = parseBirthdayMonthDay(birthdayISO);
   if (!monthDay) return undefined;
 
-  const now = new Date();
-  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-  const thisYear = birthdayInYear(now.getFullYear(), monthDay);
+  const current = now();
+  const today = Date.UTC(current.getFullYear(), current.getMonth(), current.getDate());
+  const thisYear = birthdayInYear(current.getFullYear(), monthDay);
 
-  return new Date(thisYear > today ? thisYear : birthdayInYear(now.getFullYear() + 1, monthDay));
+  return new Date(thisYear > today ? thisYear : birthdayInYear(current.getFullYear() + 1, monthDay));
 }
 
 export function buildBirthdayReminderPayload(

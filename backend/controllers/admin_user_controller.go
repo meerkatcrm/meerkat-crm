@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"meerkat/config"
 	apperrors "meerkat/errors"
@@ -23,7 +22,7 @@ func TriggerReminders(c *gin.Context, cfg config.Config) {
 	log := logger.FromContext(c)
 	db := c.MustGet("db").(*gorm.DB)
 
-	if err := services.SendReminders(db, cfg); err != nil {
+	if err := services.SendReminders(db, cfg, middleware.RequestClock(c)); err != nil {
 		log.Error().Err(err).Msg("Failed to trigger reminder emails")
 		apperrors.AbortWithError(c, apperrors.ErrInternal("Failed to send reminder emails").WithError(err))
 		return
@@ -198,7 +197,7 @@ func UpdateUser(c *gin.Context) {
 			return
 		}
 		user.Password = hashedPassword
-		passwordChangedAt := time.Now()
+		passwordChangedAt := middleware.RequestNow(c)
 		user.PasswordChangedAt = &passwordChangedAt
 	}
 	if input.IsAdmin != nil {

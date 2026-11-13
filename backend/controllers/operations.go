@@ -3,8 +3,10 @@ package controllers
 import (
 	"context"
 	"meerkat/api"
+	"meerkat/clock"
 	"meerkat/config"
 	apperrors "meerkat/errors"
+	"meerkat/middleware"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -37,6 +39,9 @@ func requestOf(ctx context.Context) (request, error) {
 }
 
 func (r request) cfg() config.Config { return currentConfig(r.c) }
+
+// clock is the request clock, for work that outlives the request (webhook deliveries).
+func (r request) clock() clock.Clock { return middleware.RequestClock(r.c) }
 
 // out is the output of an operation whose response is just a JSON body.
 type out[T any] struct{ Body T }

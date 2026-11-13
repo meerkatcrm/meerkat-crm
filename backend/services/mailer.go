@@ -147,7 +147,8 @@ func sendSMTP(cfg config.Config, addr string, auth smtp.Auth, to string, body []
 	}
 	// Closing the connection also covers the paths where no client exists yet.
 	defer func() { _ = conn.Close() }()
-	if err := conn.SetDeadline(time.Now().Add(smtpTimeout)); err != nil {
+	deadline := time.Now().Add(smtpTimeout) //nolint:forbidigo // I/O deadline against the real clock, not business time
+	if err := conn.SetDeadline(deadline); err != nil {
 		return fmt.Errorf("smtp deadline: %w", err)
 	}
 

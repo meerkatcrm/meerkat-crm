@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"meerkat/clock"
 	"meerkat/config"
 	"meerkat/middleware"
 	"meerkat/models"
@@ -367,7 +368,7 @@ func TestConfirmPasswordReset_Succeeds(t *testing.T) {
 
 	initialPassword, _ := services.HashPassword(strongPassword)
 	token, tokenHash, _ := services.GeneratePasswordResetToken()
-	expires := services.PasswordResetExpiry()
+	expires := services.PasswordResetExpiry(time.Now())
 	requested := time.Now()
 
 	user := models.User{
@@ -626,7 +627,7 @@ func TestProcessPasswordResetRequest_Cooldown(t *testing.T) {
 	user := models.User{Username: "cooldownuser", Email: "cooldown@example.com", Password: hashed}
 	db.Create(&user)
 
-	processPasswordResetRequest(db, &cfg, &log, user.Email)
+	processPasswordResetRequest(db, &cfg, &log, user.Email, clock.Real())
 	var first models.User
 	db.First(&first, user.ID)
 	if !assert.NotNil(t, first.PasswordResetTokenHash) {
@@ -634,7 +635,7 @@ func TestProcessPasswordResetRequest_Cooldown(t *testing.T) {
 	}
 
 	// A second request inside the cooldown leaves the token alone
-	processPasswordResetRequest(db, &cfg, &log, user.Email)
+	processPasswordResetRequest(db, &cfg, &log, user.Email, clock.Real())
 	var second models.User
 	db.First(&second, user.ID)
 	assert.Equal(t, *first.PasswordResetTokenHash, *second.PasswordResetTokenHash)
@@ -642,7 +643,7 @@ func TestProcessPasswordResetRequest_Cooldown(t *testing.T) {
 	// Once it has passed, a new token is issued
 	past := time.Now().Add(-2 * passwordResetCooldown)
 	db.Model(&models.User{}).Where("id = ?", user.ID).Update("password_reset_requested_at", past)
-	processPasswordResetRequest(db, &cfg, &log, user.Email)
+	processPasswordResetRequest(db, &cfg, &log, user.Email, clock.Real())
 	var third models.User
 	db.First(&third, user.ID)
 	assert.NotEqual(t, *first.PasswordResetTokenHash, *third.PasswordResetTokenHash)

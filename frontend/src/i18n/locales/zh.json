@@ -87,7 +87,9 @@
     "registerButton": "注册",
     "registering": "正在注册...",
     "registrationFailed": "注册失败",
-    "registrationSuccess": "注册成功！现在可以登录了。"
+    "registrationSuccess": "注册成功！现在可以登录了。",
+    "disabled": "此实例已关闭注册。请联系管理员获取账户。",
+    "backToLogin": "返回登录"
   },
   "contacts": {
     "title": "联系人",

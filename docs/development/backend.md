@@ -69,6 +69,17 @@ All models include `UserID uint` for tenant isolation.
 
 Complex business logic lives in `services/`. Controllers call services; services own multi-step operations (e.g. sending emails). Services receive a `*gorm.DB` and any needed config, they do not access `*gin.Context`.
 
+## Time
+
+Business code never reads the wall clock, so time-dependent behaviour can be tested by passing a time and previewed with `FAKE_NOW` (see [deployment](../deployment.md#fake-clock-for-demos-and-tests)).
+
+- `backend/clock` is the only package that reads it: `clock.Real()`, `clock.NewFake(t)` for tests, and the clock built from `FAKE_NOW`.
+- `middleware.ClockMiddleware` takes the time once per request. Handlers read it with `middleware.RequestNow(c)` and pass `now time.Time` down to services.
+- Scheduling stays on the wall clock (`clock.Real()`): job locks, the delivery queue's due, claim and retry times, and login lockouts. They decide *when* something happens, and rows stamped by a fake clock would block jobs or strand deliveries once the clock changes.
+- Work that outlives the request or does slow I/O per item (calendar and contact sync, the reminder job, webhook payloads) takes a `clock.Clock` instead (`middleware.RequestClock(c)` in a handler, the clock from `main.go` in a scheduled job) and reads it where it stamps something: a time taken before a slow HTTP call is stale after it.
+- GORM's `NowFunc` and JWT expiry use the same clock.
+- `forbidigo` fails the lint on `time.Now` outside `main.go`, `clock/`, `middleware/`, `metrics/`, `cmd/` and tests. A line that must use the real clock (an I/O deadline, a duration) carries `//nolint:forbidigo // reason`. `time.Since` and `time.Until` measure durations and are allowed.
+
 ## Testing
 
 ```sh

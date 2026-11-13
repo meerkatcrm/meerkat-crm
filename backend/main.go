@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"meerkat/clock"
 	"meerkat/config"
 	"meerkat/controllers"
 	"meerkat/database"
@@ -26,6 +27,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/go-co-op/gocron"
+	"github.com/golang-jwt/jwt/v4"
 	"gorm.io/gorm"
 )
 
@@ -62,11 +64,23 @@ func main() {
 			"    Changing JWT_SECRET_KEY signs everyone out. Do not change ENCRYPTION_KEY.", weak)
 	}
 
+	clk, fakeClock, err := clock.FromEnv(cfg.FakeNow)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("Invalid FAKE_NOW")
+	}
+	if fakeClock {
+		logger.Warn().Str("fake_now", cfg.FakeNow).Msg("FAKE_NOW is set: the clock started at this time. Do not use this on a real instance")
+	}
+
 	logger.Info().Msg("Loading database and running migrations...")
 	db, err := database.InitDB(cfg.DBPath)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("Failed to initialize database")
 	}
+	// created_at and updated_at follow the same clock as everything else
+	db.NowFunc = clk.Now
+	// JWT expiry is checked against the clock that set it
+	jwt.TimeFunc = clk.Now
 
 	prepareEncryptionKey(db, cfg)
 
@@ -112,7 +126,7 @@ func main() {
 	s := gocron.NewScheduler(cfg.GetReminderLocation())
 	task := func() {
 		// Use rate-limited version to prevent duplicate emails during rapid restarts
-		if err := services.SendRemindersWithRateLimit(db, *cfg); err != nil {
+		if err := services.SendRemindersWithRateLimit(db, *cfg, clk); err != nil {
 			logger.Error().Err(err).Msg("Error sending reminders")
 		}
 	}
@@ -125,12 +139,18 @@ func main() {
 		services.ProcessEmailOutbox(db, *cfg)
 	}))
 	schedule(s.Every(1).Hour().Do(func() {
-		if n, err := services.PurgeEmailOutbox(db, time.Now()); err != nil {
+		if fakeClock {
+			// Purges delete for good by age: a clock set into the future would erase real data
+			logger.Warn().Msg("FAKE_NOW is set: skipping the outbox purge jobs")
+			return
+		}
+		now := clk.Now()
+		if n, err := services.PurgeEmailOutbox(db, now); err != nil {
 			logger.Error().Err(err).Msg("Error purging the email outbox")
 		} else if n > 0 {
 			logger.Info().Int64("emails", n).Msg("Purged old emails from the outbox")
 		}
-		if n, err := services.PurgeWebhookDeliveries(db, time.Now()); err != nil {
+		if n, err := services.PurgeWebhookDeliveries(db, now); err != nil {
 			logger.Error().Err(err).Msg("Error purging webhook deliveries")
 		} else if n > 0 {
 			logger.Info().Int64("deliveries", n).Msg("Purged old webhook deliveries")
@@ -141,12 +161,12 @@ func main() {
 	// Interval jobs also run once when the scheduler starts, so unlike the daily
 	// reminder task above they need no separate startup call.
 	calendarSyncTask := func() {
-		services.SyncCalendarsWithRateLimit(db, *cfg)
+		services.SyncCalendarsWithRateLimit(db, *cfg, clk)
 	}
 	schedule(s.Every(cfg.CalDAVSyncIntervalHours).Hours().Do(calendarSyncTask))
 	// Sync CardDAV contact connections regularly (rate-limited via job lock)
 	contactSyncTask := func() {
-		services.SyncContactsWithRateLimit(db, *cfg)
+		services.SyncContactsWithRateLimit(db, *cfg, clk)
 	}
 	schedule(s.Every(cfg.CardDAVSyncIntervalHours).Hours().Do(contactSyncTask))
 	go s.StartBlocking()
@@ -189,6 +209,10 @@ func main() {
 
 	// Add request ID middleware for tracing
 	r.Use(middleware.RequestIDMiddleware())
+
+	// Take the time once per request; handlers read it with middleware.RequestNow
+	controllers.SetImportClock(clk)
+	r.Use(middleware.ClockMiddleware(clk))
 
 	// Add logging middleware (after request ID)
 	r.Use(middleware.LoggingMiddleware())

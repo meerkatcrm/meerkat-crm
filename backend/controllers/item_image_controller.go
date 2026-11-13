@@ -6,13 +6,13 @@ import (
 	"meerkat/config"
 	apperrors "meerkat/errors"
 	"meerkat/logger"
+	"meerkat/middleware"
 	"meerkat/models"
 	"meerkat/services"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -61,7 +61,7 @@ func (it ImageItem) notifyImageChanged(c *gin.Context, db *gorm.DB) {
 		logger.FromContext(c).Warn().Err(err).Str("item", it.Name).Msg("Failed to load item for webhook after image change")
 		return
 	}
-	go services.TriggerWebhooks(db, currentConfig(c), userID, it.Event, item)
+	go services.TriggerWebhooks(db, currentConfig(c), userID, it.Event, item, middleware.RequestClock(c))
 }
 
 func (it ImageItem) owned(db *gorm.DB, c *gin.Context, userID uint) *gorm.DB {
@@ -95,7 +95,7 @@ var errImageChanged = errors.New("image changed concurrently")
 func (it ImageItem) setImage(c *gin.Context, db *gorm.DB, oldImage, image string) error {
 	userID, _ := currentUserID(c)
 	result := it.owned(db, c, userID).Where("image = ?", oldImage).
-		Updates(map[string]any{"image": image, "updated_at": time.Now()})
+		Updates(map[string]any{"image": image, "updated_at": middleware.RequestNow(c)})
 	if result.Error != nil || result.RowsAffected > 0 {
 		return result.Error
 	}

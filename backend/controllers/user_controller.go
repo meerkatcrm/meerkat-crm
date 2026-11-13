@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"errors"
+	"meerkat/clock"
 	"net/http"
 	"slices"
 	"strings"
@@ -28,7 +29,7 @@ var passwordResetSlots = make(chan struct{}, 10)
 
 func RegisterUser(cfg *config.Config) gin.HandlerFunc {
 	return func(context *gin.Context) {
-		if cfg.RegistrationDisabled {
+		if !cfg.RegistrationEnabled() {
 			context.JSON(http.StatusForbidden, gin.H{"error": gin.H{
 				"code":    "registration_disabled",
 				"message": "Registration is disabled.",
@@ -77,11 +78,12 @@ func RegisterUser(cfg *config.Config) gin.HandlerFunc {
 	}
 }
 
-// accountLockedError is the 429 for a login that is locked out after repeated failures.
+// accountLockedError is the 429 for a login that is locked out after repeated failures. The
+// rate limiter counts the lockout on the wall clock, so its end is on the wall clock too.
 func accountLockedError(retryAfterSecs int) *apperrors.AppError {
 	return apperrors.NewError(apperrors.ErrCodeRateLimitExceeded, "Too many failed login attempts. Please try again later.", http.StatusTooManyRequests).
 		WithDetails("retry_after", retryAfterSecs).
-		WithDetails("retry_after_at", time.Now().Add(time.Duration(retryAfterSecs)*time.Second).Format(time.RFC3339))
+		WithDetails("retry_after_at", clock.Real().Now().Add(time.Duration(retryAfterSecs)*time.Second).Format(time.RFC3339))
 }
 
 // LoginInput represents the DTO for login requests
@@ -91,7 +93,17 @@ type LoginInput struct {
 	Password   string `json:"password"`
 }
 
+// errPasswordLoginDisabled answers password sign-in and reset on an SSO-only instance.
+func errPasswordLoginDisabled() *apperrors.AppError {
+	return apperrors.NewError("password_login_disabled", "Password sign-in is disabled. Sign in with SSO.", http.StatusForbidden)
+}
+
 func LoginUser(context *gin.Context, cfg *config.Config) {
+	if !cfg.PasswordLoginEnabled() {
+		apperrors.AbortWithError(context, errPasswordLoginDisabled())
+		return
+	}
+
 	var input LoginInput
 	var foundUser models.User
 
@@ -166,7 +178,7 @@ func LoginUser(context *gin.Context, cfg *config.Config) {
 	accountLimiter.RecordSuccessfulLogin(identifier)
 
 	// Create JWT token
-	tokenString, err := services.GenerateToken(foundUser, cfg)
+	tokenString, err := services.GenerateToken(foundUser, cfg, middleware.RequestNow(context))
 	if err != nil {
 		apperrors.AbortWithError(context, apperrors.ErrInternal("Could not generate token").WithError(err))
 		return
@@ -229,6 +241,10 @@ func RequestPasswordReset(context *gin.Context, cfg *config.Config) {
 		apperrors.AbortWithError(context, apperrors.ErrForbidden("Password changes are disabled in demo mode"))
 		return
 	}
+	if !cfg.PasswordLoginEnabled() {
+		apperrors.AbortWithError(context, errPasswordLoginDisabled())
+		return
+	}
 
 	log := logger.FromContext(context)
 
@@ -247,9 +263,10 @@ func RequestPasswordReset(context *gin.Context, cfg *config.Config) {
 	// the same response in the same time, including when the lookup or the mail provider fails.
 	select {
 	case passwordResetSlots <- struct{}{}:
+		clk := middleware.RequestClock(context)
 		go func() {
 			defer func() { <-passwordResetSlots }()
-			processPasswordResetRequest(db, cfg, log, email)
+			processPasswordResetRequest(db, cfg, log, email, clk)
 		}()
 	default:
 		log.Warn().Msg("Password reset request dropped: too many in progress")
@@ -260,7 +277,7 @@ func RequestPasswordReset(context *gin.Context, cfg *config.Config) {
 
 // processPasswordResetRequest stores a new reset token and emails it. Failures are only logged,
 // since the caller has already been answered.
-func processPasswordResetRequest(db *gorm.DB, cfg *config.Config, log *zerolog.Logger, email string) {
+func processPasswordResetRequest(db *gorm.DB, cfg *config.Config, log *zerolog.Logger, email string, clk clock.Clock) {
 	// This runs outside Gin's recovery middleware, so a panic would take the server down.
 	defer func() {
 		if r := recover(); r != nil {
@@ -276,7 +293,7 @@ func processPasswordResetRequest(db *gorm.DB, cfg *config.Config, log *zerolog.L
 		return
 	}
 
-	now := time.Now()
+	now := clk.Now()
 	if user.PasswordResetRequestedAt != nil && now.Sub(*user.PasswordResetRequestedAt) < passwordResetCooldown {
 		log.Info().Uint("user_id", user.ID).Msg("Password reset request ignored during cooldown")
 		return
@@ -290,7 +307,7 @@ func processPasswordResetRequest(db *gorm.DB, cfg *config.Config, log *zerolog.L
 
 	if err := db.Model(&models.User{}).Where("id = ?", user.ID).Updates(map[string]any{
 		"password_reset_token_hash":   hash,
-		"password_reset_expires_at":   services.PasswordResetExpiry(),
+		"password_reset_expires_at":   services.PasswordResetExpiry(now),
 		"password_reset_requested_at": now,
 	}).Error; err != nil {
 		log.Error().Err(err).Uint("user_id", user.ID).Msg("Failed to persist password reset token")
@@ -309,8 +326,13 @@ func processPasswordResetRequest(db *gorm.DB, cfg *config.Config, log *zerolog.L
 // ConfirmPasswordReset validates the token and updates the password.
 func ConfirmPasswordReset(context *gin.Context) {
 	// Check if demo mode is enabled - password changes are disabled in demo
-	if currentConfig(context).DemoMode {
+	cfg := currentConfig(context)
+	if cfg.DemoMode {
 		apperrors.AbortWithError(context, apperrors.ErrForbidden("Password changes are disabled in demo mode"))
+		return
+	}
+	if !cfg.PasswordLoginEnabled() {
+		apperrors.AbortWithError(context, errPasswordLoginDisabled())
 		return
 	}
 
@@ -338,7 +360,7 @@ func ConfirmPasswordReset(context *gin.Context) {
 		return
 	}
 
-	if user.PasswordResetExpiresAt == nil || time.Now().After(*user.PasswordResetExpiresAt) {
+	if user.PasswordResetExpiresAt == nil || middleware.RequestNow(context).After(*user.PasswordResetExpiresAt) {
 		user.PasswordResetTokenHash = nil
 		user.PasswordResetExpiresAt = nil
 		user.PasswordResetRequestedAt = nil
@@ -361,7 +383,7 @@ func ConfirmPasswordReset(context *gin.Context) {
 	}
 
 	user.Password = hashedPassword
-	passwordChangedAt := time.Now()
+	passwordChangedAt := middleware.RequestNow(context)
 	user.PasswordChangedAt = &passwordChangedAt
 	user.PasswordResetTokenHash = nil
 	user.PasswordResetExpiresAt = nil
@@ -733,7 +755,7 @@ func ChangePassword(context *gin.Context) {
 	}
 
 	user.Password = hashedPassword
-	passwordChangedAt := time.Now()
+	passwordChangedAt := middleware.RequestNow(context)
 	user.PasswordChangedAt = &passwordChangedAt
 	user.PasswordResetTokenHash = nil
 	user.PasswordResetExpiresAt = nil

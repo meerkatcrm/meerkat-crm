@@ -87,7 +87,9 @@
     "registerButton": "S'inscrire",
     "registering": "Inscription en cours...",
     "registrationFailed": "Échec de l'inscription",
-    "registrationSuccess": "Inscription réussie ! Vous pouvez maintenant vous connecter."
+    "registrationSuccess": "Inscription réussie ! Vous pouvez maintenant vous connecter.",
+    "disabled": "Les inscriptions sont désactivées sur cette instance. Demandez un compte à votre administrateur.",
+    "backToLogin": "Retour à la connexion"
   },
   "contacts": {
     "title": "Contacts",

@@ -1,6 +1,7 @@
 // Relationship-related API calls
 import { apiFetch, apiJson, API_BASE_URL, getAuthHeaders, parseErrorResponse } from './client';
 import { Contact } from './contacts';
+import { now } from '../utils/now';
 
 export interface Relationship {
   ID: number;
@@ -73,7 +74,7 @@ export function isEndBeforeStart(startDate?: string, endDate?: string): boolean 
 // so "2026" is not in the future at any point during 2026. Used to mirror the
 // backend rule that an end date must not lie in the future, and to word a start
 // date that is still ahead ("starting …" rather than "since …").
-export function isPartialDateInFuture(date?: string, today: Date = new Date()): boolean {
+export function isPartialDateInFuture(date?: string, today: Date = now()): boolean {
   if (!date) return false;
   const pad = (n: number) => String(n).padStart(2, '0');
   const todayISO = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;

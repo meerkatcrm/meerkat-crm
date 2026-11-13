@@ -87,7 +87,9 @@
     "registerButton": "Register",
     "registering": "Registering...",
     "registrationFailed": "Registration failed",
-    "registrationSuccess": "Registration successful! You can now log in."
+    "registrationSuccess": "Registration successful! You can now log in.",
+    "disabled": "Registration is disabled on this instance. Ask your administrator for an account.",
+    "backToLogin": "Back to login"
   },
   "contacts": {
     "title": "Contacts",

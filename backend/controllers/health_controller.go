@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"meerkat/middleware"
 	"net/http"
 	"time"
 
@@ -41,7 +42,7 @@ func HealthCheck(c *gin.Context) {
 
 	response := HealthResponse{
 		Status:    status,
-		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Timestamp: middleware.RequestNow(c).UTC().Format(time.RFC3339),
 		Database:  dbHealth,
 		Version:   "0.1.0",
 	}
@@ -51,7 +52,7 @@ func HealthCheck(c *gin.Context) {
 
 // checkDatabaseHealth checks if the database is accessible and responsive
 func checkDatabaseHealth(db *gorm.DB) DatabaseHealth {
-	start := time.Now()
+	start := time.Now() //nolint:forbidigo // measures a duration, not business time
 
 	sqlDB, err := db.DB()
 	if err != nil {

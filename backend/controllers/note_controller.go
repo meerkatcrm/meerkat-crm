@@ -164,7 +164,7 @@ func saveNewNote(r request, body NoteBody, contactID *uint) (*out[NoteSaved], er
 	if err := r.db.Create(&note).Error; err != nil {
 		return nil, apperrors.ErrDatabase("Failed to save note").WithError(err)
 	}
-	go services.TriggerWebhooks(r.db, r.cfg(), r.userID, "note.created", note)
+	go services.TriggerWebhooks(r.db, r.cfg(), r.userID, "note.created", note, r.clock())
 	return respond(NoteSaved{Message: "Note created successfully", Note: toNote(note)}), nil
 }
 
@@ -247,7 +247,7 @@ func updateNote(ctx context.Context, in *idNoteBodyInput) (*out[NoteSaved], erro
 	if err := r.db.Model(&note).Select("content", "date", "contact_id").Updates(&note).Error; err != nil {
 		return nil, apperrors.ErrDatabase("Failed to update note").WithError(err)
 	}
-	go services.TriggerWebhooks(r.db, r.cfg(), r.userID, "note.updated", note)
+	go services.TriggerWebhooks(r.db, r.cfg(), r.userID, "note.updated", note, r.clock())
 	return respond(NoteSaved{Message: "Note updated successfully", Note: toNote(note)}), nil
 }
 
@@ -264,6 +264,6 @@ func deleteNote(ctx context.Context, in *idInput) (*out[MessageBody], error) {
 		return nil, apperrors.ErrDatabase("Failed to delete note").WithError(err)
 	}
 	carddav.RemoveContactPhotoFile(r.cfg().ProfilePhotoDir, note.Image)
-	go services.TriggerWebhooks(r.db, r.cfg(), r.userID, "note.deleted", gin.H{"id": note.ID})
+	go services.TriggerWebhooks(r.db, r.cfg(), r.userID, "note.deleted", gin.H{"id": note.ID}, r.clock())
 	return respond(MessageBody{Message: "Note deleted"}), nil
 }

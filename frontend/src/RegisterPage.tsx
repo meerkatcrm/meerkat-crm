@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { API_BASE_URL, apiFetch } from './api/client';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuthConfig } from './hooks/useAuthConfig';
 import { useTranslation } from 'react-i18next';
 import {
   Box,
@@ -21,6 +22,7 @@ export default function RegisterPage() {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { data: authConfig, loading: authConfigLoading } = useAuthConfig();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,38 +78,47 @@ export default function RegisterPage() {
         <Typography variant="h5" sx={{
           mb: 2
         }}>{t('register.title')}</Typography>
-        <form onSubmit={handleSubmit}>
+        {!authConfigLoading && !authConfig.registrationEnabled ? (
           <Stack spacing={2}>
-            <TextField
-              label={t('register.username')}
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              required
-              fullWidth
-            />
-            <TextField
-              label={t('register.email')}
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              required
-              fullWidth
-            />
-            <TextField
-              label={t('register.password')}
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-              fullWidth
-            />
-            {error && <Alert severity="error">{error}</Alert>}
-            {success && <Alert severity="success">{success}</Alert>}
-            <Button type="submit" variant="contained" color="primary" disabled={loading}>
-              {loading ? t('register.registering') : t('register.registerButton')}
+            <Alert severity="info">{t('register.disabled')}</Alert>
+            <Button component={Link} to="/login" variant="contained" color="primary">
+              {t('register.backToLogin')}
             </Button>
           </Stack>
-        </form>
+        ) : (
+          <form onSubmit={handleSubmit}>
+            <Stack spacing={2}>
+              <TextField
+                label={t('register.username')}
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                required
+                fullWidth
+              />
+              <TextField
+                label={t('register.email')}
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                required
+                fullWidth
+              />
+              <TextField
+                label={t('register.password')}
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+                fullWidth
+              />
+              {error && <Alert severity="error">{error}</Alert>}
+              {success && <Alert severity="success">{success}</Alert>}
+              <Button type="submit" variant="contained" color="primary" disabled={loading}>
+                {loading ? t('register.registering') : t('register.registerButton')}
+              </Button>
+            </Stack>
+          </form>
+        )}
       </Paper>
     </Box>
   );

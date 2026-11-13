@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
@@ -26,6 +27,7 @@ import (
 // decision: anything not listed here must reject anonymous requests.
 var publicRoutes = map[string]bool{
 	"GET /health":                          true,
+	"GET /api/v1/auth/config":              true,
 	"GET /api/v1/auth/oidc/config":         true,
 	"GET /api/v1/auth/oidc/login":          true,
 	"GET /api/v1/auth/oidc/callback":       true,
@@ -185,7 +187,7 @@ func TestRoutes_AdminGroupIsClosedToOtherAuthenticatedUsers(t *testing.T) {
 	router, db := newRouter(t, cfg, nil)
 	user := models.User{Username: "regular", Email: "regular@example.com", Password: "x"}
 	require.NoError(t, db.Create(&user).Error)
-	token, err := middleware.GenerateToken(user, cfg)
+	token, err := middleware.GenerateToken(user, cfg, time.Now())
 	require.NoError(t, err)
 	asUser := func(r *http.Request) { r.Header.Set("Authorization", "Bearer "+token) }
 
@@ -223,7 +225,7 @@ func TestRoutes_NonNumericIDsAreRejected(t *testing.T) {
 	router, db := newRouter(t, cfg, nil)
 	user := models.User{Username: "regular", Email: "regular@example.com", Password: "x"}
 	require.NoError(t, db.Create(&user).Error)
-	token, err := middleware.GenerateToken(user, cfg)
+	token, err := middleware.GenerateToken(user, cfg, time.Now())
 	require.NoError(t, err)
 	asUser := func(r *http.Request) { r.Header.Set("Authorization", "Bearer "+token) }
 

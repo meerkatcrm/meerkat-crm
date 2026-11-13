@@ -14,7 +14,7 @@ import {
   Divider
 } from '@mui/material';
 import ForgotPasswordDialog from './components/ForgotPasswordDialog';
-import { useOIDCConfig } from './hooks/useOIDCConfig';
+import { useAuthConfig } from './hooks/useAuthConfig';
 
 type LoginPageProps = {
   setToken?: (token: string | null) => void;
@@ -38,7 +38,7 @@ export default function LoginPage({ setToken }: LoginPageProps) {
   const [loading, setLoading] = useState(false);
   const [forgotOpen, setForgotOpen] = useState(false);
   const navigate = useNavigate();
-  const oidcConfig = useOIDCConfig();
+  const { data: authConfig } = useAuthConfig();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,50 +75,57 @@ export default function LoginPage({ setToken }: LoginPageProps) {
         <Typography variant="h5" sx={{
           mb: 2
         }}>{t('login.title')}</Typography>
-        <form onSubmit={handleSubmit}>
-          <Stack spacing={2}>
-            <TextField
-              label={t('login.identifier')}
-              type="text"
-              value={identifier}
-              onChange={e => setIdentifier(e.target.value)}
-              required
-              fullWidth
-            />
-            <TextField
-              label={t('login.password')}
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-              fullWidth
-            />
-            {error && <Alert severity="error">{error}</Alert>}
-            <Button type="submit" variant="contained" color="primary" disabled={loading}>
-              {loading ? t('login.loggingIn') : t('login.loginButton')}
-            </Button>
-            <Button variant="text" color="secondary" onClick={() => setForgotOpen(true)}>
-              {t('login.forgotPassword')}
-            </Button>
-            <Button component={Link} to="/register" color="secondary" variant="text">
-              {t('login.noAccount')}
-            </Button>
-            {oidcConfig.enabled && (
-              <>
-                <Divider>{t('login.orSeparator')}</Divider>
-                <Button
-                  variant="outlined"
-                  color="primary"
-                  onClick={() => { window.location.href = `${API_BASE_URL}/auth/oidc/login`; }}
-                >
-                  {t('login.ssoButton', { provider: oidcConfig.provider_name })}
+        <Stack spacing={2}>
+          {authConfig.passwordLoginEnabled && (
+            <form onSubmit={handleSubmit}>
+              <Stack spacing={2}>
+                <TextField
+                  label={t('login.identifier')}
+                  type="text"
+                  value={identifier}
+                  onChange={e => setIdentifier(e.target.value)}
+                  required
+                  fullWidth
+                />
+                <TextField
+                  label={t('login.password')}
+                  type="password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  required
+                  fullWidth
+                />
+                {error && <Alert severity="error">{error}</Alert>}
+                <Button type="submit" variant="contained" color="primary" disabled={loading}>
+                  {loading ? t('login.loggingIn') : t('login.loginButton')}
                 </Button>
-              </>
-            )}
-          </Stack>
-        </form>
+                <Button variant="text" color="secondary" onClick={() => setForgotOpen(true)}>
+                  {t('login.forgotPassword')}
+                </Button>
+                {authConfig.registrationEnabled && (
+                  <Button component={Link} to="/register" color="secondary" variant="text">
+                    {t('login.noAccount')}
+                  </Button>
+                )}
+              </Stack>
+            </form>
+          )}
+          {!authConfig.passwordLoginEnabled && error && <Alert severity="error">{error}</Alert>}
+          {authConfig.oidcEnabled && (
+            <>
+              {authConfig.passwordLoginEnabled && <Divider>{t('login.orSeparator')}</Divider>}
+              <Button
+                variant={authConfig.passwordLoginEnabled ? 'outlined' : 'contained'}
+                color="primary"
+                onClick={() => { window.location.href = `${API_BASE_URL}/auth/oidc/login`; }}
+              >
+                {t('login.ssoButton', { provider: authConfig.oidcProviderName })}
+              </Button>
+            </>
+          )}
+        </Stack>
       </Paper>
-      <ForgotPasswordDialog open={forgotOpen} onClose={() => setForgotOpen(false)} />
+      {authConfig.passwordLoginEnabled && <ForgotPasswordDialog open={forgotOpen} onClose={() => setForgotOpen(false)} />}
     </Box>
   );
 }

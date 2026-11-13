@@ -87,7 +87,9 @@
     "registerButton": "Registrarse",
     "registering": "Registrando...",
     "registrationFailed": "Error en el registro",
-    "registrationSuccess": "¡Registro completado! Ahora puedes iniciar sesión."
+    "registrationSuccess": "¡Registro completado! Ahora puedes iniciar sesión.",
+    "disabled": "El registro está desactivado en esta instancia. Pide una cuenta a tu administrador.",
+    "backToLogin": "Volver al inicio de sesión"
   },
   "contacts": {
     "title": "Contactos",

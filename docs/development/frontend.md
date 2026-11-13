@@ -54,6 +54,10 @@ Reusable components live in `src/components/`. They are MUI-based and receive da
 
 All user-facing strings must be translated. Add keys to both `src/i18n/locales/en.json` and `de.json`. Do not hardcode English strings in components.
 
+## Time
+
+`src/utils/now.ts` is the one place that reads the clock; call `now()` instead of `new Date()` or `Date.now()`, which ESLint rejects elsewhere in `src` (tests excepted). The browser does not follow the server's `FAKE_NOW` (see [backend](backend.md#time)).
+
 ## Testing
 
 The frontend is tested via Playwright E2E tests against a running application. See [Testing](testing.md).
