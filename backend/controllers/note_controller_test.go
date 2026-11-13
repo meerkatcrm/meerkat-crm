@@ -387,9 +387,16 @@ func TestUpdateNote_DetachesFromContact(t *testing.T) {
 func TestNoteOperationsRefuseANonNumericID(t *testing.T) {
 	_, router := setupRouter()
 	mountNotes(router)
-	for _, path := range []string{"/notes/abc", "/notes/" + url.PathEscape("1 OR 1=1"), "/contacts/abc/notes"} {
-		w := doRequest(router, http.MethodGet, path, nil, "")
-		assert.Equal(t, http.StatusBadRequest, w.Code, path)
+	for _, route := range [][2]string{
+		{http.MethodGet, "/notes/abc"},
+		{http.MethodGet, "/notes/" + url.PathEscape("1 OR 1=1")},
+		{http.MethodGet, "/contacts/abc/notes"},
+		{http.MethodPost, "/contacts/abc/notes"},
+		{http.MethodPut, "/notes/abc"},
+		{http.MethodDelete, "/notes/abc"},
+	} {
+		w := doJSON(t, router, route[0], route[1], map[string]any{"content": "x", "date": time.Now()})
+		assert.Equal(t, http.StatusBadRequest, w.Code, route[0]+" "+route[1])
 	}
 }
 
