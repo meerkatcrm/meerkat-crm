@@ -315,12 +315,12 @@
             }
           },
           {
-            "description": "Text the content contains, case-insensitive",
+            "description": "Words the content contains, each matching the start of a word; case and accents are ignored. Digits-only and Chinese/Japanese/Korean text match anywhere",
             "explode": false,
             "in": "query",
             "name": "search",
             "schema": {
-              "description": "Text the content contains, case-insensitive",
+              "description": "Words the content contains, each matching the start of a word; case and accents are ignored. Digits-only and Chinese/Japanese/Korean text match anywhere",
               "type": "string"
             }
           },

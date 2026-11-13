@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strconv"
 
 	"testing"
@@ -30,6 +31,14 @@ func setupRouter() (*gorm.DB, *gin.Engine) {
 	sqlDB.SetMaxOpenConns(1)
 
 	db.AutoMigrate(&models.Contact{}, &models.Activity{}, &models.Note{}, models.Relationship{}, models.Reminder{}, models.User{}, models.Webhook{}, models.WebhookDelivery{}, &models.EmailOutbox{}, &models.EmploymentHistory{})
+	// The search indexes are SQL-only (FTS5 tables and triggers), so build them from the real migration
+	ftsSQL, err := os.ReadFile("../database/migrations/000041_add_fts_search.up.sql")
+	if err != nil {
+		panic(err)
+	}
+	if err := db.Exec(string(ftsSQL)).Error; err != nil {
+		panic(err)
+	}
 
 	user := models.User{Username: "tester", Password: "password123", Email: "tester@example.com"}
 	if err := db.Create(&user).Error; err != nil {

@@ -140,7 +140,8 @@
       "oldestFirst": "最早添加",
       "nameAZ": "姓名 A-Z",
       "nameZA": "姓名 Z-A",
-      "random": "随机"
+      "random": "随机",
+      "relevance": "最佳匹配"
     },
     "showArchived": "显示已归档",
     "archived": "已归档",

@@ -111,8 +111,26 @@ func CreateContact(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "Contact created successfully", "contact": contact})
 }
 
-// filters a contacts query by a free-text term
+// filters a contacts query by a free-text term. Names, e-mail addresses and phone numbers
+// are searched in contacts_fts when ftsMatch allows it; the matches are then joined as
+// "hits", and hits.hit_rank orders by best match (NULL for a match through a relationship
+// only).
 func applyContactSearch(query *gorm.DB, userID uint, searchTerm string) *gorm.DB {
+	// People without a contact of their own (e.g. a child stored only as
+	// a relationship) are found through the contact they belong to.
+	const unlinkedRelationship = "relationships.user_id = @user_id AND relationships.deleted_at IS NULL AND relationships.related_contact_id IS NULL AND "
+	args := []any{searchArg(searchTerm), sql.Named("user_id", userID)}
+
+	if match, ok := ftsMatch(searchTerm); ok {
+		// An inner join on a subquery that runs once: a LEFT JOIN or an OR would run the
+		// MATCH again for every contact (2 s instead of 2 ms on 20,000 contacts).
+		return query.Joins("JOIN (SELECT hit_id, MIN(hit_rank) AS hit_rank FROM ("+
+			"SELECT rowid AS hit_id, rank AS hit_rank FROM contacts_fts WHERE contacts_fts MATCH @match"+
+			" UNION ALL SELECT contact_id, NULL FROM relationships WHERE "+unlinkedRelationship+likeAny("relationships.name")+
+			") GROUP BY hit_id) AS hits ON hits.hit_id = contacts.id",
+			append(args, sql.Named("match", match))...)
+	}
+	relationshipMatch := "EXISTS (SELECT 1 FROM relationships WHERE relationships.contact_id = contacts.id AND " + unlinkedRelationship + likeAny("relationships.name") + ")"
 	const jsonValue = "json_extract(json_each.value, '$.value')"
 	return query.Where(
 		likeAny("firstname", "lastname", "nickname",
@@ -120,10 +138,8 @@ func applyContactSearch(query *gorm.DB, userID uint, searchTerm string) *gorm.DB
 			"email", "phone")+
 			" OR (json_valid(emails) AND EXISTS (SELECT 1 FROM json_each(contacts.emails) WHERE "+likeAny(jsonValue)+"))"+
 			" OR (json_valid(phones) AND EXISTS (SELECT 1 FROM json_each(contacts.phones) WHERE "+likeAny(jsonValue)+"))"+
-			// People without a contact of their own (e.g. a child stored only as
-			// a relationship) are found through the contact they belong to.
-			" OR EXISTS (SELECT 1 FROM relationships WHERE relationships.contact_id = contacts.id AND relationships.user_id = @user_id AND relationships.deleted_at IS NULL AND relationships.related_contact_id IS NULL AND "+likeAny("relationships.name")+")",
-		searchArg(searchTerm), sql.Named("user_id", userID),
+			" OR "+relationshipMatch,
+		args...,
 	)
 }
 
@@ -192,7 +208,10 @@ func GetContacts(c *gin.Context) {
 	if includeArchived && searchTerm != "" {
 		query = query.Order("archived ASC")
 	}
-	if sortField == "random" {
+	// A full-text search lists the best match first, unless the caller asked for an order
+	if _, ranked := ftsMatch(searchTerm); ranked && c.Query("sort") == "" {
+		query = query.Order("hits.hit_rank IS NULL, hits.hit_rank, contacts.id DESC")
+	} else if sortField == "random" {
 		query = query.Order("RANDOM()")
 	} else {
 		query = query.Order(sortField + " " + sortOrder)
