@@ -152,6 +152,7 @@ func (e *isolationEnv) seed(t *testing.T) {
 		"relationships": relationship.ID, "employment-history": job.ID,
 		"reminders": reminder.ID, "reminder-completions": completion.ID,
 		"api-tokens": token.ID, "webhooks": webhook.ID, "calendars": calendar.ID, "users": b,
+		"carddav-connection": connection.ID, // only sent in the body
 	}
 }
 
@@ -319,8 +320,9 @@ func (e *isolationEnv) walk(t *testing.T, methods func(string) bool, check func(
 	return walked
 }
 
-// body carries every field the JSON routes require, with B's ids wherever a field names a
-// contact, so a route that trusts the body over the owner shows up in the snapshot.
+// body carries every field the JSON routes require, with B's ids wherever a field names one
+// of B's rows or B's user id, so a route that trusts the body over the owner shows up in the
+// snapshot.
 func (e *isolationEnv) body() []byte {
 	c1, c2 := e.ids["contacts"], e.contact2
 	data, _ := json.Marshal(map[string]any{
@@ -328,6 +330,8 @@ func (e *isolationEnv) body() []byte {
 		"type": "Friend", "organization": "Mine", "date": time.Now().UTC().Format(time.RFC3339),
 		"remind_at": time.Now().UTC().Add(24 * time.Hour).Format(time.RFC3339), "recurrence": "once",
 		"contact_id": c1, "contact_ids": []uint{c1, c2}, "related_contact_id": c2, "source_id": c2,
+		"user_id": e.b.ID, "reminder_id": e.ids["reminders"], "webhook_id": e.ids["webhooks"],
+		"subscription_id": e.ids["calendars"], "connection_id": e.ids["carddav-connection"], "activity_id": e.ids["activities"],
 		"contact_a_id": c1, "contact_b_id": c2, "url": "https://127.0.0.1:1/x", "base_url": "https://127.0.0.1:1/",
 		"address_book_path": "/ab/", "events": []string{"contact.created"}, "language": "de",
 		"date_format": "iso", "mode": "all", "circles": []string{"x"}, "hide_empty_contact_fields": true,
@@ -457,12 +461,21 @@ func TestInvariants_SessionKeyedRoutesNameTheirIsolationTest(t *testing.T) {
 		if !assert.NoError(t, err, key) {
 			continue
 		}
-		found := false
+		var fn *ast.FuncDecl
 		for _, decl := range parsed.Decls {
-			if fn, ok := decl.(*ast.FuncDecl); ok && fn.Recv == nil && fn.Name.Name == p.test {
-				found = true
+			if f, ok := decl.(*ast.FuncDecl); ok && f.Recv == nil && f.Name.Name == p.test {
+				fn = f
 			}
 		}
-		assert.True(t, found, "%s: %s has no top-level test %s", key, p.file, p.test)
+		if !assert.NotNil(t, fn, "%s: %s has no top-level test %s", key, p.file, p.test) {
+			continue
+		}
+		assert.NotEmpty(t, fn.Body.List, "%s: %s is empty", key, p.test)
+		ast.Inspect(fn.Body, func(n ast.Node) bool {
+			if sel, ok := n.(*ast.SelectorExpr); ok && strings.HasPrefix(sel.Sel.Name, "Skip") {
+				t.Errorf("%s: %s calls %s, so nothing proves the route's isolation", key, p.test, sel.Sel.Name)
+			}
+			return true
+		})
 	}
 }
