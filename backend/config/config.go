@@ -16,6 +16,7 @@ import (
 type OIDCConfig struct {
 	Enabled            bool
 	ProviderURL        string
+	ProviderName       string // optional display name for the login button; falls back to the ProviderURL host
 	ClientID           string
 	ClientSecret       string
 	RedirectURL        string // derived from FrontendURL, not configurable
@@ -150,6 +151,7 @@ func LoadConfig() *Config {
 	cfg.OIDC = OIDCConfig{
 		Enabled:            oidcProviderURL != "" && oidcClientID != "" && oidcClientSecret != "",
 		ProviderURL:        oidcProviderURL,
+		ProviderName:       strings.TrimSpace(getEnv("OIDC_PROVIDER_NAME", "")),
 		ClientID:           oidcClientID,
 		ClientSecret:       oidcClientSecret,
 		RedirectURL:        cfg.FrontendURL + "/api/v1/auth/oidc/callback",

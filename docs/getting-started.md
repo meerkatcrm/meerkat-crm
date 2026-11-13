@@ -43,6 +43,7 @@ After adjusting the environment variables as needed you can run:
 | `OIDC_PROVIDER_URL` | Issuer URL of your OIDC provider (i.e. endpoint URI for your provider). Required to enable SSO |
 | `OIDC_CLIENT_ID` | OAuth2 client ID registered with your OIDC provider |
 | `OIDC_CLIENT_SECRET` | OAuth2 client secret registered with your OIDC provider |
+| `OIDC_PROVIDER_NAME` | Display name of your provider shown on the SSO login button (e.g. `Pocket ID`, `Keycloak`). Defaults to the host of `OIDC_PROVIDER_URL` |
 | `OIDC_AUTO_PROVISION` | When `true`, a new account is automatically created on first SSO login. Default is `false` |
 | `OIDC_TRUST_EMAIL` | When `true`, skips the `email_verified`  requirement when linking an OIDC identity to an existing account by email. Safe to enable for self-hosted providers (e.g. Authentik) where you control all user accounts. Default is `false` |
 | `REMINDER_TIME` | Time of day at which reminder emails are sent, in `HH:MM` format (24-hour). Default is `12:00` |

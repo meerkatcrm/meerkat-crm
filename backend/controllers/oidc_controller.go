@@ -19,7 +19,7 @@ func OIDCConfigHandler(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		resp := gin.H{"enabled": cfg.OIDC.Enabled}
 		if cfg.OIDC.Enabled {
-			resp["provider_name"] = services.ProviderName(cfg.OIDC.ProviderURL)
+			resp["provider_name"] = services.ProviderName(cfg.OIDC.ProviderName, cfg.OIDC.ProviderURL)
 		}
 		c.JSON(http.StatusOK, resp)
 	}

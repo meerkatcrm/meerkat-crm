@@ -476,11 +476,17 @@ func TestEnrichFromUserInfo_Failures(t *testing.T) {
 }
 
 func TestProviderName(t *testing.T) {
-	assert.Equal(t, "auth.example.com", ProviderName("https://auth.example.com/realms/main"))
-	assert.Equal(t, "auth.example.com:8443", ProviderName("https://auth.example.com:8443"))
-	assert.Equal(t, "SSO", ProviderName("not a url"))
-	assert.Equal(t, "SSO", ProviderName("://broken"))
-	assert.Equal(t, "SSO", ProviderName(""))
+	assert.Equal(t, "auth.example.com", ProviderName("", "https://auth.example.com/realms/main"))
+	assert.Equal(t, "auth.example.com:8443", ProviderName("", "https://auth.example.com:8443"))
+	assert.Equal(t, "SSO", ProviderName("", "not a url"))
+	assert.Equal(t, "SSO", ProviderName("", "://broken"))
+	assert.Equal(t, "SSO", ProviderName("", ""))
+
+	// OIDC_PROVIDER_NAME wins over the URL host; blank falls back to it.
+	assert.Equal(t, "Pocket ID", ProviderName("Pocket ID", "https://auth.example.com"))
+	assert.Equal(t, "Pocket ID", ProviderName("  Pocket ID  ", "https://auth.example.com"))
+	assert.Equal(t, "auth.example.com", ProviderName("   ", "https://auth.example.com"))
+	assert.Equal(t, "Keycloak", ProviderName("Keycloak", ""))
 }
 
 const testOIDCProvider = "https://idp.example.com"
