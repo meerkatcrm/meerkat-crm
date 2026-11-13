@@ -187,6 +187,7 @@ func TestGetContactsSearchLiteralWildcards(t *testing.T) {
 	}
 
 	assert.Equal(t, 2, search("Fifty%"), "% separates words: both Fifty contacts match")
+	assert.Equal(t, 2, search("Fifty% Percent"), "a term spanning firstname and lastname matches both words")
 	assert.Equal(t, 1, search("a_b"), "_ separates words: a_b matches, axb does not")
 	assert.Equal(t, 1, search("555_01"), "secondary phone is searched word by word")
 	assert.Equal(t, 1, search("Kid_one"), "relationship name should match _ literally")
