@@ -222,3 +222,45 @@ func TestAVCardWithAPhotoGivesTheContactAPhoto(t *testing.T) {
 
 	assert.Contains(t, s.get("c-5").Body.String(), "PHOTO", "the client gets the profile picture back")
 }
+
+func TestAnotherUsersAddressBookPathAnswersNotFound(t *testing.T) {
+	s := newServer(t)
+	// alice holds a contact under the same UID as bob's, so a request that
+	// ignored the username in the path would find, change or delete hers.
+	require.Equal(t, http.StatusCreated, s.put("bobs-friend", vcardBody("bobs-friend", "Alices", "Friend")).Code)
+	var before models.Contact
+	require.NoError(t, s.db.Where("vcard_uid = ? AND user_id <> ?", "bobs-friend", s.alice.ID).First(&before).Error)
+
+	for _, uid := range []string{"bobs-friend", "brand-new"} {
+		target := "/carddav/addressbooks/bob/contacts/" + uid + ".vcf"
+		t.Run(uid, func(t *testing.T) {
+			req := httptest.NewRequest("PUT", target, strings.NewReader(vcardBody(uid, "Mallory", "Moved")))
+			req.SetBasicAuth("alice", alicePassword)
+			req.Header.Set("Content-Type", "text/vcard")
+			put := httptest.NewRecorder()
+			s.router.ServeHTTP(put, req)
+			assert.Equal(t, http.StatusNotFound, put.Code, "PUT")
+
+			get := s.do("GET", target, "alice", alicePassword)
+			assert.Equal(t, http.StatusNotFound, get.Code, "GET")
+			assert.NotContains(t, get.Body.String(), "BEGIN:VCARD")
+
+			assert.Equal(t, http.StatusNotFound, s.do("DELETE", target, "alice", alicePassword).Code, "DELETE")
+		})
+	}
+
+	// A path that climbs out of alice's address book is judged after cleaning.
+	assert.Equal(t, http.StatusNotFound, s.do("GET", "/carddav/addressbooks/alice/contacts/../../bob/contacts/bobs-friend.vcf", "alice", alicePassword).Code)
+
+	var after models.Contact
+	require.NoError(t, s.db.Where("id = ?", before.ID).First(&after).Error)
+	assert.Equal(t, before.Firstname, after.Firstname, "bob's contact is unchanged")
+	assert.Equal(t, before.ETag, after.ETag)
+	assert.Equal(t, before.UpdatedAt, after.UpdatedAt)
+
+	mine := s.get("bobs-friend")
+	assert.Equal(t, http.StatusOK, mine.Code, "alice's own contact survives")
+	assert.Contains(t, mine.Body.String(), "Alices")
+	assert.NotContains(t, mine.Body.String(), "Mallory")
+	assert.NotContains(t, s.addressBook(), "brand-new", "nothing was created in alice's address book")
+}

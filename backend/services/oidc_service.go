@@ -274,8 +274,12 @@ func sanitizeUsername(s string) string {
 	}, strings.ToLower(s))
 }
 
-// ProviderName extracts a human-readable name from a provider URL
-func ProviderName(providerURL string) string {
+// ProviderName returns the name shown on the SSO login button: the configured
+// display name (OIDC_PROVIDER_NAME) when set, otherwise the provider URL's host.
+func ProviderName(displayName, providerURL string) string {
+	if name := strings.TrimSpace(displayName); name != "" {
+		return name
+	}
 	u, err := url.Parse(providerURL)
 	if err != nil || u.Host == "" {
 		return "SSO"

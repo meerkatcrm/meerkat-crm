@@ -16,6 +16,7 @@ import (
 type OIDCConfig struct {
 	Enabled            bool
 	ProviderURL        string
+	ProviderName       string // optional display name for the login button; falls back to the ProviderURL host
 	ClientID           string
 	ClientSecret       string
 	RedirectURL        string // derived from FrontendURL, not configurable
@@ -54,6 +55,7 @@ type Config struct {
 	CookieSecure             bool   // Set Secure flag on auth cookie (requires HTTPS)
 	CookieDomain             string // Domain for auth cookie (empty = current domain only)
 	RegistrationDisabled     bool   // Disable new user registration
+	PasswordLoginDisabled    bool   // DISABLE_PASSWORD_LOGIN: SSO-only sign-in; only honored while OIDC is enabled (see PasswordLoginEnabled)
 	DemoMode                 bool   // Public demo instance: password changes and photo uploads are refused
 	WebhookBlockPrivateURLs  bool   // Block webhook deliveries to private/loopback addresses (useful for cloud deployments)
 	CalDAVSyncIntervalHours  int    // Interval in hours for the scheduled calendar sync job
@@ -118,6 +120,7 @@ func LoadConfig() *Config {
 		CookieSecure:            getBoolEnv("COOKIE_SECURE", false),
 		CookieDomain:            getEnv("COOKIE_DOMAIN", ""),
 		RegistrationDisabled:    getBoolEnv("DISABLE_REGISTRATION", false),
+		PasswordLoginDisabled:   getBoolEnv("DISABLE_PASSWORD_LOGIN", false),
 		DemoMode:                getBoolEnv("DEMO_MODE", false),
 		WebhookBlockPrivateURLs: getBoolEnv("WEBHOOK_BLOCK_PRIVATE_URLS", false),
 		CalDAVSyncIntervalHours: getIntEnv("CALDAV_SYNC_INTERVAL_HOURS", 6),
@@ -152,6 +155,7 @@ func LoadConfig() *Config {
 	cfg.OIDC = OIDCConfig{
 		Enabled:            oidcProviderURL != "" && oidcClientID != "" && oidcClientSecret != "",
 		ProviderURL:        oidcProviderURL,
+		ProviderName:       strings.TrimSpace(getEnv("OIDC_PROVIDER_NAME", "")),
 		ClientID:           oidcClientID,
 		ClientSecret:       oidcClientSecret,
 		RedirectURL:        cfg.FrontendURL + "/api/v1/auth/oidc/callback",
@@ -427,6 +431,10 @@ func (c *Config) Validate() []ValidationError {
 		log.Println("WARN: OIDC is partially configured. Set OIDC_PROVIDER_URL, OIDC_CLIENT_ID, and OIDC_CLIENT_SECRET to enable SSO.")
 	}
 
+	if c.PasswordLoginDisabled && !c.OIDC.Enabled {
+		log.Println("WARN: DISABLE_PASSWORD_LOGIN is ignored because OIDC is not enabled; without SSO nobody could sign in.")
+	}
+
 	// UseResend and UseSMTP are derived from these fields being set, so a
 	// half-configured channel is silently off. Say so instead.
 	if (c.ResendAPIKey != "") != (c.ResendFromEmail != "") {
@@ -490,4 +498,17 @@ func (c *Config) ValidateOrPanic() {
 		panic("Configuration validation failed")
 	}
 	log.Println("✓ Configuration validated successfully")
+}
+
+// PasswordLoginEnabled reports whether username/password sign-in (and the password
+// reset that serves it) is allowed. DISABLE_PASSWORD_LOGIN only takes effect while
+// OIDC is enabled, so a misconfiguration can never lock every user out.
+func (c *Config) PasswordLoginEnabled() bool {
+	return !(c.PasswordLoginDisabled && c.OIDC.Enabled)
+}
+
+// RegistrationEnabled reports whether new accounts can register with a password.
+// Registration creates a password account, so it is off whenever password sign-in is.
+func (c *Config) RegistrationEnabled() bool {
+	return !c.RegistrationDisabled && c.PasswordLoginEnabled()
 }

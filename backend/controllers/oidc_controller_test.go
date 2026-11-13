@@ -220,6 +220,13 @@ func TestOIDCConfigHandler(t *testing.T) {
 
 	w = doRequest(router, http.MethodGet, "/enabled", nil, "")
 	assert.Equal(t, map[string]any{"enabled": true, "provider_name": "sso.example.com"}, decodeJSON[map[string]any](t, w))
+
+	named := &config.Config{}
+	named.OIDC = enabled.OIDC
+	named.OIDC.ProviderName = "Pocket ID"
+	router.GET("/named", OIDCConfigHandler(named))
+	w = doRequest(router, http.MethodGet, "/named", nil, "")
+	assert.Equal(t, map[string]any{"enabled": true, "provider_name": "Pocket ID"}, decodeJSON[map[string]any](t, w))
 }
 
 func TestOIDCLogin_RedirectsToProviderWithFreshStateAndNonce(t *testing.T) {
