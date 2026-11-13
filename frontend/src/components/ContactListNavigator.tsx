@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Box, Button, Typography } from '@mui/material';
@@ -17,6 +17,14 @@ export default function ContactListNavigator() {
   const navigate = useNavigate();
   const { showError } = useSnackbar();
   const [busy, setBusy] = useState(false);
+  // A step that resolves after the user went elsewhere must not pull them back
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const nav = readContactListNav(location.state);
 
   if (!nav || nav.total < 2) return null;
@@ -28,6 +36,7 @@ export default function ContactListNavigator() {
     try {
       // With one contact per page, page n is the contact at position n - 1.
       const result = await getContacts({ ...nav.params, page: index + 1, limit: 1 });
+      if (!mounted.current) return;
       const next = result.contacts[0];
       if (!next) {
         // The list shrank since it was opened: there is nothing at that position any more
@@ -38,9 +47,9 @@ export default function ContactListNavigator() {
         state: { listNav: { ...nav, index, total: result.total } },
       });
     } catch (err) {
-      showError(getErrorMessage(err));
+      if (mounted.current) showError(getErrorMessage(err));
     } finally {
-      setBusy(false);
+      if (mounted.current) setBusy(false);
     }
   };
 

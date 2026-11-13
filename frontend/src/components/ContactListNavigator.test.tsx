@@ -1,6 +1,6 @@
 import { test, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react';
-import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { render, screen, cleanup, fireEvent, waitFor, act } from '@testing-library/react';
+import { MemoryRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import '../i18n/config';
 import ContactListNavigator from './ContactListNavigator';
 import { SnackbarProvider } from '../context/SnackbarContext';
@@ -58,4 +58,23 @@ test('next loads the contact at the following position of the same list', async 
 test('the last contact has no next one', () => {
   renderWith({ listNav: { params, index: 2, total: 3 } });
   expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+});
+
+test('a step that resolves after the user left does not pull them back', async () => {
+  let resolve!: (v: unknown) => void;
+  vi.mocked(getContacts).mockReturnValue(new Promise((r) => { resolve = r; }) as never);
+  render(
+    <SnackbarProvider>
+      <MemoryRouter initialEntries={[{ pathname: '/contacts/5', state: { listNav: { params, index: 0, total: 3 } } }]}>
+        <Routes>
+          <Route path="/contacts/:id" element={<><ContactListNavigator /><Link to="/activities">leave</Link></>} />
+          <Route path="/activities" element={<Where />} />
+        </Routes>
+      </MemoryRouter>
+    </SnackbarProvider>,
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+  fireEvent.click(screen.getByText('leave'));
+  await act(async () => resolve({ contacts: [{ ID: 9, firstname: 'Bo', lastname: '' }], total: 3, page: 2, limit: 1 }));
+  expect(screen.getByTestId('where')).toHaveTextContent('/activities');
 });

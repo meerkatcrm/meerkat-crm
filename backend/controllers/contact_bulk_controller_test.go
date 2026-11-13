@@ -160,3 +160,24 @@ func loadContact(t *testing.T, db *gorm.DB, id uint) models.Contact {
 	require.NoError(t, db.First(&ct, id).Error)
 	return ct
 }
+
+func TestBulkUpdateContacts_UnchangedContactsAreNotSaved(t *testing.T) {
+	db, router, user := setupBulkRouter(t)
+
+	active := models.Contact{UserID: user.ID, Firstname: "Active", Circles: []string{"friends"}}
+	archived := models.Contact{UserID: user.ID, Firstname: "Archived", Archived: true}
+	require.NoError(t, db.Create(&active).Error)
+	require.NoError(t, db.Create(&archived).Error)
+	etag := loadContact(t, db, active.ID).ETag
+
+	w := postBulk(router, gin.H{"contact_ids": []uint{active.ID, archived.ID}, "archived": false, "add_circles": []string{"friends"}})
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var resp map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, float64(1), resp["updated"], "only the archived contact changes")
+
+	assert.Equal(t, etag, loadContact(t, db, active.ID).ETag, "an unchanged contact keeps its ETag")
+	got := loadContact(t, db, archived.ID)
+	assert.False(t, got.Archived)
+	assert.Equal(t, []string{"friends"}, got.Circles)
+}

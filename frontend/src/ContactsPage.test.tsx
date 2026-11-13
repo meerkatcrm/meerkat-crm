@@ -1,5 +1,5 @@
 import { test, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, within, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, cleanup, within, fireEvent, waitFor, act } from '@testing-library/react';
 import { MemoryRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { SnackbarProvider } from './context/SnackbarContext';
 import { getContacts } from './api/contacts';
@@ -171,4 +171,17 @@ test('a random order gives no previous / next', () => {
   );
   fireEvent.click(screen.getByRole('link', { name: /Ann/ }));
   expect(JSON.parse(screen.getByTestId('state').textContent!).listNav).toBeUndefined();
+});
+
+test('select all keeps nothing when the filters change while it collects', async () => {
+  mockList([contact(1, 'Ann')], 5);
+  let resolve!: (v: unknown) => void;
+  vi.mocked(getContacts).mockReturnValue(new Promise((r) => { resolve = r; }) as never);
+  renderAt('/contacts');
+
+  fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Select all 5' }));
+  fireEvent.click(screen.getByRole('switch', { name: 'Show archived' }));
+  await act(async () => resolve({ contacts: [1, 2, 3, 4, 5].map(id => contact(id, 'X')), total: 5, page: 1, limit: 100 }));
+  expect(screen.getByText('0 selected')).toBeInTheDocument();
 });

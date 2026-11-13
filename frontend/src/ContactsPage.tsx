@@ -112,6 +112,10 @@ export default function ContactsPage() {
     return rest;
   }, [contactParams]);
 
+  // The list showing now, for async work that must not apply to a list changed meanwhile
+  const listParamsRef = useRef(listParams);
+  listParamsRef.current = listParams;
+
   // Use custom hook for fetching contacts
   const { contacts, total: totalContacts, loading, refetch } = useContacts(contactParams);
 
@@ -199,6 +203,7 @@ export default function ContactsPage() {
   // Collects the IDs of every contact matching the current filters, a page of the
   // largest size the server allows at a time.
   const selectAllMatching = async () => {
+    const forList = listParams;
     setSelectingAll(true);
     try {
       const ids = new Set<number>();
@@ -209,6 +214,8 @@ export default function ContactsPage() {
         result.contacts.forEach(c => ids.add(c.ID));
         if (result.contacts.length < limit || p * limit >= result.total) break;
       }
+      // The filters changed while the IDs were collected: they belong to another list
+      if (listParamsRef.current !== forList) return;
       setSelectedIds(ids);
     } catch (err) {
       showError(getErrorMessage(err));

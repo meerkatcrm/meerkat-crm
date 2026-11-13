@@ -6,6 +6,7 @@ import (
 	"meerkat/models"
 	"meerkat/services"
 	"net/http"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -78,7 +79,7 @@ func BulkUpdateContacts(c *gin.Context) {
 	slices.Sort(ids)
 	ids = slices.Compact(ids)
 
-	var contacts []models.Contact
+	var contacts, changed []models.Contact
 	err := db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("user_id = ? AND id IN ?", userID, ids).Find(&contacts).Error; err != nil {
 			return apperrors.ErrDatabase("Failed to load contacts").WithError(err)
@@ -89,6 +90,7 @@ func BulkUpdateContacts(c *gin.Context) {
 		}
 		for i := range contacts {
 			contact := &contacts[i]
+			before := bulkSnapshotOf(contact)
 			contact.Circles = applyCircleChanges(contact.Circles, addCircles, removeCircles)
 			for _, f := range fields {
 				if f.value != nil {
@@ -104,9 +106,15 @@ func BulkUpdateContacts(c *gin.Context) {
 				}
 				contact.Archived = *input.Archived
 			}
+			// A contact that already holds every value is left alone: saving it would
+			// still bump its ETag and send a contact.updated webhook.
+			if reflect.DeepEqual(before, bulkSnapshotOf(contact)) {
+				continue
+			}
 			if err := tx.Save(contact).Error; err != nil {
 				return apperrors.ErrDatabase("Failed to update contacts").WithError(err)
 			}
+			changed = append(changed, *contact)
 		}
 		return nil
 	})
@@ -121,12 +129,33 @@ func BulkUpdateContacts(c *gin.Context) {
 
 	cfg, clk := currentConfig(c), middleware.RequestClock(c)
 	go func() {
-		for _, contact := range contacts {
+		for _, contact := range changed {
 			services.TriggerWebhooks(db, cfg, userID, "contact.updated", contact, clk)
 		}
 	}()
 
-	c.JSON(http.StatusOK, gin.H{"updated": len(contacts)})
+	c.JSON(http.StatusOK, gin.H{"updated": len(changed)})
+}
+
+// bulkSnapshot holds the values a bulk update can change.
+type bulkSnapshot struct {
+	Circles                                   []string
+	HowWeMet, FoodPreference, WorkInformation string
+	Organization, Department, JobTitle, Role  string
+	Addresses                                 []models.ContactAddress
+	Archived                                  bool
+}
+
+func bulkSnapshotOf(c *models.Contact) bulkSnapshot {
+	circles := c.Circles
+	if len(circles) == 0 {
+		circles = nil // a stored [] and a nil list are the same circles
+	}
+	return bulkSnapshot{
+		Circles: circles, HowWeMet: c.HowWeMet, FoodPreference: c.FoodPreference,
+		WorkInformation: c.WorkInformation, Organization: c.Organization, Department: c.Department,
+		JobTitle: c.JobTitle, Role: c.Role, Addresses: slices.Clone(c.Addresses), Archived: c.Archived,
+	}
 }
 
 // cleanCircles trims the names and drops blanks and repeats.
