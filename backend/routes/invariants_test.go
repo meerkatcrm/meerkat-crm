@@ -38,7 +38,7 @@ import (
 
 var mutating = map[string]bool{
 	"POST": true, "PUT": true, "PATCH": true, "DELETE": true,
-	"PROPPATCH": true, "MKCOL": true, "COPY": true, "MOVE": true,
+	"MKCOL": true, "COPY": true, "MOVE": true,
 }
 
 // reads are the methods the read walk sends. Every registered method must be in mutating or
@@ -262,17 +262,14 @@ func (e *isolationEnv) targets(route string) (out []target, ok bool) {
 	if strings.HasPrefix(route, "/carddav/") {
 		// One wildcard route serves every CardDAV path, so the walk picks them: A's own address
 		// book (where an unscoped listing would show B's contacts), B's contact reached through
-		// it by UID and by id, and B's address book itself. None is aimed: the backend resolves
-		// every path to the caller's own contacts, so a PUT under B's path that writes A's own
-		// contact rightly succeeds. The snapshot, the copy check and the read walk's body check
-		// are what guard CardDAV.
+		// it by UID and by id, and B's address book itself, which the backend must refuse.
 		id := strconv.Itoa(int(e.ids["contacts"]))
 		return []target{
 			{"/carddav/addressbooks/a/contacts/", false},
 			{"/carddav/addressbooks/a/contacts/b-uid.vcf", false},
 			{"/carddav/addressbooks/a/contacts/" + id + ".vcf", false},
-			{"/carddav/addressbooks/b/contacts/b-uid.vcf", false},
-			{"/carddav/addressbooks/b/contacts/", false},
+			{"/carddav/addressbooks/b/contacts/b-uid.vcf", true},
+			{"/carddav/addressbooks/b/contacts/", true},
 		}, true
 	}
 	segments := strings.Split(route, "/")
@@ -289,6 +286,15 @@ func (e *isolationEnv) targets(route string) (out []target, ok bool) {
 		aimed = true
 	}
 	return []target{{strings.Join(segments, "/"), aimed}}, true
+}
+
+// refuses checks the answer to a request aimed at B's data. The JSON API answers 403 or 404;
+// go-webdav answers CardDAV with several codes (404, 405, 501, ...), so there any non-2xx will do.
+func refuses(path string, code int) bool {
+	if strings.HasPrefix(path, "/carddav/") {
+		return code < 200 || code >= 300
+	}
+	return code == http.StatusForbidden || code == http.StatusNotFound
 }
 
 // walk sends every route of the given methods as A and calls check with each answer. It fails
@@ -310,9 +316,9 @@ func (e *isolationEnv) walk(t *testing.T, methods func(string) bool, check func(
 			w := e.send(route.Method, tg.path)
 			assert.NotContains(t, []int{http.StatusUnauthorized, http.StatusTooManyRequests}, w.Code,
 				"%s %s: A's credentials did not get through, so the request proves nothing", route.Method, tg.path)
-			if tg.aimed {
-				assert.Contains(t, []int{http.StatusForbidden, http.StatusNotFound}, w.Code,
-					"%s %s aims at B's data and answered %d: %.300s", route.Method, tg.path, w.Code, w.Body.String())
+			// OPTIONS only lists the allowed methods; it reads no data, whatever the path.
+			if tg.aimed && route.Method != http.MethodOptions {
+				assert.True(t, refuses(tg.path, w.Code), "%s %s aims at B's data and answered %d: %.300s", route.Method, tg.path, w.Code, w.Body.String())
 			}
 			check(route.Method, tg, w)
 		}
@@ -351,8 +357,6 @@ func cardDAVBody(method string) (body, contentType string) {
 		return xml + `<D:propfind xmlns:D="DAV:"><D:allprop/></D:propfind>`, "application/xml"
 	case "REPORT":
 		return xml + `<C:addressbook-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:carddav"><D:prop><D:getetag/><C:address-data/></D:prop></C:addressbook-query>`, "application/xml"
-	case "PROPPATCH":
-		return xml + `<D:propertyupdate xmlns:D="DAV:"><D:set><D:prop><D:displayname>Mine</D:displayname></D:prop></D:set></D:propertyupdate>`, "application/xml"
 	case "MKCOL":
 		return "", ""
 	}
@@ -383,7 +387,8 @@ func TestInvariants_NoMutatingRouteChangesAnotherUsersRows(t *testing.T) {
 	e := newIsolationEnv(t)
 	before := e.snapshot(t)
 
-	walked := e.walk(t, func(m string) bool { return mutating[m] }, func(method string, tg target, _ *httptest.ResponseRecorder) {
+	walked := e.walk(t, func(m string) bool { return mutating[m] }, func(method string, tg target, w *httptest.ResponseRecorder) {
+		assert.NotContains(t, w.Body.String(), secret, "%s %s shows B's data to A", method, tg.path)
 		if after := e.snapshot(t); !assert.Equal(t, before, after, "%s %s changed B's rows", method, tg.path) {
 			before = after // report each route once
 		}
@@ -407,9 +412,16 @@ func TestInvariants_NoReadRouteShowsAnotherUsersRows(t *testing.T) {
 
 func TestInvariants_EveryRouteMethodIsWalked(t *testing.T) {
 	router, _ := newRouter(t, testConfig(), nil)
+	registered := map[string]bool{}
 	for _, route := range router.Routes() {
+		registered[route.Method] = true
 		assert.True(t, mutating[route.Method] || reads[route.Method],
 			"%s is in neither walk: add %s to mutating or reads", routeKey(route), route.Method)
+	}
+	for _, set := range []map[string]bool{mutating, reads} {
+		for method := range set {
+			assert.True(t, registered[method], "no route uses %s: drop it from the walk's methods", method)
+		}
 	}
 }
 
