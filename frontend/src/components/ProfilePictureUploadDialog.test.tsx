@@ -195,6 +195,29 @@ describe('ProfilePictureUploadDialog paste from clipboard', () => {
     }
   });
 
+  test('a URL fetch that finishes after the dialog closed does not show up when it reopens', async () => {
+    let finish: (r: Response) => void = () => {};
+    let signal: AbortSignal | undefined;
+    vi.mocked(client.apiFetch).mockImplementation((_url, options) => {
+      signal = options?.signal ?? undefined;
+      return new Promise((resolve) => { finish = resolve; });
+    });
+    const { rerender } = render(<ProfilePictureUploadDialog open onClose={() => {}} onUpload={async () => {}} />);
+    fireEvent.change(screen.getByPlaceholderText('Paste image URL...'), { target: { value: 'https://example.com/a.png' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Fetch' }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(signal?.aborted).toBe(true);
+    finish(new Response(new Uint8Array([1, 2, 3]), { status: 200, headers: { 'Content-Type': 'image/png' } }));
+    rerender(<ProfilePictureUploadDialog open={false} onClose={() => {}} onUpload={async () => {}} />);
+    rerender(<ProfilePictureUploadDialog open onClose={() => {}} onUpload={async () => {}} />);
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Fetch' })).toBeInTheDocument());
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.queryByRole('slider', { name: 'Zoom' })).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Paste image URL...')).toHaveValue('');
+  });
+
   test('a closed dialog ignores pastes', () => {
     render(<ProfilePictureUploadDialog open={false} onClose={() => {}} onUpload={async () => {}} />);
     const event = paste(document, [new File([new Uint8Array([1])], 'image.png', { type: 'image/png' })]);

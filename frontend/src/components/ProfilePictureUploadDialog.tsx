@@ -179,16 +179,23 @@ export default function ProfilePictureUploadDialog({
     return () => document.removeEventListener('paste', handlePaste);
   }, [open, pasteBlocked, loadFile]);
 
+  // Aborted by handleClose, so a fetch still running when the dialog closes cannot load
+  // its image (or an error) into the dialog for the next time it opens.
+  const fetchAbort = useRef<AbortController | null>(null);
+
   const handleFetchFromUrl = async () => {
     if (!imageUrl.trim()) return;
 
+    fetchAbort.current?.abort();
+    const controller = new AbortController();
+    fetchAbort.current = controller;
     setError(null);
     setFetchingUrl(true);
 
     try {
       const proxyUrl = `${API_BASE_URL}/proxy/image?url=${encodeURIComponent(imageUrl.trim())}`;
 
-      const response = await apiFetch(proxyUrl);
+      const response = await apiFetch(proxyUrl, { signal: controller.signal });
 
       if (!response.ok) {
         // The server does not say why a fetch failed (that would tell which internal hosts exist),
@@ -205,6 +212,7 @@ export default function ProfilePictureUploadDialog({
       }
 
       const blob = await response.blob();
+      if (controller.signal.aborted) return;
 
       if (blob.size > MAX_FILE_SIZE) {
         throw new Error(t('profilePicture.fileTooLarge'));
@@ -213,10 +221,14 @@ export default function ProfilePictureUploadDialog({
       loadFile(new File([blob], 'image', { type: blob.type }));
       setImageUrl('');
     } catch (err) {
+      if (controller.signal.aborted) return;
       handleError(err, { operation: 'fetching image from URL' });
       setError(getErrorMessage(err));
     } finally {
-      setFetchingUrl(false);
+      if (fetchAbort.current === controller) {
+        fetchAbort.current = null;
+        setFetchingUrl(false);
+      }
     }
   };
 
@@ -259,7 +271,9 @@ export default function ProfilePictureUploadDialog({
   };
 
   const handleClose = () => {
-    // A read still in flight must not put its image into the dialog when it is reopened.
+    // A fetch or read still in flight must not put its image into the dialog when it is reopened.
+    fetchAbort.current?.abort();
+    fetchAbort.current = null;
     loadGeneration.current++;
     setImageSrc(null);
     setCrop({ x: 0, y: 0 });
