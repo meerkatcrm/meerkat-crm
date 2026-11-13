@@ -282,7 +282,9 @@ func GetContactsRandom(c *gin.Context) {
 	var selectedFields = []string{"ID", "firstname", "lastname", "nickname", "circles", "photo_thumbnail_file"}
 
 	var contacts []models.Contact
-	query := db.Model(&models.Contact{}).Where("user_id = ?", userID).Where("archived = ?", false)
+	query := db.Model(&models.Contact{}).Where("user_id = ?", userID).Where("archived = ?", false).
+		// These are "get back in touch" suggestions, which never include the user themself.
+		Scopes(models.ExcludeSelfContact(userID))
 
 	if len(selectedFields) > 0 {
 		query = query.Select(thumbnailColumns(selectedFields))

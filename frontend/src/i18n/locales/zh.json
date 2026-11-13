@@ -393,6 +393,13 @@
       "next": "下一个",
       "position": "第 {{position}} 个，共 {{total}} 个",
       "gone": "该联系人已不在列表中"
+    },
+    "self": {
+      "badge": "我",
+      "mark": "这是我",
+      "unmark": "这不是我",
+      "marked": "已标记为你本人",
+      "unmarked": "已取消标记为你本人"
     }
   },
   "noteDialog": {
@@ -916,7 +923,8 @@
       "circleEdge": "圈子成员"
     },
     "filterByContact": "以联系人为中心",
-    "showCircles": "圈子"
+    "showCircles": "圈子",
+    "centerOnMe": "以我为中心"
   },
   "employmentHistory": {
     "title": "工作经历",

@@ -393,6 +393,13 @@
       "next": "Next",
       "position": "{{position}} of {{total}}",
       "gone": "That contact is no longer in the list"
+    },
+    "self": {
+      "badge": "Me",
+      "mark": "This is me",
+      "unmark": "This is not me",
+      "marked": "Marked as you",
+      "unmarked": "No longer marked as you"
     }
   },
   "noteDialog": {
@@ -916,7 +923,8 @@
       "circleEdge": "Circle Membership"
     },
     "filterByContact": "Center on Contact",
-    "showCircles": "Circles"
+    "showCircles": "Circles",
+    "centerOnMe": "Center on me"
   },
   "employmentHistory": {
     "title": "Employment History",

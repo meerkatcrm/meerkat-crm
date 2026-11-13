@@ -393,6 +393,13 @@
       "next": "Weiter",
       "position": "{{position}} von {{total}}",
       "gone": "Dieser Kontakt ist nicht mehr in der Liste"
+    },
+    "self": {
+      "badge": "Ich",
+      "mark": "Das bin ich",
+      "unmark": "Das bin nicht ich",
+      "marked": "Als du markiert",
+      "unmarked": "Nicht mehr als du markiert"
     }
   },
   "noteDialog": {
@@ -916,7 +923,8 @@
       "circleEdge": "Kreiszugehörigkeit"
     },
     "filterByContact": "Kontakt zentrieren",
-    "showCircles": "Kreise"
+    "showCircles": "Kreise",
+    "centerOnMe": "Auf mich zentrieren"
   },
   "employmentHistory": {
     "title": "Berufsverlauf",

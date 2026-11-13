@@ -179,6 +179,12 @@ type ContactFieldDisplayInput struct {
 	HideEmptyContactFields *bool `json:"hide_empty_contact_fields" validate:"required"`
 }
 
+// SelfContactInput marks which contact is the user themself. Clearing the mark is a DELETE,
+// so a body without contact_id is rejected rather than read as "clear".
+type SelfContactInput struct {
+	ContactID uint `json:"contact_id" validate:"required,min=1"`
+}
+
 // UserRegistrationInput represents the DTO for user registration
 // This DTO intentionally excludes IsAdmin to prevent mass assignment attacks
 type UserRegistrationInput struct {
@@ -296,6 +302,8 @@ type CurrentUserResponse struct {
 	CustomFieldNames       []string `json:"custom_field_names"`
 	EnabledContactFields   []string `json:"enabled_contact_fields"`
 	HideEmptyContactFields bool     `json:"hide_empty_contact_fields"`
+	// The contact marked as the user themself; null when none is.
+	SelfContactID *uint `json:"self_contact_id"`
 	// The server refuses uploads in demo mode; the UI hides their controls.
 	DemoMode bool `json:"demo_mode"`
 }

@@ -10,6 +10,8 @@ import ArchiveIcon from '@mui/icons-material/Archive';
 import UnarchiveIcon from '@mui/icons-material/Unarchive';
 import ContactMailIcon from '@mui/icons-material/ContactMail';
 import CallMergeIcon from '@mui/icons-material/CallMerge';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined';
 import { useTranslation } from 'react-i18next';
 import { ContactFieldKey, resolveEnabledFields } from '../contactFields';
 import { contactDisplayName } from '../utils/contactName';
@@ -60,6 +62,10 @@ interface ContactHeaderProps {
   onUnarchiveContact?: () => void;
   onExportVcard?: () => void;
   onMergeContact?: () => void;
+  /** True when this contact is marked as the user themself ("me"). */
+  isSelf?: boolean;
+  /** Marks this contact as "me", or clears the mark when it already is. */
+  onToggleSelf?: () => void;
 }
 
 export default function ContactHeader({
@@ -85,7 +91,9 @@ export default function ContactHeader({
   onArchiveContact,
   onUnarchiveContact,
   onExportVcard,
-  onMergeContact
+  onMergeContact,
+  isSelf = false,
+  onToggleSelf
 }: ContactHeaderProps) {
   const { t } = useTranslation();
   const enabled = enabledFields ?? resolveEnabledFields(null);
@@ -228,13 +236,24 @@ export default function ContactHeader({
             ) : (
               // View Mode
               <>
-                {contact.archived && (
-                  <Chip
-                    label={t('contactDetail.archivedBadge')}
-                    color="warning"
-                    size="small"
-                    sx={{ mb: 1 }}
-                  />
+                {(isSelf || contact.archived) && (
+                  <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
+                    {isSelf && (
+                      <Chip
+                        icon={<AccountCircleIcon />}
+                        label={t('contactDetail.self.badge')}
+                        color="primary"
+                        size="small"
+                      />
+                    )}
+                    {contact.archived && (
+                      <Chip
+                        label={t('contactDetail.archivedBadge')}
+                        color="warning"
+                        size="small"
+                      />
+                    )}
+                  </Stack>
                 )}
                 <Box
                   sx={{
@@ -270,6 +289,19 @@ export default function ContactHeader({
                       <Tooltip title={t('contactDetail.exportVcard')}>
                         <IconButton size="small" onClick={() => onExportVcard()}>
                           <ContactMailIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                    {onToggleSelf && (
+                      <Tooltip title={isSelf ? t('contactDetail.self.unmark') : t('contactDetail.self.mark')}>
+                        <IconButton
+                          size="small"
+                          onClick={() => onToggleSelf()}
+                          aria-label={isSelf ? t('contactDetail.self.unmark') : t('contactDetail.self.mark')}
+                          aria-pressed={isSelf}
+                          color={isSelf ? 'primary' : 'default'}
+                        >
+                          {isSelf ? <AccountCircleIcon fontSize="small" /> : <AccountCircleOutlinedIcon fontSize="small" />}
                         </IconButton>
                       </Tooltip>
                     )}

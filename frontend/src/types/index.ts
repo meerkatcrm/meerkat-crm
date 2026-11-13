@@ -17,6 +17,8 @@ export interface User {
   enabled_contact_fields?: string[] | null;
   // When true, the contact detail page hides empty fields until the user expands them.
   hide_empty_contact_fields?: boolean;
+  // The contact marked as the user themself ("me"); null when none is.
+  self_contact_id?: number | null;
 }
 
 /**
