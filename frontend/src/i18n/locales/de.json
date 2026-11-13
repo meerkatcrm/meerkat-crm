@@ -87,7 +87,9 @@
     "registerButton": "Registrieren",
     "registering": "Registrierung läuft...",
     "registrationFailed": "Registrierung fehlgeschlagen",
-    "registrationSuccess": "Registrierung erfolgreich! Sie können sich jetzt anmelden."
+    "registrationSuccess": "Registrierung erfolgreich! Sie können sich jetzt anmelden.",
+    "disabled": "Die Registrierung ist auf dieser Instanz deaktiviert. Wenden Sie sich für ein Konto an Ihren Administrator.",
+    "backToLogin": "Zurück zur Anmeldung"
   },
   "contacts": {
     "title": "Kontakte",

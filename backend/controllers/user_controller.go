@@ -29,7 +29,7 @@ var passwordResetSlots = make(chan struct{}, 10)
 
 func RegisterUser(cfg *config.Config) gin.HandlerFunc {
 	return func(context *gin.Context) {
-		if cfg.RegistrationDisabled {
+		if !cfg.RegistrationEnabled() {
 			context.JSON(http.StatusForbidden, gin.H{"error": gin.H{
 				"code":    "registration_disabled",
 				"message": "Registration is disabled.",
@@ -93,7 +93,17 @@ type LoginInput struct {
 	Password   string `json:"password"`
 }
 
+// errPasswordLoginDisabled answers password sign-in and reset on an SSO-only instance.
+func errPasswordLoginDisabled() *apperrors.AppError {
+	return apperrors.NewError("password_login_disabled", "Password sign-in is disabled. Sign in with SSO.", http.StatusForbidden)
+}
+
 func LoginUser(context *gin.Context, cfg *config.Config) {
+	if !cfg.PasswordLoginEnabled() {
+		apperrors.AbortWithError(context, errPasswordLoginDisabled())
+		return
+	}
+
 	var input LoginInput
 	var foundUser models.User
 
@@ -231,6 +241,10 @@ func RequestPasswordReset(context *gin.Context, cfg *config.Config) {
 		apperrors.AbortWithError(context, apperrors.ErrForbidden("Password changes are disabled in demo mode"))
 		return
 	}
+	if !cfg.PasswordLoginEnabled() {
+		apperrors.AbortWithError(context, errPasswordLoginDisabled())
+		return
+	}
 
 	log := logger.FromContext(context)
 
@@ -312,8 +326,13 @@ func processPasswordResetRequest(db *gorm.DB, cfg *config.Config, log *zerolog.L
 // ConfirmPasswordReset validates the token and updates the password.
 func ConfirmPasswordReset(context *gin.Context) {
 	// Check if demo mode is enabled - password changes are disabled in demo
-	if currentConfig(context).DemoMode {
+	cfg := currentConfig(context)
+	if cfg.DemoMode {
 		apperrors.AbortWithError(context, apperrors.ErrForbidden("Password changes are disabled in demo mode"))
+		return
+	}
+	if !cfg.PasswordLoginEnabled() {
+		apperrors.AbortWithError(context, errPasswordLoginDisabled())
 		return
 	}
 

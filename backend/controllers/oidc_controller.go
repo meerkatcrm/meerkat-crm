@@ -15,12 +15,30 @@ import (
 	"gorm.io/gorm"
 )
 
-// returns whether OIDC is enabled and a provider name hint.
+// AuthConfigHandler tells the login and registration pages which sign-in methods
+// this instance offers, so they can hide controls that would only fail. It is
+// public (asked before there is a session) and carries no secrets.
+func AuthConfigHandler(cfg *config.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		resp := gin.H{
+			"oidc_enabled":           cfg.OIDC.Enabled,
+			"password_login_enabled": cfg.PasswordLoginEnabled(),
+			"registration_enabled":   cfg.RegistrationEnabled(),
+		}
+		if cfg.OIDC.Enabled {
+			resp["oidc_provider_name"] = services.ProviderName(cfg.OIDC.ProviderName, cfg.OIDC.ProviderURL)
+		}
+		c.JSON(http.StatusOK, resp)
+	}
+}
+
+// returns whether OIDC is enabled and a provider name hint. Kept for existing
+// clients; the frontend uses AuthConfigHandler.
 func OIDCConfigHandler(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		resp := gin.H{"enabled": cfg.OIDC.Enabled}
 		if cfg.OIDC.Enabled {
-			resp["provider_name"] = services.ProviderName(cfg.OIDC.ProviderURL)
+			resp["provider_name"] = services.ProviderName(cfg.OIDC.ProviderName, cfg.OIDC.ProviderURL)
 		}
 		c.JSON(http.StatusOK, resp)
 	}
