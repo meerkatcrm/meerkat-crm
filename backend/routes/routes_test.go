@@ -68,7 +68,8 @@ func newRouter(t *testing.T, cfg *config.Config, oidc *services.OIDCProvider) (*
 	return routerOn(db, cfg, oidc), db
 }
 
-// routerOn registers the real routes over db.
+// routerOn registers the real routes over db. newRouter gives it a small AutoMigrate schema;
+// the invariant walk gives it the real migrations, since it snapshots every table.
 func routerOn(db *gorm.DB, cfg *config.Config, oidc *services.OIDCProvider) *gin.Engine {
 	router := gin.New()
 	// The same injection main.go does ahead of the routes.

@@ -307,14 +307,15 @@ func refuses(path string, code int) bool {
 	return code == http.StatusForbidden || code == http.StatusNotFound
 }
 
-// walk sends every route of the given methods as A and calls check with each answer. It fails
-// a request that A's credentials did not get through, so a lockout cannot hollow out the walk.
+// walk sends every route of the given methods as A, the public ones included, and calls check
+// with each answer. It fails a request to a protected route that A's credentials did not get
+// through, so a lockout cannot hollow out the walk.
 func (e *isolationEnv) walk(t *testing.T, methods func(string) bool, check func(method string, tg target, w *httptest.ResponseRecorder)) int {
 	t.Helper()
 	walked := 0
 	for _, route := range e.router.Routes() {
 		key := routeKey(route)
-		if !methods(route.Method) || publicRoutes[key] {
+		if !methods(route.Method) {
 			continue
 		}
 		targets, ok := e.targets(route.Path)
@@ -324,8 +325,10 @@ func (e *isolationEnv) walk(t *testing.T, methods func(string) bool, check func(
 		for _, tg := range targets {
 			walked++
 			w := e.send(route.Method, tg.path)
-			assert.NotContains(t, []int{http.StatusUnauthorized, http.StatusTooManyRequests}, w.Code,
-				"%s %s: A's credentials did not get through, so the request proves nothing", route.Method, tg.path)
+			if !publicRoutes[key] {
+				assert.NotContains(t, []int{http.StatusUnauthorized, http.StatusTooManyRequests}, w.Code,
+					"%s %s: A's credentials did not get through, so the request proves nothing", route.Method, tg.path)
+			}
 			// OPTIONS only lists the allowed methods; it reads no data, whatever the path.
 			if tg.aimed && route.Method != http.MethodOptions {
 				assert.True(t, refuses(tg.path, w.Code), "%s %s aims at B's data and answered %d: %.300s", route.Method, tg.path, w.Code, w.Body.String())
@@ -338,7 +341,8 @@ func (e *isolationEnv) walk(t *testing.T, methods func(string) bool, check func(
 
 // body carries every field the JSON routes require, with B's ids wherever a field names one
 // of B's rows or B's user id, so a route that trusts the body over the owner shows up in the
-// snapshot.
+// snapshot. Only the field names listed here are probed: a route that takes a row id under a
+// new name needs that name added, or the walk sends it nothing of B's.
 func (e *isolationEnv) body() []byte {
 	c1, c2 := e.ids["contacts"], e.contact2
 	data, _ := json.Marshal(map[string]any{
@@ -384,7 +388,12 @@ func (e *isolationEnv) send(method, path string) *httptest.ResponseRecorder {
 			r.Body = io.NopCloser(strings.NewReader(body))
 			r.Header.Set("Content-Type", contentType)
 			r.Header.Set("Depth", "1")
-			r.Header.Set("Destination", "/carddav/addressbooks/a/contacts/moved.vcf")
+			// COPY and MOVE cross books: from B's into A's, and from A's into B's.
+			destination := "/carddav/addressbooks/b/contacts/moved.vcf"
+			if strings.HasPrefix(path, "/carddav/addressbooks/b/") {
+				destination = "/carddav/addressbooks/a/contacts/moved.vcf"
+			}
+			r.Header.Set("Destination", destination)
 			r.SetBasicAuth("a", isolationPassword)
 			return
 		}
@@ -403,14 +412,12 @@ func TestInvariants_NoMutatingRouteChangesAnotherUsersRows(t *testing.T) {
 		if _, listed := sessionKeyed[method+" "+tg.path]; !listed && strings.Contains(w.Body.String(), sessionNotFound) {
 			t.Errorf("%s %s looks up an import session: add it to sessionKeyed with the test that proves its isolation", method, tg.path)
 		}
-		if after := e.snapshot(t); !assert.Equal(t, before, after, "%s %s changed B's rows", method, tg.path) {
-			before = after // report each route once
-		}
+		// Stop at the first change: the rest of the walk would run against B's damaged rows.
+		require.Equal(t, before, e.snapshot(t), "%s %s changed B's rows", method, tg.path)
+		// The snapshot sees B's rows; a copy of B's data into anyone else's row shows up here.
+		require.Empty(t, e.rowsOutsideBWithSecret(t), "%s %s copied B's data outside B's rows", method, tg.path)
 	})
 	assert.Greater(t, walked, 60, "the walk must see the real route table")
-
-	// The snapshot sees B's rows; a copy of B's data into anyone else's row is caught here.
-	assert.Empty(t, e.rowsOutsideBWithSecret(t), "rows outside B's carry B's data")
 }
 
 // rowsOutsideBWithSecret returns "table: row" for every row, outside the ones the snapshot
