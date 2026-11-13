@@ -184,3 +184,24 @@ func TestABodyOverTheLimitIsInvalidInputWith400(t *testing.T) {
 		t.Fatalf("got %d %v", status, body)
 	}
 }
+
+// A field huma requires (no omitempty) but without validate:"required" is
+// reported from huma's own message. The bridge recognizes that message by its
+// wording, so this fails loudly if a huma upgrade rewords it.
+func TestAMissingFieldWithoutValidateTagIsReportedByName(t *testing.T) {
+	gin.SetMode(gin.ReleaseMode)
+	r := gin.New()
+	type kindInput struct {
+		Body struct {
+			Kind string `json:"kind"`
+		}
+	}
+	Register(Mount(r, r.Group("/api/v1"), NewSpec()), huma.Operation{OperationID: "put-kind", Method: http.MethodPut, Path: "/kinds"},
+		func(context.Context, *kindInput) (*struct{}, error) { return &struct{}{}, nil })
+
+	status, body := put(t, r, "/api/v1/kinds", `{}`)
+	code, details := errorOf(t, body)
+	if status != http.StatusBadRequest || code != apperrors.ErrCodeValidation || len(details) != 1 || details["kind"] != "kind is required" {
+		t.Fatalf("got %d %v", status, body)
+	}
+}
