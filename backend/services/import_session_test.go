@@ -832,3 +832,81 @@ func TestImportSession_VCFCardThatFailsToDecodeKeepsRowsAligned(t *testing.T) {
 	assert.Equal(t, 1, result.Created)
 	assert.Equal(t, int64(1), countContacts(t, db, importOwner))
 }
+
+func TestAddCircles(t *testing.T) {
+	assert.Nil(t, AddCircles(nil, nil))
+	assert.Equal(t, []string{"Family"}, AddCircles([]string{"Family"}, nil))
+	assert.Equal(t, []string{"Family", "Work"}, AddCircles([]string{"Family"}, []string{" family ", "", "Work", "work"}))
+
+	// The existing slice is never written through, even with spare capacity.
+	existing := make([]string, 1, 4)
+	existing[0] = "Family"
+	_ = AddCircles(existing, []string{"Work"})
+	assert.Equal(t, "", existing[:2][1])
+
+	assert.Equal(t, []string{"Work", "Friends"}, CleanCircles([]string{" Work", "work", " ", "Friends"}))
+}
+
+func TestImportSession_ConfirmAssignsCirclesToAddedContacts(t *testing.T) {
+	db := newImportSessionTestDB(t)
+	log := zerolog.Nop()
+	mgr := NewImportSessionManager()
+	sessionID := previewedCSVSession(t, mgr, db,
+		[]string{"Jane", "Doe", "jane@example.com"},
+		[]string{"John", "Roe", "john@example.com"},
+	)
+
+	req := confirmRows(sessionID, "add", "skip")
+	req.Circles = []string{"Imported", " imported ", "Work"}
+	result, appErr := mgr.Confirm(db, importOwner, req, &log)
+	require.Nil(t, appErr)
+	assert.Equal(t, 1, result.Created)
+
+	var stored []models.Contact
+	require.NoError(t, db.Where("user_id = ?", importOwner).Find(&stored).Error)
+	require.Len(t, stored, 1)
+	assert.Equal(t, []string{"Imported", "Work"}, stored[0].Circles)
+}
+
+func TestImportSession_ConfirmAddsCirclesToUpdatedContacts(t *testing.T) {
+	db := newImportSessionTestDB(t)
+	log := zerolog.Nop()
+	existing := models.Contact{UserID: importOwner, Firstname: "Jane", Lastname: "Doe", Email: "jane@example.com", Circles: []string{"Family"}}
+	require.NoError(t, db.Create(&existing).Error)
+
+	mgr := NewImportSessionManager()
+	sessionID := previewedCSVSession(t, mgr, db, []string{"Jane", "Doe", "jane@example.com"})
+
+	req := confirmRows(sessionID, "update")
+	req.Circles = []string{"family", "Imported"}
+	result, appErr := mgr.Confirm(db, importOwner, req, &log)
+	require.Nil(t, appErr)
+	assert.Equal(t, 1, result.Updated)
+
+	var stored models.Contact
+	require.NoError(t, db.First(&stored, existing.ID).Error)
+	assert.Equal(t, []string{"Family", "Imported"}, stored.Circles, "existing circles stay; a case variant is not added twice")
+
+	var note models.Note
+	require.NoError(t, db.Where("contact_id = ?", existing.ID).First(&note).Error)
+	assert.Contains(t, note.Content, "Circles: Family → Family, Imported")
+}
+
+func TestImportSession_ConfirmVCFAssignsCircles(t *testing.T) {
+	db := newImportSessionTestDB(t)
+	log := zerolog.Nop()
+	contacts, previews, _, err := ParseVCF(strings.NewReader(strings.NewReplacer("%s", "circle-uid").Replace(testVCFTemplate)), db, importOwner)
+	require.NoError(t, err)
+
+	mgr := NewImportSessionManager()
+	sessionID := mgr.CreateVCFSession(importOwner, contacts, previews)
+	req := confirmRows(sessionID, "add")
+	req.Circles = []string{"Imported"}
+	result, appErr := mgr.ConfirmVCF(db, importOwner, req, &config.Config{}, &log)
+	require.Nil(t, appErr)
+	assert.Equal(t, 1, result.Created)
+
+	var stored models.Contact
+	require.NoError(t, db.Where("user_id = ? AND vcard_uid = ?", importOwner, "circle-uid").First(&stored).Error)
+	assert.Equal(t, []string{"Imported"}, stored.Circles)
+}

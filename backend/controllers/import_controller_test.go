@@ -292,3 +292,28 @@ func TestSetImportClockIsUsedForSessionExpiry(t *testing.T) {
 	require.NotNil(t, appErr)
 	assert.Contains(t, appErr.Message, "expired")
 }
+
+func TestCSVImport_ConfirmAssignsCircles(t *testing.T) {
+	f := setupImport(t)
+	sessionID, mappings := uploadCSVAndMap(t, f)
+	w := doJSON(t, f.router, http.MethodPost, "/import/preview", models.ImportPreviewRequest{SessionID: sessionID, Mappings: mappings})
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	// A blank circle name is refused before anything is written, and the session survives.
+	w = doJSON(t, f.router, http.MethodPost, "/import/confirm", map[string]any{
+		"session_id": sessionID, "actions": addAll(2), "circles": []string{""},
+	})
+	assert.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+	assert.Empty(t, f.contactsOf(t, f.user.ID))
+
+	w = doJSON(t, f.router, http.MethodPost, "/import/confirm", map[string]any{
+		"session_id": sessionID, "actions": addAll(2), "circles": []string{"Mathematicians"},
+	})
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	contacts := f.contactsOf(t, f.user.ID)
+	require.Len(t, contacts, 2)
+	for _, c := range contacts {
+		assert.Equal(t, []string{"Mathematicians"}, c.Circles)
+	}
+}

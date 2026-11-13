@@ -199,7 +199,9 @@
         "toCreate": "{{count}} da creare",
         "toUpdate": "{{count}} da aggiornare",
         "toSkip": "{{count}} da saltare",
-        "errors": "{{count}} con errori"
+        "errors": "{{count}} con errori",
+        "assignCircles": "Aggiungi tutti i contatti importati a cerchie",
+        "assignCirclesHelp": "I contatti aggiunti o aggiornati entrano in queste cerchie, oltre a quelle presenti nel file. Digita un nuovo nome per creare una cerchia."
       },
       "result": {
         "title": "Importazione Completata",

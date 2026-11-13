@@ -199,7 +199,9 @@
         "toCreate": "{{count}} para crear",
         "toUpdate": "{{count}} para actualizar",
         "toSkip": "{{count}} para omitir",
-        "errors": "{{count}} con errores"
+        "errors": "{{count}} con errores",
+        "assignCircles": "Añadir todos los contactos importados a círculos",
+        "assignCirclesHelp": "Los contactos añadidos o actualizados se unen a estos círculos, además de los círculos del archivo. Escribe un nombre nuevo para crear un círculo."
       },
       "result": {
         "title": "Importación Completa",

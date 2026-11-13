@@ -74,8 +74,8 @@ const preview = (rows: ImportRowPreview[], session_id = 'csv-session'): ImportPr
 
 const result = (extra = {}) => ({ total_processed: 1, created: 1, updated: 0, skipped: 0, errors: [], ...extra });
 
-function renderDialog() {
-  const p = { open: true, onClose: vi.fn(), onImportComplete: vi.fn() };
+function renderDialog(availableCircles: string[] = []) {
+  const p = { open: true, onClose: vi.fn(), onImportComplete: vi.fn(), availableCircles };
   render(
     <I18nextProvider i18n={i18n}>
       <ImportContactsDialog {...p} />
@@ -314,7 +314,7 @@ test('confirming a CSV import sends every row action and shows the result', asyn
     { row_index: 0, action: 'add' },
     { row_index: 1, action: 'update' },
     { row_index: 2, action: 'skip' },
-  ]);
+  ], []);
   expect(mocked.confirmVCFImport).not.toHaveBeenCalled();
   expect(screen.getByText('1 contacts created')).toBeInTheDocument();
   expect(screen.getByText('1 contacts updated')).toBeInTheDocument();
@@ -330,7 +330,7 @@ test('a changed row action is what gets confirmed', async () => {
   await choose(within(rowOf(/Anna/)).getByRole('combobox'), 'Skip');
   click('Import');
   await screen.findByText('Import Complete');
-  expect(mocked.confirmImport).toHaveBeenCalledWith('csv-session', [{ row_index: 0, action: 'skip' }]);
+  expect(mocked.confirmImport).toHaveBeenCalledWith('csv-session', [{ row_index: 0, action: 'skip' }], []);
 });
 
 test('an import that changed nothing does not refresh the parent, and lists its errors', async () => {
@@ -363,7 +363,7 @@ test('a VCF skips the mapping step and confirms through the VCF endpoint', async
   expect(mocked.uploadCSVForImport).not.toHaveBeenCalled();
   click('Import');
   await screen.findByText('Import Complete');
-  expect(mocked.confirmVCFImport).toHaveBeenCalledWith('vcf-session', [{ row_index: 0, action: 'add' }]);
+  expect(mocked.confirmVCFImport).toHaveBeenCalledWith('vcf-session', [{ row_index: 0, action: 'add' }], []);
   expect(mocked.confirmImport).not.toHaveBeenCalled();
 });
 
@@ -414,4 +414,32 @@ test('mapping targets that exist on the contact form use its translated label', 
   } finally {
     await act(() => i18n.changeLanguage('en'));
   }
+});
+
+test('circles chosen on the preview, including one only typed, are sent with the import', async () => {
+  mocked.confirmImport.mockResolvedValue(result());
+  renderDialog(['Family', 'Work']);
+  await toPreview([row(0, 'Anna')]);
+  const circles = screen.getByRole('combobox', { name: 'Add all imported contacts to circles' });
+  fireEvent.mouseDown(circles);
+  fireEvent.click(screen.getByRole('option', { name: 'Work' }));
+  // A new circle typed without pressing Enter still counts; a case variant of a chosen one does not.
+  fireEvent.change(circles, { target: { value: 'Conference 2026' } });
+  click('Import');
+  await screen.findByText('Import Complete');
+  expect(mocked.confirmImport).toHaveBeenCalledWith('csv-session', [{ row_index: 0, action: 'add' }], ['Work', 'Conference 2026']);
+});
+
+test('a VCF import sends its chosen circles through the VCF endpoint', async () => {
+  mocked.uploadVCFForImport.mockResolvedValue(preview([row(0, 'Anna')], 'vcf-session'));
+  mocked.confirmVCFImport.mockResolvedValue(result());
+  renderDialog();
+  selectFile(file('people.vcf'));
+  const circles = await screen.findByRole('combobox', { name: 'Add all imported contacts to circles' });
+  fireEvent.change(circles, { target: { value: 'work' } });
+  fireEvent.keyDown(circles, { key: 'Enter' });
+  fireEvent.change(circles, { target: { value: 'Work' } });
+  click('Import');
+  await screen.findByText('Import Complete');
+  expect(mocked.confirmVCFImport).toHaveBeenCalledWith('vcf-session', [{ row_index: 0, action: 'add' }], ['work']);
 });

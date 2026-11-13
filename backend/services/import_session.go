@@ -236,6 +236,7 @@ func (m *ImportSessionManager) Confirm(db *gorm.DB, userID uint, req models.Impo
 
 	actionMap := buildActionMap(req.Actions)
 	result := models.ImportResult{Errors: []string{}}
+	assigned := CleanCircles(req.Circles)
 	isVCFImport := sessionData.importType == "vcf"
 
 	txErr := db.Transaction(func(tx *gorm.DB) error {
@@ -263,6 +264,7 @@ func (m *ImportSessionManager) Confirm(db *gorm.DB, userID uint, req models.Impo
 					contact = sessionData.csvContacts[preview.RowIndex]
 				}
 				contact.UserID = userID
+				contact.Circles = AddCircles(contact.Circles, assigned)
 				avoidVCardUIDCollision(tx, userID, &contact, log)
 
 				if err := tx.Create(&contact).Error; err != nil {
@@ -293,16 +295,20 @@ func (m *ImportSessionManager) Confirm(db *gorm.DB, userID uint, req models.Impo
 				if isVCFImport {
 					importType = "VCF"
 				}
-				if err := CreateMergeNote(tx, userID, existing.ID, &existing, preview.ParsedContact, importType); err != nil {
+				var incoming *models.Contact
+				if isVCFImport {
+					incoming = sessionData.vcfContacts[preview.RowIndex].Contact
+				} else {
+					csvContact := sessionData.csvContacts[preview.RowIndex]
+					incoming = &csvContact
+				}
+
+				if err := CreateMergeNote(tx, userID, existing.ID, &existing, parsedWithAssignedCircles(preview.ParsedContact, &existing, incoming, assigned), importType); err != nil {
 					log.Warn().Err(err).Uint("contact_id", existing.ID).Msg("Failed to create merge note")
 				}
 
-				if isVCFImport {
-					MergeImportedContact(&existing, sessionData.vcfContacts[preview.RowIndex].Contact)
-				} else {
-					csvContact := sessionData.csvContacts[preview.RowIndex]
-					MergeImportedContact(&existing, &csvContact)
-				}
+				MergeImportedContact(&existing, incoming)
+				existing.Circles = AddCircles(existing.Circles, assigned)
 
 				// A matched vcard_uid can point at a soft-deleted contact (re-importing
 				// a previously deleted vCard); restore it instead of leaving it deleted.
@@ -378,6 +384,7 @@ func (m *ImportSessionManager) ConfirmVCF(db *gorm.DB, userID uint, req models.I
 
 	actionMap := buildActionMap(req.Actions)
 	result := models.ImportResult{Errors: []string{}}
+	assigned := CleanCircles(req.Circles)
 	var photoTasks []photoTask
 
 	txErr := db.Transaction(func(tx *gorm.DB) error {
@@ -402,6 +409,7 @@ func (m *ImportSessionManager) ConfirmVCF(db *gorm.DB, userID uint, req models.I
 			case "add":
 				contact := *vcfData.Contact
 				contact.UserID = userID
+				contact.Circles = AddCircles(contact.Circles, assigned)
 				avoidVCardUIDCollision(tx, userID, &contact, log)
 
 				if err := tx.Create(&contact).Error; err != nil {
@@ -435,11 +443,12 @@ func (m *ImportSessionManager) ConfirmVCF(db *gorm.DB, userID uint, req models.I
 					continue
 				}
 
-				if err := CreateMergeNote(tx, userID, existing.ID, &existing, preview.ParsedContact, "VCF"); err != nil {
+				if err := CreateMergeNote(tx, userID, existing.ID, &existing, parsedWithAssignedCircles(preview.ParsedContact, &existing, vcfData.Contact, assigned), "VCF"); err != nil {
 					log.Warn().Err(err).Uint("contact_id", existing.ID).Msg("Failed to create merge note")
 				}
 
 				MergeImportedContact(&existing, vcfData.Contact)
+				existing.Circles = AddCircles(existing.Circles, assigned)
 
 				// A matched vcard_uid can point at a soft-deleted contact (re-importing
 				// a previously deleted vCard); restore it instead of leaving it deleted.
@@ -531,6 +540,26 @@ func (m *ImportSessionManager) ConfirmVCF(db *gorm.DB, userID uint, req models.I
 		Msg("VCF import completed")
 
 	return &result, nil
+}
+
+// parsedWithAssignedCircles returns the parsed row the merge note compares against,
+// with its circles set to what the contact ends up with once the circles chosen for
+// the whole import are added, so the note records those too. Without assigned
+// circles it returns parsed unchanged.
+func parsedWithAssignedCircles(parsed map[string]interface{}, existing, incoming *models.Contact, assigned []string) map[string]interface{} {
+	if len(assigned) == 0 {
+		return parsed
+	}
+	base := existing.Circles
+	if len(incoming.Circles) > 0 { // MergeImportedContact takes the file's circles when it has any
+		base = incoming.Circles
+	}
+	out := make(map[string]interface{}, len(parsed)+1)
+	for k, v := range parsed {
+		out[k] = v
+	}
+	out["circles"] = strings.Join(AddCircles(base, assigned), ", ")
+	return out
 }
 
 // buildActionMap indexes per-row import actions by row index.

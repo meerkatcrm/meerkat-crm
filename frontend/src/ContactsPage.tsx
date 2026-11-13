@@ -542,6 +542,7 @@ export default function ContactsPage() {
         open={importDialogOpen}
         onClose={() => setImportDialogOpen(false)}
         onImportComplete={handleImportComplete}
+        availableCircles={circles}
       />
     </Box>
   );

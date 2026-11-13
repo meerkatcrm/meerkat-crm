@@ -77,6 +77,8 @@ type RowImportAction struct {
 type ImportConfirmRequest struct {
 	SessionID string            `json:"session_id" validate:"required"`
 	Actions   []RowImportAction `json:"actions" validate:"required,dive"`
+	// Circles every added or updated contact joins, on top of any it brings from the file
+	Circles []string `json:"circles" validate:"omitempty,max=50,dive,min=1,max=100"`
 }
 
 // ImportResult summarizes what happened during import
