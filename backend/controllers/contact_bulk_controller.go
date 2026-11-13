@@ -17,6 +17,14 @@ import (
 
 const legacyThumbnailColumn = "photo_thumbnail"
 
+// bulkColumns are the columns a bulk update writes: what it can change, the address
+// scalar derived from the addresses, and the update time the ETag is made from.
+var bulkColumns = []string{
+	"circles", "how_we_met", "food_preference", "work_information",
+	"organization", "department", "job_title", "role",
+	"addresses", "address", "archived", "updated_at",
+}
+
 // bulkTextField pairs a bulk-update input value with the contact field it sets.
 type bulkTextField struct {
 	name  string
@@ -84,8 +92,7 @@ func BulkUpdateContacts(c *gin.Context) {
 
 	var contacts, changed []models.Contact
 	err := db.Transaction(func(tx *gorm.DB) error {
-		// The legacy base64 thumbnail column is neither read nor written: nothing here
-		// needs it, and Save would otherwise carry it back for every contact.
+		// The legacy base64 thumbnail column is not needed here.
 		if err := tx.Omit(legacyThumbnailColumn).Where("user_id = ? AND id IN ?", userID, ids).Find(&contacts).Error; err != nil {
 			return apperrors.ErrDatabase("Failed to load contacts").WithError(err)
 		}
@@ -125,7 +132,10 @@ func BulkUpdateContacts(c *gin.Context) {
 			if reflect.DeepEqual(before, bulkSnapshotOf(contact)) {
 				continue
 			}
-			if err := tx.Omit(legacyThumbnailColumn).Save(contact).Error; err != nil {
+			// Only the columns a bulk update can change are written, so an edit made
+			// elsewhere to any other field in the meantime is never reverted. The model's
+			// hooks still run: the address scalar, the ETag and the employment history.
+			if err := tx.Model(contact).Select(bulkColumns).Updates(contact).Error; err != nil {
 				return apperrors.ErrDatabase("Failed to update contacts").WithError(err)
 			}
 			changed = append(changed, *contact)
@@ -143,11 +153,13 @@ func BulkUpdateContacts(c *gin.Context) {
 	}
 
 	cfg, clk := currentConfig(c), middleware.RequestClock(c)
-	go func() {
-		for _, contact := range changed {
-			services.TriggerWebhooks(db, cfg, userID, "contact.updated", contact, clk)
-		}
-	}()
+	if len(changed) > 0 {
+		go func() {
+			for _, contact := range changed {
+				services.TriggerWebhooks(db, cfg, userID, "contact.updated", contact, clk)
+			}
+		}()
+	}
 
 	c.JSON(http.StatusOK, gin.H{"updated": len(changed)})
 }

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -238,4 +239,38 @@ func TestBulkUpdateContacts_AnotherUsersDeletedContactStillFails(t *testing.T) {
 	w := postBulk(router, gin.H{"contact_ids": []uint{mine.ID, theirs.ID}, "food_preference": "tea"})
 	assert.Equal(t, http.StatusNotFound, w.Code)
 	assert.Empty(t, loadContact(t, db, mine.ID).FoodPreference)
+}
+
+// A bulk update writes only its own columns: a field changed elsewhere since the
+// contacts were loaded is kept, and the ETag still moves.
+func TestBulkUpdateContacts_WritesOnlyItsColumns(t *testing.T) {
+	db, router, user := setupBulkRouter(t)
+	ct := models.Contact{UserID: user.ID, Firstname: "A", Note: "old note"}
+	require.NoError(t, db.Create(&ct).Error)
+	before := loadContact(t, db, ct.ID)
+
+	// An edit landing between the bulk load and its write survives only if the
+	// UPDATE leaves unrelated columns out, so check the statement's columns.
+	var statements []string
+	require.NoError(t, db.Callback().Update().After("gorm:update").Register("test:capture", func(tx *gorm.DB) {
+		statements = append(statements, tx.Statement.SQL.String())
+	}))
+	defer db.Callback().Update().Remove("test:capture")
+
+	time.Sleep(2 * time.Millisecond)
+	w := postBulk(router, gin.H{"contact_ids": []uint{ct.ID}, "city": "Rome"})
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	// The hooks' own updates (the ETag) finish first, so find the bulk write by its columns
+	idx := slices.IndexFunc(statements, func(sql string) bool { return strings.Contains(sql, "`addresses`") })
+	require.NotEqual(t, -1, idx, "%q", statements)
+	assert.NotContains(t, statements[idx], "`note`")
+	assert.NotContains(t, statements[idx], "`firstname`")
+
+	got := loadContact(t, db, ct.ID)
+	assert.Equal(t, "Rome", got.Addresses[0].City)
+	assert.Equal(t, "Rome", got.Address, "the address scalar follows the addresses")
+	assert.Equal(t, "old note", got.Note)
+	assert.NotEqual(t, before.ETag, got.ETag, "the ETag moves so CardDAV clients pick up the change")
+	assert.True(t, got.UpdatedAt.After(before.UpdatedAt))
 }
