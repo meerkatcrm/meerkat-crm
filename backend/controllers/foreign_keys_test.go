@@ -44,9 +44,13 @@ func TestDeletePathsWithForeignKeysEnforced(t *testing.T) {
 	w := doRequest(userRouter, http.MethodDelete, fmt.Sprintf("/contacts/%d", a.ID), nil, "")
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 
-	// Merge.
+	// Merge, while another contact's relationship points at the merged-away source.
+	require.NoError(t, db.Create(&models.Relationship{UserID: victim.ID, ContactID: b.ID, RelatedContactID: &d.ID, Name: "Sibling", Type: "family"}).Error)
 	_, err = services.MergeContacts(db, victim.ID, c.ID, d.ID, nil)
 	require.NoError(t, err)
+	var source models.Contact
+	require.NoError(t, db.Unscoped().First(&source, d.ID).Error, "the merge source is soft-deleted, which the relationships -> contacts exemption relies on")
+	require.True(t, source.DeletedAt.Valid)
 
 	// User delete hard-deletes the user row, which every user_id foreign key references.
 	adminRouter := routerAs(db, admin.ID, cfg)
