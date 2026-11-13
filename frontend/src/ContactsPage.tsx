@@ -111,7 +111,15 @@ export default function ContactsPage() {
   const selectionEpoch = useRef(0);
 
   // Use custom hook for fetching contacts
-  const { contacts, total: totalContacts, loading, refetch } = useContacts(contactParams);
+  const { contacts, total: totalContacts, loading, error, refetch } = useContacts(contactParams);
+
+  // A page past the end (the list shrank, e.g. after a bulk archive or a delete) shows
+  // nothing although earlier pages have contacts: go to the last page there is.
+  useEffect(() => {
+    if (loading || error || page <= 1 || contacts.length > 0) return;
+    const lastPage = Math.max(1, Math.ceil(totalContacts / pageSize));
+    if (page > lastPage) setPage(lastPage);
+  }, [loading, error, page, contacts.length, totalContacts, setPage]);
 
   // Fetch circles for filter and custom field names
   useEffect(() => {

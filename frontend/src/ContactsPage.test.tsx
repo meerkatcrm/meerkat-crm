@@ -233,3 +233,23 @@ test('select all applies nothing when select mode is left while it collects', as
   fireEvent.click(screen.getByRole('button', { name: 'Select' }));
   expect(screen.getByText('0 selected')).toBeInTheDocument();
 });
+
+test('a page past the end of a shrunken list moves to the last page there is', async () => {
+  mockList([], 12);
+  render(
+    <SnackbarProvider>
+      <MemoryRouter initialEntries={['/contacts?page=3']}>
+        <Routes>
+          <Route path="/contacts" element={<ContactsPage />} />
+        </Routes>
+      </MemoryRouter>
+    </SnackbarProvider>,
+  );
+  await waitFor(() => expect(lastParams()).toMatchObject({ page: 2 }));
+});
+
+test('a valid page with contacts is left alone', () => {
+  mockList([contact(11, 'Kim')], 12);
+  renderAt('/contacts?page=2');
+  expect(lastParams()).toMatchObject({ page: 2 });
+});
