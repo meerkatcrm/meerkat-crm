@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import Cropper, { Area } from 'react-easy-crop';
 import {
@@ -20,7 +20,7 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import LinkIcon from '@mui/icons-material/Link';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { handleError, getErrorMessage } from '../utils/errorHandler';
-import { API_BASE_URL, apiFetch, parseErrorResponse } from '../api/client';
+import { API_BASE_URL, ApiError, apiFetch, parseErrorResponse } from '../api/client';
 
 interface ProfilePictureUploadDialogProps {
   open: boolean;
@@ -32,6 +32,8 @@ interface ProfilePictureUploadDialogProps {
    */
   onRemove?: () => Promise<boolean>;
 }
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 // Helper function to create a cropped image blob
 async function getCroppedImg(
@@ -106,14 +108,18 @@ export default function ProfilePictureUploadDialog({
   const [error, setError] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState('');
   const [fetchingUrl, setFetchingUrl] = useState(false);
-
-  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+  const busy = uploading || removing;
 
   const onCropComplete = useCallback((_croppedArea: Area, croppedAreaPixels: Area) => {
     setCroppedAreaPixels(croppedAreaPixels);
   }, []);
 
-  const loadFile = (file: File) => {
+  // Picker, drop, paste and URL fetch all load through loadFile; FileReader is async, so
+  // only the most recently started load may set the image, whatever order they finish in.
+  const loadGeneration = useRef(0);
+
+  const loadFile = useCallback((file: File) => {
+    const generation = ++loadGeneration.current;
     setError(null);
 
     // Validate file type
@@ -130,12 +136,13 @@ export default function ProfilePictureUploadDialog({
 
     const reader = new FileReader();
     reader.addEventListener('load', () => {
+      if (generation !== loadGeneration.current) return;
       setImageSrc(reader.result as string);
       setCrop({ x: 0, y: 0 });
       setZoom(1);
     });
     reader.readAsDataURL(file);
-  };
+  }, [t]);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -155,16 +162,40 @@ export default function ProfilePictureUploadDialog({
     if (file) loadFile(file);
   };
 
+  // Ctrl+V / Cmd+V anywhere in the open dialog: a pasted image (a screenshot, an image
+  // copied in a browser) goes through the same checks and cropper as a picked file.
+  // Pastes without an image are left alone, so text still pastes into the URL field.
+  // A URL fetch in flight would replace the pasted image when it finishes.
+  const pasteBlocked = uploading || removing || fetchingUrl;
+  useEffect(() => {
+    if (!open || pasteBlocked) return;
+    const handlePaste = (event: ClipboardEvent) => {
+      const image = Array.from(event.clipboardData?.files ?? []).find((file) => file.type.startsWith('image/'));
+      if (!image) return;
+      event.preventDefault();
+      loadFile(image);
+    };
+    document.addEventListener('paste', handlePaste);
+    return () => document.removeEventListener('paste', handlePaste);
+  }, [open, pasteBlocked, loadFile]);
+
+  // Aborted by handleClose, so a fetch still running when the dialog closes cannot load
+  // its image (or an error) into the dialog for the next time it opens.
+  const fetchAbort = useRef<AbortController | null>(null);
+
   const handleFetchFromUrl = async () => {
     if (!imageUrl.trim()) return;
 
+    fetchAbort.current?.abort();
+    const controller = new AbortController();
+    fetchAbort.current = controller;
     setError(null);
     setFetchingUrl(true);
 
     try {
       const proxyUrl = `${API_BASE_URL}/proxy/image?url=${encodeURIComponent(imageUrl.trim())}`;
 
-      const response = await apiFetch(proxyUrl);
+      const response = await apiFetch(proxyUrl, { signal: controller.signal });
 
       if (!response.ok) {
         // The server does not say why a fetch failed (that would tell which internal hosts exist),
@@ -181,24 +212,23 @@ export default function ProfilePictureUploadDialog({
       }
 
       const blob = await response.blob();
+      if (controller.signal.aborted) return;
 
       if (blob.size > MAX_FILE_SIZE) {
         throw new Error(t('profilePicture.fileTooLarge'));
       }
 
-      const reader = new FileReader();
-      reader.addEventListener('load', () => {
-        setImageSrc(reader.result as string);
-        setCrop({ x: 0, y: 0 });
-        setZoom(1);
-        setImageUrl('');
-      });
-      reader.readAsDataURL(blob);
+      loadFile(new File([blob], 'image', { type: blob.type }));
+      setImageUrl('');
     } catch (err) {
+      if (controller.signal.aborted) return;
       handleError(err, { operation: 'fetching image from URL' });
       setError(getErrorMessage(err));
     } finally {
-      setFetchingUrl(false);
+      if (fetchAbort.current === controller) {
+        fetchAbort.current = null;
+        setFetchingUrl(false);
+      }
     }
   };
 
@@ -232,13 +262,19 @@ export default function ProfilePictureUploadDialog({
       }
     } catch (err) {
       handleError(err, { operation: 'removing profile picture' });
-      setError(t('profilePicture.removeError'));
+      // The server's reason (e.g. demo mode) when there is one; network errors and
+      // timeouts arrive as untranslated plain Errors, so those get the locale string.
+      setError(err instanceof ApiError ? err.getDisplayMessage() : t('profilePicture.removeError'));
     } finally {
       setRemoving(false);
     }
   };
 
   const handleClose = () => {
+    // A fetch or read still in flight must not put its image into the dialog when it is reopened.
+    fetchAbort.current?.abort();
+    fetchAbort.current = null;
+    loadGeneration.current++;
     setImageSrc(null);
     setCrop({ x: 0, y: 0 });
     setZoom(1);
@@ -250,7 +286,7 @@ export default function ProfilePictureUploadDialog({
   };
 
   return (
-    <AppDialog open={open} onClose={handleClose} busy={uploading || removing} maxWidth="sm" fullWidth>
+    <AppDialog open={open} onClose={handleClose} busy={busy} maxWidth="sm" fullWidth>
       <DialogTitle>{t('profilePicture.title')}</DialogTitle>
       <DialogContent>
         {error && (
@@ -299,6 +335,12 @@ export default function ProfilePictureUploadDialog({
                 color: "text.secondary"
               }}>
                 {t('profilePicture.dragOrClick')}
+              </Typography>
+              <Typography variant="body2" sx={{
+                color: "text.secondary",
+                mt: 0.5
+              }}>
+                {t('profilePicture.pasteHint')}
               </Typography>
             </Box>
 
@@ -403,20 +445,20 @@ export default function ProfilePictureUploadDialog({
           <Button
             onClick={handleRemove}
             color="error"
-            disabled={uploading || removing}
+            disabled={busy}
             startIcon={removing ? <CircularProgress size={20} /> : <DeleteIcon />}
             sx={{ mr: 'auto' }}
           >
             {t('profilePicture.remove')}
           </Button>
         )}
-        <Button onClick={handleClose} disabled={uploading || removing}>
+        <Button onClick={handleClose} disabled={busy}>
           {t('common.cancel')}
         </Button>
         <Button
           onClick={handleUpload}
           variant="contained"
-          disabled={!imageSrc || uploading || removing}
+          disabled={!imageSrc || busy}
           startIcon={uploading ? <CircularProgress size={20} /> : undefined}
         >
           {uploading ? t('profilePicture.uploading') : t('common.save')}

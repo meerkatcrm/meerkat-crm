@@ -458,6 +458,7 @@
     "title": "Upload Profile Picture",
     "selectImage": "Select an image",
     "dragOrClick": "Click to browse or drag and drop",
+    "pasteHint": "You can also paste an image or screenshot (Ctrl+V / ⌘V)",
     "changeImage": "Change image",
     "zoom": "Zoom",
     "uploading": "Uploading...",

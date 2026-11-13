@@ -458,6 +458,7 @@
     "title": "Subir Foto de Perfil",
     "selectImage": "Seleccionar una imagen",
     "dragOrClick": "Haz clic para explorar o arrastra y suelta",
+    "pasteHint": "También puedes pegar una imagen o captura de pantalla (Ctrl+V / ⌘V)",
     "changeImage": "Cambiar imagen",
     "zoom": "Zoom",
     "uploading": "Subiendo...",

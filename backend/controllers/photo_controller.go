@@ -152,8 +152,12 @@ func AddPhotoToContact(c *gin.Context, cfg *config.Config) {
 		swap := carddav.NewPhotoSwap(&contact)
 		swap.Apply(&contact, photoPath, thumbnailPath)
 
-		// Save the updated contact
-		if err := db.Save(&contact).Error; err != nil {
+		// Only the photo columns: a full Save would write back every other field as read
+		// above and undo an edit made in the meantime. UpdatedAt still moves, so AfterSave
+		// gives the contact a new CardDAV ETag.
+		if err := db.Model(&contact).Select("photo", "photo_thumbnail_file", "photo_thumbnail").Updates(map[string]any{
+			"photo": contact.Photo, "photo_thumbnail_file": contact.PhotoThumbnailFile, "photo_thumbnail": contact.LegacyThumbnail,
+		}).Error; err != nil {
 			// Clean up the newly saved files since the DB update failed
 			swap.Rollback(cfg.ProfilePhotoDir, &contact)
 			apperrors.AbortWithError(c, apperrors.ErrDatabase("update").WithError(err))
@@ -167,12 +171,8 @@ func AddPhotoToContact(c *gin.Context, cfg *config.Config) {
 		return
 	}
 
-	// Save the updated contact (no new photo uploaded)
-	if err := db.Save(&contact).Error; err != nil {
-		apperrors.AbortWithError(c, apperrors.ErrDatabase("update").WithError(err))
-		return
-	}
-
+	// No photo uploaded: nothing to change, and writing the contact back as read could
+	// undo an edit made in the meantime.
 	c.JSON(http.StatusOK, contact)
 }
 
@@ -214,9 +214,11 @@ func RemovePhotoFromContact(c *gin.Context, cfg *config.Config) {
 	}
 
 	old := contact
-	contact.Photo, contact.PhotoThumbnailFile, contact.LegacyThumbnail = "", "", ""
-	// Save (not Updates) so empty strings are written and the CardDAV ETag changes.
-	if err := db.Save(&contact).Error; err != nil {
+	// Only the photo columns: a full Save would write back every other field as read
+	// above and undo an edit made in the meantime. UpdatedAt still moves, so AfterSave
+	// gives the contact a new CardDAV ETag.
+	if err := db.Model(&contact).Select("photo", "photo_thumbnail_file", "photo_thumbnail").
+		Updates(map[string]any{"photo": "", "photo_thumbnail_file": "", "photo_thumbnail": ""}).Error; err != nil {
 		apperrors.AbortWithError(c, apperrors.ErrDatabase("update").WithError(err))
 		return
 	}

@@ -458,6 +458,7 @@
     "title": "Télécharger une photo de profil",
     "selectImage": "Sélectionner une image",
     "dragOrClick": "Cliquez pour parcourir ou glissez-déposez",
+    "pasteHint": "Vous pouvez aussi coller une image ou une capture d'écran (Ctrl+V / ⌘V)",
     "changeImage": "Changer l'image",
     "zoom": "Zoom",
     "uploading": "Téléchargement en cours...",

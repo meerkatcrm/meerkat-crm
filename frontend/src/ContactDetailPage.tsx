@@ -979,7 +979,7 @@ function ContactDetail() {
         open={profilePictureDialogOpen}
         onClose={() => setProfilePictureDialogOpen(false)}
         onUpload={handleUploadProfilePicture}
-        onRemove={profilePic ? handleRemoveProfilePicture : undefined}
+        onRemove={profilePic || contact.photo ? handleRemoveProfilePicture : undefined}
       />
 
       <AddRelationshipDialog
