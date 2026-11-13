@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"encoding/json"
+	"meerkat/api"
 	"meerkat/carddav"
 	"meerkat/config"
 	"meerkat/controllers"
@@ -9,6 +11,7 @@ import (
 	"meerkat/models"
 	"meerkat/services"
 
+	"github.com/danielgtaylor/huma/v2"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -131,14 +134,8 @@ func RegisterRoutes(router *gin.Engine, cfg *config.Config, db *gorm.DB, oidcPro
 			// Image proxy route (for fetching images from external URLs)
 			protected.GET("/proxy/image", middleware.ImageProxyRateLimitMiddleware(), controllers.ProxyImage)
 
-			// Note routes
-			protected.GET("/contacts/:id/notes", controllers.GetNotesForContact)
-			protected.POST("/contacts/:id/notes", middleware.ValidateJSONMiddleware(&models.NoteInput{}), controllers.CreateNote)
-			protected.GET("/notes/:id", controllers.GetNote)
-			protected.GET("/notes", controllers.GetUnassignedNotes)
-			protected.POST("/notes", middleware.ValidateJSONMiddleware(&models.NoteInput{}), controllers.CreateUnassignedNote)
-			protected.PUT("/notes/:id", middleware.ValidateJSONMiddleware(&models.NoteInput{}), controllers.UpdateNote)
-			protected.DELETE("/notes/:id", controllers.DeleteNote)
+			// Note routes: huma operations (see package api)
+			RegisterOperations(api.Mount(router, protected, api.NewSpec()))
 
 			// Note and activity image routes (one optional image each)
 			for path, item := range map[string]controllers.ImageItem{"notes": controllers.NoteImages, "activities": controllers.ActivityImages} {
@@ -256,4 +253,24 @@ func registerCardDAVRoutes(router *gin.Engine, cfg *config.Config, db *gorm.DB) 
 		cardDAVGroup.Handle("COPY", "/*path", ginHandler)
 		cardDAVGroup.Handle("MOVE", "/*path", ginHandler)
 	}
+}
+
+// RegisterOperations adds the huma operations of the authenticated group to
+// protected. cmd/openapi calls it too, without a database: the handlers are only
+// described, never run.
+func RegisterOperations(protected huma.API) {
+	controllers.RegisterNoteOperations(protected)
+}
+
+// OpenAPISpec returns the OpenAPI document of every huma operation, as committed
+// in docs/openapi.json.
+func OpenAPISpec() ([]byte, error) {
+	engine := gin.New()
+	spec := api.NewSpec()
+	RegisterOperations(api.Mount(engine, engine.Group("/api/v1"), spec))
+	doc, err := json.MarshalIndent(spec, "", "  ") // sorted keys, so the output is stable
+	if err != nil {
+		return nil, err
+	}
+	return append(doc, '\n'), nil
 }

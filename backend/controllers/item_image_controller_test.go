@@ -46,7 +46,7 @@ func setupItemImageFixture(t *testing.T) itemImageFixture {
 		router.POST("/"+path+"/:id/image", func(c *gin.Context) { UploadItemImage(c, cfg, item) })
 		router.DELETE("/"+path+"/:id/image", func(c *gin.Context) { DeleteItemImage(c, cfg, item) })
 	}
-	router.DELETE("/notes/:id", DeleteNote)
+	mountNotes(router)
 	router.DELETE("/activities/:id", DeleteActivity)
 	router.DELETE("/contacts/:id", DeleteContact)
 
@@ -220,12 +220,9 @@ func TestItemImage_UpdatingTheNoteKeepsTheImage(t *testing.T) {
 	f := setupItemImageFixture(t)
 	require.NoError(t, f.db.Model(&f.note).Update("image", "kept_image.jpg").Error)
 	router := routerAs(f.db, f.user.ID, config.Config{})
-	router.PUT("/notes/:id", func(c *gin.Context) {
-		c.Set("validated", &models.NoteInput{Content: "edited", Date: time.Now(), ContactID: &f.contact.ID})
-		UpdateNote(c)
-	})
+	mountNotes(router)
 
-	w := doRequest(router, http.MethodPut, fmt.Sprintf("/notes/%d", f.note.ID), nil, "")
+	w := doJSON(t, router, http.MethodPut, fmt.Sprintf("/notes/%d", f.note.ID), map[string]any{"content": "edited", "date": time.Now(), "contact_id": f.contact.ID})
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	assert.Equal(t, "kept_image.jpg", f.noteImage(t))
 }

@@ -1064,7 +1064,8 @@ func TestUpdateContact_EmploymentFieldsWhitespaceCreatesNoEntry(t *testing.T) {
 }
 
 // Without the route-level guard, a non-numeric id must still be bound as a value
-// instead of reaching GORM as an inline (raw SQL) condition.
+// instead of reaching GORM as an inline (raw SQL) condition. (Huma operations,
+// such as the note ones, type their ids as integers, so they cannot get one.)
 func TestContactHandlers_TreatANonNumericIDAsAValue(t *testing.T) {
 	db, router := setupRouter()
 	var user models.User
@@ -1072,11 +1073,9 @@ func TestContactHandlers_TreatANonNumericIDAsAValue(t *testing.T) {
 	require.NoError(t, db.Create(&models.Contact{UserID: user.ID, Firstname: "Mine"}).Error)
 
 	router.GET("/contacts/:id", GetContact)
-	router.GET("/contacts/:id/notes", GetNotesForContact)
 	router.GET("/contacts/:id/reminders", GetRemindersForContact)
 	router.GET("/contacts/:id/relationships", GetRelationships)
 	router.GET("/contacts/:id/activities", GetActivitiesForContact)
-	router.GET("/notes/:id", GetNote)
 	router.GET("/reminders/:id", GetReminder)
 	router.GET("/activities/:id", GetActivity)
 
@@ -1084,11 +1083,9 @@ func TestContactHandlers_TreatANonNumericIDAsAValue(t *testing.T) {
 	injected := url.PathEscape("EXISTS(SELECT 1 FROM users)")
 	for _, path := range []string{
 		"/contacts/" + injected,
-		"/contacts/" + injected + "/notes",
 		"/contacts/" + injected + "/reminders",
 		"/contacts/" + injected + "/relationships",
 		"/contacts/" + injected + "/activities",
-		"/notes/" + injected,
 		"/reminders/" + injected,
 		"/activities/" + injected,
 	} {
@@ -1105,7 +1102,6 @@ func TestContactHandlers_TreatANonNumericIDAsAValue(t *testing.T) {
 	router.POST("/contacts/:id/archive", ArchiveContact)
 	router.PUT("/contacts/:id/relationships/:rid", UpdateRelationship)
 	router.DELETE("/contacts/:id/relationships/:rid", DeleteRelationship)
-	router.DELETE("/notes/:id", DeleteNote)
 	router.DELETE("/reminders/:id", DeleteReminder)
 	router.DELETE("/activities/:id", DeleteActivity)
 	for _, route := range [][2]string{
@@ -1114,7 +1110,6 @@ func TestContactHandlers_TreatANonNumericIDAsAValue(t *testing.T) {
 		{"POST", "/contacts/" + injected + "/archive"},
 		{"PUT", "/contacts/1/relationships/" + injected},
 		{"DELETE", "/contacts/1/relationships/" + injected},
-		{"DELETE", "/notes/" + injected},
 		{"DELETE", "/reminders/" + injected},
 		{"DELETE", "/activities/" + injected},
 	} {

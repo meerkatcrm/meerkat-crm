@@ -71,8 +71,14 @@ func currentConfig(c *gin.Context) config.Config {
 
 // GetPaginationParams extracts pagination query params using shared defaults and bounds.
 func GetPaginationParams(c *gin.Context) PaginationParams {
-	page := parsePositiveOrDefault(c.DefaultQuery("page", "1"), defaultPage)
-	limit := parsePositiveOrDefault(c.DefaultQuery("limit", "25"), defaultLimit)
+	return paginationOf(c.Query("page"), c.Query("limit"))
+}
+
+// paginationOf sanitizes raw page and limit values: a missing or unparsable one
+// falls back to its default.
+func paginationOf(rawPage, rawLimit string) PaginationParams {
+	page := parsePositiveOrDefault(rawPage, defaultPage)
+	limit := parsePositiveOrDefault(rawLimit, defaultLimit)
 	if limit > maxLimit {
 		limit = maxLimit
 	}
@@ -97,14 +103,23 @@ func parsePositiveOrDefault(raw string, fallback int) int {
 // carries any Preload. The id is always bound as a value: GORM runs a non-numeric
 // string given as an inline condition as raw SQL.
 func findOwned[T any](c *gin.Context, db *gorm.DB, userID uint, id any, resource string) (T, bool) {
-	var row T
-	if err := db.Where("user_id = ?", userID).First(&row, "id = ?", id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			apperrors.AbortWithError(c, apperrors.ErrNotFound(resource).WithDetails("id", id))
-		} else {
-			apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to retrieve "+strings.ToLower(resource)).WithError(err))
-		}
+	row, err := loadOwned[T](db, userID, id, resource)
+	if err != nil {
+		apperrors.AbortWithError(c, err)
 		return row, false
 	}
 	return row, true
+}
+
+// loadOwned is findOwned for operation handlers, which return the error instead
+// of writing it.
+func loadOwned[T any](db *gorm.DB, userID uint, id any, resource string) (T, *apperrors.AppError) {
+	var row T
+	if err := db.Where("user_id = ?", userID).First(&row, "id = ?", id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return row, apperrors.ErrNotFound(resource).WithDetails("id", id)
+		}
+		return row, apperrors.ErrDatabase("Failed to retrieve " + strings.ToLower(resource)).WithError(err)
+	}
+	return row, nil
 }

@@ -15,13 +15,22 @@ import (
 )
 
 // Global validator instance
-var validate *validator.Validate
+// validate reports Go field names (the Gin endpoints' error keys); validateJSON
+// reports JSON names, for huma operations, whose own errors use JSON names too.
+var validate, validateJSON = newValidator(false), newValidator(true)
 
-func init() {
-	validate = validator.New()
-
-	// Register custom validators
-	validators := []struct {
+func newValidator(jsonNames bool) *validator.Validate {
+	v := validator.New()
+	if jsonNames {
+		v.RegisterTagNameFunc(func(f reflect.StructField) string {
+			name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
+			if name == "-" {
+				return ""
+			}
+			return name
+		})
+	}
+	for _, custom := range []struct {
 		tag string
 		fn  validator.Func
 	}{
@@ -33,12 +42,12 @@ func init() {
 		{"unique_circles", validateUniqueCircles},
 		{"no_at_sign", validateNoAtSign},
 		{"safeurl", validateSafeURL},
-	}
-	for _, v := range validators {
-		if err := validate.RegisterValidation(v.tag, v.fn); err != nil {
-			panic(fmt.Sprintf("register validator %q: %v", v.tag, err))
+	} {
+		if err := v.RegisterValidation(custom.tag, custom.fn); err != nil {
+			panic(fmt.Sprintf("register validator %q: %v", custom.tag, err))
 		}
 	}
+	return v
 }
 
 // ValidationError represents a validation error response
@@ -49,9 +58,17 @@ type ValidationError struct {
 
 // ValidateStruct validates a struct and returns formatted errors
 func ValidateStruct(obj interface{}) []ValidationError {
-	var errors []ValidationError
+	return validateWith(validate, obj)
+}
 
-	err := validate.Struct(obj)
+// ValidateStructJSON is ValidateStruct with JSON field names, for huma operations.
+func ValidateStructJSON(obj interface{}) []ValidationError {
+	return validateWith(validateJSON, obj)
+}
+
+func validateWith(v *validator.Validate, obj interface{}) []ValidationError {
+	var errors []ValidationError
+	err := v.Struct(obj)
 	if err != nil {
 		for _, err := range err.(validator.ValidationErrors) {
 			errors = append(errors, ValidationError{
@@ -60,7 +77,6 @@ func ValidateStruct(obj interface{}) []ValidationError {
 			})
 		}
 	}
-
 	return errors
 }
 

@@ -19,7 +19,7 @@ const contacts = vi.mocked(contactsApi);
 const notes = vi.mocked(notesApi);
 const activities = vi.mocked(activitiesApi);
 
-const note: Note = { ID: 1, content: 'Hello', date: '2026-03-15T00:00:00Z', CreatedAt: '', UpdatedAt: '' };
+const note: Note = { ID: 1, content: 'Hello', date: '2026-03-15T00:00:00Z', CreatedAt: '', UpdatedAt: '', contact_id: null, image: '' };
 const person = { ID: 9, firstname: 'Anna', lastname: 'Schmidt' };
 const activity: Activity = {
   ID: 2,
@@ -56,7 +56,7 @@ test('editing a note fills the form with its content and its date in the display
   const { result } = setup();
   await act(() => result.current.handleStartEditTimelineItem('note', note));
   expect(result.current.editingTimelineItem).toEqual({ type: 'note', id: 1 });
-  expect(result.current.editTimelineValues).toEqual({ noteContent: 'Hello', noteDate: '15.03.2026', itemId: 1, image: undefined });
+  expect(result.current.editTimelineValues).toEqual({ noteContent: 'Hello', noteDate: '15.03.2026', itemId: 1, image: '' });
   expect(contacts.getContacts).not.toHaveBeenCalled();
 });
 

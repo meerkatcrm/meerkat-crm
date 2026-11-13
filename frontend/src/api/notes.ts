@@ -1,22 +1,13 @@
-// Notes-related API calls
+// Notes-related API calls. The types come from the backend's OpenAPI document.
 import { apiJson } from './client';
+import type { components } from '../types/generated/api';
 
-export interface Note {
-  ID: number;
-  content: string;
-  date: string;
-  contact_id?: number;
-  image?: string;
-  CreatedAt: string;
-  UpdatedAt: string;
-}
-
-export interface NotesResponse {
-  notes: Note[];
-  total?: number;
-  page?: number;
-  limit?: number;
-}
+type Schemas = components['schemas'];
+export type Note = Schemas['Note'];
+export type NoteBody = Schemas['NoteBody'];
+export type ContactNotes = Schemas['ContactNotes'];
+export type NotePage = Schemas['NotePage'];
+type NoteSaved = Schemas['NoteSaved'];
 
 export interface GetNotesParams {
   page?: number;
@@ -29,14 +20,14 @@ export interface GetNotesParams {
 // Get notes for a contact
 export async function getContactNotes(
   contactId: string | number
-): Promise<NotesResponse> {
+): Promise<ContactNotes> {
   return apiJson(`/contacts/${contactId}/notes`);
 }
 
 // Get all unassigned notes
 export async function getUnassignedNotes(
   params: GetNotesParams = {}
-): Promise<NotesResponse> {
+): Promise<NotePage> {
   const { page = 1, limit = 25 } = params;
   const search = params.search?.trim();
 
@@ -63,9 +54,9 @@ export async function getUnassignedNotes(
 // Create note for contact
 export async function createNote(
   contactId: string | number,
-  data: { content: string; date: string; contact_id?: number }
+  data: NoteBody
 ): Promise<Note> {
-  const res = await apiJson<{ note: Note }>(`/contacts/${contactId}/notes`, {
+  const res = await apiJson<NoteSaved>(`/contacts/${contactId}/notes`, {
     method: 'POST',
     body: JSON.stringify(data),
   });
@@ -74,9 +65,9 @@ export async function createNote(
 
 // Create unassigned note
 export async function createUnassignedNote(
-  data: { content: string; date: string }
+  data: NoteBody
 ): Promise<Note> {
-  const res = await apiJson<{ note: Note }>('/notes', {
+  const res = await apiJson<NoteSaved>('/notes', {
     method: 'POST',
     body: JSON.stringify(data),
   });
@@ -86,9 +77,9 @@ export async function createUnassignedNote(
 // Update note
 export async function updateNote(
   id: string | number,
-  data: { content: string; date: string; contact_id?: number }
+  data: NoteBody
 ): Promise<Note> {
-  const res = await apiJson<{ note: Note }>(`/notes/${id}`, {
+  const res = await apiJson<NoteSaved>(`/notes/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   });

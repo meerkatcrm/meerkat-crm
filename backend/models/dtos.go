@@ -93,13 +93,6 @@ type DiscoveredAddressBook struct {
 	Description string `json:"description"`
 }
 
-// NoteInput represents the DTO for creating/updating notes
-type NoteInput struct {
-	Content   string    `json:"content" validate:"required,min=1,max=5000"`
-	Date      time.Time `json:"date" validate:"required"`
-	ContactID *uint     `json:"contact_id" validate:"omitempty,gt=0"`
-}
-
 // EmploymentHistoryInput represents the DTO for creating/updating employment history entries
 type EmploymentHistoryInput struct {
 	Organization string `json:"organization" validate:"max=200"`

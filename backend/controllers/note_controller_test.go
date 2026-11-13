@@ -3,7 +3,8 @@ package controllers
 import (
 	"bytes"
 	"encoding/json"
-	"meerkat/middleware"
+	"github.com/gin-gonic/gin"
+	"meerkat/api"
 	"meerkat/models"
 	"net/http"
 	"net/http/httptest"
@@ -22,7 +23,7 @@ func TestGetContactNotes(t *testing.T) {
 	var user models.User
 	db.First(&user)
 
-	router.GET("/contacts/:id/notes", GetNotesForContact)
+	mountNotes(router)
 
 	// Create a contact
 	contact := models.Contact{
@@ -62,7 +63,7 @@ func TestCreateContactNote(t *testing.T) {
 	var user models.User
 	db.First(&user)
 
-	router.POST("/contacts/:id/notes", withValidated(func() any { return &models.NoteInput{} }), CreateNote)
+	mountNotes(router)
 
 	// Create a contact
 	contact := models.Contact{
@@ -74,7 +75,7 @@ func TestCreateContactNote(t *testing.T) {
 
 	// Create a note
 	now := time.Now()
-	newNote := models.NoteInput{
+	newNote := NoteBody{
 		Content:   "This is a new note.",
 		Date:      now,
 		ContactID: &contact.ID,
@@ -101,7 +102,7 @@ func TestGetNote(t *testing.T) {
 	var user models.User
 	db.First(&user)
 
-	router.GET("/notes/:id", GetNote)
+	mountNotes(router)
 
 	// Create a note
 	note := models.Note{
@@ -128,7 +129,7 @@ func TestGetNotes(t *testing.T) {
 	var user models.User
 	db.First(&user)
 
-	router.GET("/notes", GetUnassignedNotes)
+	mountNotes(router)
 
 	// Create some unassigned notes
 	notes := []models.Note{
@@ -162,7 +163,7 @@ func TestGetNotesSearch(t *testing.T) {
 	var user models.User
 	db.First(&user)
 
-	router.GET("/notes", GetUnassignedNotes)
+	mountNotes(router)
 
 	db.Create(&models.Note{UserID: user.ID, Content: "Call Alice"})
 	db.Create(&models.Note{UserID: user.ID, Content: "Call Bob"})
@@ -190,7 +191,7 @@ func TestGetNotesSearchLiteralWildcards(t *testing.T) {
 	var user models.User
 	db.First(&user)
 
-	router.GET("/notes", GetUnassignedNotes)
+	mountNotes(router)
 
 	db.Create(&models.Note{UserID: user.ID, Content: "Discount 50% off"})
 	db.Create(&models.Note{UserID: user.ID, Content: "Discount 500 off"})
@@ -212,7 +213,7 @@ func TestCreateNote(t *testing.T) {
 	var user models.User
 	db.First(&user)
 
-	router.POST("/notes", withValidated(func() any { return &models.NoteInput{} }), CreateUnassignedNote)
+	mountNotes(router)
 
 	contact := models.Contact{
 		UserID:    user.ID,
@@ -223,7 +224,7 @@ func TestCreateNote(t *testing.T) {
 
 	// Create a note
 	noteDate := time.Now()
-	newNote := models.NoteInput{
+	newNote := NoteBody{
 		Content:   "This is a standalone note.",
 		Date:      noteDate,
 		ContactID: &contact.ID,
@@ -247,10 +248,10 @@ func TestCreateNote(t *testing.T) {
 func TestCreateUnassignedNoteWithoutContactID(t *testing.T) {
 	_, router := setupRouter()
 
-	router.POST("/notes", middleware.ValidateJSONMiddleware(&models.NoteInput{}), CreateUnassignedNote)
+	mountNotes(router)
 
 	noteDate := time.Now()
-	newNote := models.NoteInput{
+	newNote := NoteBody{
 		Content: "This is a floating note without a contact.",
 		Date:    noteDate,
 	}
@@ -281,8 +282,7 @@ func TestUpdateNote(t *testing.T) {
 	var user models.User
 	db.First(&user)
 
-	router.PUT("/notes/:id", withValidated(func() any { return &models.NoteInput{} }), UpdateNote)
-	router.GET("/notes/:id", GetNote)
+	mountNotes(router)
 
 	// Seed a contact to satisfy validation and ownership checks.
 	contact := models.Contact{
@@ -302,7 +302,7 @@ func TestUpdateNote(t *testing.T) {
 	db.Create(&note)
 
 	// Update the note
-	updatedNote := models.NoteInput{
+	updatedNote := NoteBody{
 		Content:   "Updated note content.",
 		Date:      time.Now().Add(time.Hour),
 		ContactID: &contact.ID,
@@ -337,7 +337,7 @@ func TestDeleteNote(t *testing.T) {
 	var user models.User
 	db.First(&user)
 
-	router.DELETE("/notes/:id", DeleteNote)
+	mountNotes(router)
 
 	// Create a note
 	note := models.Note{
@@ -367,7 +367,7 @@ func TestUpdateNote_DetachesFromContact(t *testing.T) {
 	note := models.Note{UserID: user.ID, ContactID: &contact.ID, Content: "attached", Date: time.Now()}
 	require.NoError(t, db.Create(&note).Error)
 
-	router.PUT("/notes/:id", withValidated(func() any { return &models.NoteInput{} }), UpdateNote)
+	mountNotes(router)
 
 	body, _ := json.Marshal(map[string]any{"content": "now unassigned", "date": time.Now().Format(time.RFC3339)})
 	req, _ := http.NewRequest("PUT", "/notes/"+strconv.Itoa(int(note.ID)), bytes.NewBuffer(body))
@@ -380,4 +380,27 @@ func TestUpdateNote_DetachesFromContact(t *testing.T) {
 	require.NoError(t, db.First(&stored, note.ID).Error)
 	assert.Equal(t, "now unassigned", stored.Content)
 	assert.Nil(t, stored.ContactID, "a note saved without contact_id must be detached")
+}
+
+// Note ids are typed as integers, so a non-numeric one is refused before any
+// query runs (the numeric id middleware refuses it first in production).
+func TestNoteOperationsRefuseANonNumericID(t *testing.T) {
+	_, router := setupRouter()
+	mountNotes(router)
+	for _, route := range [][2]string{
+		{http.MethodGet, "/notes/abc"},
+		{http.MethodGet, "/notes/" + url.PathEscape("1 OR 1=1")},
+		{http.MethodGet, "/contacts/abc/notes"},
+		{http.MethodPost, "/contacts/abc/notes"},
+		{http.MethodPut, "/notes/abc"},
+		{http.MethodDelete, "/notes/abc"},
+	} {
+		w := doJSON(t, router, route[0], route[1], map[string]any{"content": "x", "date": time.Now()})
+		assert.Equal(t, http.StatusBadRequest, w.Code, route[0]+" "+route[1])
+	}
+}
+
+// mountNotes serves the note operations on router, as routes.go does.
+func mountNotes(router *gin.Engine) {
+	RegisterNoteOperations(api.Mount(router, &router.RouterGroup, api.NewSpec()))
 }
