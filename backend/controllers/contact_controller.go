@@ -111,17 +111,17 @@ func CreateContact(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "Contact created successfully", "contact": contact})
 }
 
-// filters a contacts query by a free-text term. Names, e-mail addresses and phone numbers
-// are searched in contacts_fts when ftsMatch allows it; the matches are then joined as
-// "hits", and hits.hit_rank orders by best match (NULL for a match through a relationship
-// only).
-func applyContactSearch(query *gorm.DB, userID uint, searchTerm string) *gorm.DB {
+// filters a contacts query by a free-text term. With an ftsMatch expression, names, e-mail
+// addresses and phone numbers are searched in contacts_fts and the matches are joined as
+// "hits": hits.hit_rank orders by best match (NULL for a match through a relationship only).
+// Without one ("") the search uses LIKE.
+func applyContactSearch(query *gorm.DB, userID uint, searchTerm, match string) *gorm.DB {
 	// People without a contact of their own (e.g. a child stored only as
 	// a relationship) are found through the contact they belong to.
 	const unlinkedRelationship = "relationships.user_id = @user_id AND relationships.deleted_at IS NULL AND relationships.related_contact_id IS NULL AND "
 	args := []any{searchArg(searchTerm), sql.Named("user_id", userID)}
 
-	if match, ok := ftsMatch(searchTerm); ok {
+	if match != "" {
 		// An inner join on a subquery that runs once: a LEFT JOIN or an OR would run the
 		// MATCH again for every contact (2 s instead of 2 ms on 20,000 contacts).
 		return query.Joins("JOIN (SELECT hit_id, MIN(hit_rank) AS hit_rank FROM ("+
@@ -183,6 +183,7 @@ func GetContacts(c *gin.Context) {
 	archivedOnly := c.Query("archived") == "true"
 
 	searchTerm := c.Query("search")
+	match, _ := ftsMatch(searchTerm)
 	circle := c.Query("circle")
 
 	// The page query and the count query must apply exactly the same filters.
@@ -192,7 +193,7 @@ func GetContacts(c *gin.Context) {
 			query = query.Where("archived = ?", archivedOnly)
 		}
 		if searchTerm != "" {
-			query = applyContactSearch(query, userID, searchTerm)
+			query = applyContactSearch(query, userID, searchTerm, match)
 		}
 		if circle != "" {
 			query = query.Where("EXISTS (SELECT 1 FROM json_each(contacts.circles) WHERE json_each.value = ?)", circle)
@@ -209,7 +210,7 @@ func GetContacts(c *gin.Context) {
 		query = query.Order("archived ASC")
 	}
 	// A full-text search lists the best match first, unless the caller asked for an order
-	if _, ranked := ftsMatch(searchTerm); ranked && c.Query("sort") == "" {
+	if match != "" && c.Query("sort") == "" {
 		query = query.Order("hits.hit_rank IS NULL, hits.hit_rank, contacts.id DESC")
 	} else if sortField == "random" {
 		query = query.Order("RANDOM()")

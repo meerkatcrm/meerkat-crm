@@ -203,4 +203,13 @@ func TestNoteAndActivitySearch(t *testing.T) {
 	assert.Empty(t, titles("dinner renee"), "every word must match in the activity or in one contact's name")
 	assert.Empty(t, titles("0100"), "activities match contact names, not their phone numbers")
 	assert.Empty(t, titles("someone"), "other users' activities are not searched")
+
+	require.NoError(t, db.Delete(&contact).Error)
+	assert.Empty(t, titles("renee"), "a deleted contact's name no longer matches")
+	assert.Equal(t, []string{"Café catch-up"}, titles("caf"))
+}
+
+func TestLikeSearchTermsAreCapped(t *testing.T) {
+	long := strings.Repeat("山", 300)
+	assert.Equal(t, "%"+strings.Repeat("山", maxSearchRunes)+"%", searchArg(long).Value)
 }

@@ -1,6 +1,6 @@
 import { test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, within, fireEvent } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, Link } from 'react-router-dom';
 import './i18n/config';
 import ContactsPage from './ContactsPage';
 import { useContacts } from './hooks/useContacts';
@@ -46,4 +46,21 @@ test('a search asks the server for its ranking, and another order can still be p
   fireEvent.click(within(screen.getByRole('listbox')).getByText('Name Z-A'));
   expect(lastParams()).toMatchObject({ sort: 'firstname', order: 'desc' });
   expect(localStorage.getItem('contacts-sort-option')).toBe('firstname-asc');
+});
+
+test('a new search starts at Best match again', () => {
+  render(
+    <MemoryRouter initialEntries={['/contacts?search=zoe']}>
+      <Routes>
+        <Route path="/contacts" element={<><ContactsPage /><Link to="/contacts?search=ann">next</Link></>} />
+      </Routes>
+    </MemoryRouter>,
+  );
+  fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Sort by' }));
+  fireEvent.click(within(screen.getByRole('listbox')).getByText('Name Z-A'));
+  expect(lastParams()).toMatchObject({ sort: 'firstname', order: 'desc' });
+
+  fireEvent.click(screen.getByText('next'));
+  expect(lastParams()).toMatchObject({ search: 'ann', sort: undefined, order: undefined });
+  expect(screen.getByRole('combobox', { name: 'Sort by' })).toHaveTextContent('Best match');
 });

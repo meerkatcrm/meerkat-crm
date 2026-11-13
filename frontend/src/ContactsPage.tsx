@@ -49,9 +49,10 @@ export default function ContactsPage() {
   const pageSize = 10;
 
   // While searching, the default order is the best match first (the server ranks when no
-  // sort is sent); picking another order is still possible and is not remembered.
+  // sort is sent). Another order can be picked; it holds for that search only.
   const searching = searchQuery.trim() !== '';
-  const [searchSortOption, setSearchSortOption] = useState('relevance');
+  const [searchSort, setSearchSort] = useState({ query: '', option: 'relevance' });
+  const searchSortOption = searchSort.query === searchQuery ? searchSort.option : 'relevance';
   const activeSort = searching ? searchSortOption : sortOption;
   const [sortField, sortOrder] = activeSort.split('-');
 
@@ -173,7 +174,7 @@ export default function ContactsPage() {
             labelId="sort-select-label"
             value={activeSort}
             label={t('contacts.sortBy')}
-            onChange={e => (searching ? setSearchSortOption(e.target.value) : setSortOption(e.target.value))}
+            onChange={e => (searching ? setSearchSort({ query: searchQuery, option: e.target.value }) : setSortOption(e.target.value))}
           >
             {searching && <MenuItem value="relevance">{t('contacts.sort.relevance')}</MenuItem>}
             <MenuItem value="id-desc">{t('contacts.sort.recentlyAdded')}</MenuItem>

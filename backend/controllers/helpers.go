@@ -34,8 +34,11 @@ func likeAny(exprs ...string) string {
 }
 
 // searchArg binds a user search term for likeAny, escaping the LIKE wildcards so
-// that "50%" or "a_b" match literally.
+// that "50%" or "a_b" match literally. Like ftsMatch it uses the first maxSearchRunes.
 func searchArg(term string) sql.NamedArg {
+	if r := []rune(term); len(r) > maxSearchRunes {
+		term = string(r[:maxSearchRunes])
+	}
 	return sql.Named("search", "%"+likeEscaper.Replace(term)+"%")
 }
 
