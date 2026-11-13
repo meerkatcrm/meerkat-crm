@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
+	"time"
 
 	"meerkat/config"
 	"meerkat/models"
@@ -87,7 +88,7 @@ func TestSSOOnly_RefusesPasswordReset(t *testing.T) {
 
 	hash, _ := services.HashPassword(strongPassword)
 	token, tokenHash, _ := services.GeneratePasswordResetToken()
-	expires := services.PasswordResetExpiry()
+	expires := services.PasswordResetExpiry(time.Now())
 	user := models.User{Username: "pw", Email: "pw@example.com", Password: hash, PasswordResetTokenHash: &tokenHash, PasswordResetExpiresAt: &expires}
 	require.NoError(t, db.Create(&user).Error)
 
