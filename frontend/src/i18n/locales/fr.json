@@ -468,7 +468,10 @@
     "urlPlaceholder": "Collez l'URL de l'image...",
     "fetch": "Récupérer",
     "urlFetchError": "Échec de la récupération de l'image depuis l'URL",
-    "urlRateLimited": "Trop d'images récupérées depuis des URL. Attendez une minute et réessayez."
+    "urlRateLimited": "Trop d'images récupérées depuis des URL. Attendez une minute et réessayez.",
+    "remove": "Supprimer la photo",
+    "confirmRemove": "Supprimer la photo de profil de ce contact ?",
+    "removeError": "Impossible de supprimer la photo de profil"
   },
   "itemImage": {
     "alt": "Image jointe",

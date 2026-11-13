@@ -468,7 +468,10 @@
     "urlPlaceholder": "Paste image URL...",
     "fetch": "Fetch",
     "urlFetchError": "Failed to fetch image from URL",
-    "urlRateLimited": "Too many images fetched from URLs. Please wait a minute and try again."
+    "urlRateLimited": "Too many images fetched from URLs. Please wait a minute and try again.",
+    "remove": "Remove photo",
+    "confirmRemove": "Remove this contact's profile picture?",
+    "removeError": "Failed to remove profile picture"
   },
   "itemImage": {
     "alt": "Attached image",

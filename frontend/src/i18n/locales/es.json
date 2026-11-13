@@ -468,7 +468,10 @@
     "urlPlaceholder": "Pegar URL de imagen...",
     "fetch": "Obtener",
     "urlFetchError": "Error al obtener la imagen desde la URL",
-    "urlRateLimited": "Demasiadas imágenes obtenidas desde URL. Espera un minuto e inténtalo de nuevo."
+    "urlRateLimited": "Demasiadas imágenes obtenidas desde URL. Espera un minuto e inténtalo de nuevo.",
+    "remove": "Quitar foto",
+    "confirmRemove": "¿Quitar la foto de perfil de este contacto?",
+    "removeError": "No se pudo quitar la foto de perfil"
   },
   "itemImage": {
     "alt": "Imagen adjunta",

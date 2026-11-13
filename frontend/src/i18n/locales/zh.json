@@ -468,7 +468,10 @@
     "urlPlaceholder": "粘贴图片 URL...",
     "fetch": "获取",
     "urlFetchError": "从 URL 获取图片失败",
-    "urlRateLimited": "从 URL 获取的图片过多，请稍等一分钟后再试。"
+    "urlRateLimited": "从 URL 获取的图片过多，请稍等一分钟后再试。",
+    "remove": "移除照片",
+    "confirmRemove": "要移除此联系人的头像吗？",
+    "removeError": "移除头像失败"
   },
   "itemImage": {
     "alt": "附加的图片",

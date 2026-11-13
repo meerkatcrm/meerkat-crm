@@ -8,6 +8,7 @@ import {
   getContactProfilePicture,
   deleteContact,
   uploadProfilePicture,
+  removeProfilePicture,
   getCircles,
   archiveContact,
   unarchiveContact
@@ -721,6 +722,27 @@ function ContactDetail() {
     }
   };
 
+  // Resolves to false when the user cancels the confirmation; throws when the request fails.
+  const handleRemoveProfilePicture = async (): Promise<boolean> => {
+    if (!id) return false;
+
+    const confirmed = await confirm({
+      message: t('profilePicture.confirmRemove'),
+      confirmLabel: t('profilePicture.remove'),
+      destructive: true,
+    });
+    if (!confirmed) return false;
+
+    await removeProfilePicture(id);
+
+    if (profilePic) {
+      URL.revokeObjectURL(profilePic);
+    }
+    setProfilePic('');
+    setContact(prev => (prev ? { ...prev, photo: '' } : prev));
+    return true;
+  };
+
   // Lazy-load circles only when entering edit mode
   const handleToggleEditCircles = async () => {
     if (!editingCircles) {
@@ -957,6 +979,7 @@ function ContactDetail() {
         open={profilePictureDialogOpen}
         onClose={() => setProfilePictureDialogOpen(false)}
         onUpload={handleUploadProfilePicture}
+        onRemove={profilePic ? handleRemoveProfilePicture : undefined}
       />
 
       <AddRelationshipDialog

@@ -18,6 +18,7 @@ import AppDialog from './AppDialog';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import LinkIcon from '@mui/icons-material/Link';
+import DeleteIcon from '@mui/icons-material/Delete';
 import { handleError, getErrorMessage } from '../utils/errorHandler';
 import { API_BASE_URL, apiFetch, parseErrorResponse } from '../api/client';
 
@@ -25,6 +26,11 @@ interface ProfilePictureUploadDialogProps {
   open: boolean;
   onClose: () => void;
   onUpload: (croppedImageBlob: Blob) => Promise<void>;
+  /**
+   * Shown as a "Remove photo" button when the contact has a photo. Resolves to true when
+   * the photo was removed (the dialog then closes), false when the user backed out.
+   */
+  onRemove?: () => Promise<boolean>;
 }
 
 // Helper function to create a cropped image blob
@@ -87,7 +93,8 @@ function createImage(url: string): Promise<HTMLImageElement> {
 export default function ProfilePictureUploadDialog({
   open,
   onClose,
-  onUpload
+  onUpload,
+  onRemove
 }: ProfilePictureUploadDialogProps) {
   const { t } = useTranslation();
   const [imageSrc, setImageSrc] = useState<string | null>(null);
@@ -95,6 +102,7 @@ export default function ProfilePictureUploadDialog({
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [removing, setRemoving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState('');
   const [fetchingUrl, setFetchingUrl] = useState(false);
@@ -212,6 +220,24 @@ export default function ProfilePictureUploadDialog({
     }
   };
 
+  const handleRemove = async () => {
+    if (!onRemove) return;
+
+    setRemoving(true);
+    setError(null);
+
+    try {
+      if (await onRemove()) {
+        handleClose();
+      }
+    } catch (err) {
+      handleError(err, { operation: 'removing profile picture' });
+      setError(t('profilePicture.removeError'));
+    } finally {
+      setRemoving(false);
+    }
+  };
+
   const handleClose = () => {
     setImageSrc(null);
     setCrop({ x: 0, y: 0 });
@@ -224,7 +250,7 @@ export default function ProfilePictureUploadDialog({
   };
 
   return (
-    <AppDialog open={open} onClose={handleClose} busy={uploading} maxWidth="sm" fullWidth>
+    <AppDialog open={open} onClose={handleClose} busy={uploading || removing} maxWidth="sm" fullWidth>
       <DialogTitle>{t('profilePicture.title')}</DialogTitle>
       <DialogContent>
         {error && (
@@ -373,13 +399,24 @@ export default function ProfilePictureUploadDialog({
         )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={handleClose} disabled={uploading}>
+        {onRemove && !imageSrc && (
+          <Button
+            onClick={handleRemove}
+            color="error"
+            disabled={uploading || removing}
+            startIcon={removing ? <CircularProgress size={20} /> : <DeleteIcon />}
+            sx={{ mr: 'auto' }}
+          >
+            {t('profilePicture.remove')}
+          </Button>
+        )}
+        <Button onClick={handleClose} disabled={uploading || removing}>
           {t('common.cancel')}
         </Button>
         <Button
           onClick={handleUpload}
           variant="contained"
-          disabled={!imageSrc || uploading}
+          disabled={!imageSrc || uploading || removing}
           startIcon={uploading ? <CircularProgress size={20} /> : undefined}
         >
           {uploading ? t('profilePicture.uploading') : t('common.save')}
