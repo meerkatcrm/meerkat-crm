@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"meerkat/clock"
+	"meerkat/config"
 	"meerkat/database"
 	"meerkat/models"
 
@@ -76,7 +78,7 @@ func TestAcquireJobLock_ConcurrentJobsAllAcquire(t *testing.T) {
 				var fns []func()
 				for _, jobName := range jobNames {
 					fns = append(fns, func() {
-						acquired, err := acquireJobLock(db, jobName, time.Hour)
+						acquired, err := acquireJobLock(db, jobName, time.Hour, time.Now())
 						assert.NoError(t, err, jobName)
 						assert.True(t, acquired, jobName)
 					})
@@ -121,7 +123,7 @@ func TestAcquireJobLock_ReportsDatabaseError(t *testing.T) {
 	db := setupFileDB(t)
 	require.NoError(t, db.Migrator().DropTable(&models.JobExecution{}))
 
-	acquired, err := acquireJobLock(db, "job_a", time.Hour)
+	acquired, err := acquireJobLock(db, "job_a", time.Hour, time.Now())
 
 	assert.Error(t, err)
 	assert.False(t, acquired)
@@ -130,11 +132,11 @@ func TestAcquireJobLock_ReportsDatabaseError(t *testing.T) {
 func TestAcquireJobLock_SkipIsNotAnError(t *testing.T) {
 	db := setupFileDB(t)
 
-	acquired, err := acquireJobLock(db, "job_a", time.Hour)
+	acquired, err := acquireJobLock(db, "job_a", time.Hour, time.Now())
 	require.NoError(t, err)
 	require.True(t, acquired)
 
-	acquired, err = acquireJobLock(db, "job_a", time.Hour)
+	acquired, err = acquireJobLock(db, "job_a", time.Hour, time.Now())
 	assert.NoError(t, err)
 	assert.False(t, acquired)
 }
@@ -149,8 +151,22 @@ func TestAcquireJobLock_SkipsWhileAnotherInstanceHoldsLock(t *testing.T) {
 		LockedBy:  "other-instance",
 	}).Error)
 
-	acquired, err := acquireJobLock(db, "job_a", time.Hour)
+	acquired, err := acquireJobLock(db, "job_a", time.Hour, time.Now())
 
 	assert.NoError(t, err)
 	assert.False(t, acquired)
+}
+
+// Job locks decide when a job runs, so they follow the wall clock even under a fake
+// clock: a last_run_at stamped in the future would block the job once the clock changes.
+func TestJobLockIgnoresFakeClock(t *testing.T) {
+	db := setupFileDB(t)
+	future := clock.NewFake(time.Date(2031, 12, 24, 12, 0, 0, 0, time.UTC))
+	cfg := config.Config{ReminderTime: "12:00"}
+
+	require.NoError(t, SendRemindersWithRateLimit(db, cfg, future))
+
+	var job models.JobExecution
+	require.NoError(t, db.Where("job_name = ?", models.JobNameDailyReminders).First(&job).Error)
+	assert.WithinDuration(t, time.Now(), job.LastRunAt, time.Minute)
 }

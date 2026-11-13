@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"meerkat/clock"
 	"meerkat/config"
 	"meerkat/models"
 
@@ -59,7 +60,7 @@ func TestSyncAllCalendarsSkipsDeletedUsers(t *testing.T) {
 	require.NoError(t, db.Create(&orphan).Error)
 	require.NoError(t, db.Delete(&deleted).Error)
 
-	SyncAllCalendars(db, cfg)
+	SyncAllCalendars(db, cfg, clock.Real())
 
 	assert.NotZero(t, liveHits.Load())
 	assert.Zero(t, orphanHits.Load(), "stored credentials of a deleted user must not be used")
@@ -79,7 +80,7 @@ func TestSyncAllContactConnectionsSkipsDeletedUsers(t *testing.T) {
 	require.NoError(t, db.Create(&orphan).Error)
 	require.NoError(t, db.Delete(&deleted).Error)
 
-	SyncAllContactConnections(db, cfg)
+	SyncAllContactConnections(db, cfg, clock.Real())
 
 	assert.NotZero(t, liveHits.Load())
 	assert.Zero(t, orphanHits.Load(), "stored credentials of a deleted user must not be used")
@@ -129,12 +130,12 @@ func TestSendRemindersSkipsDeletedUsers(t *testing.T) {
 
 	var mailed int
 	original := sendReminderEmailFn
-	sendReminderEmailFn = func(models.User, []models.Reminder, config.Config, *gorm.DB) error {
+	sendReminderEmailFn = func(models.User, []models.Reminder, config.Config, *gorm.DB, clock.Clock) error {
 		mailed++
 		return nil
 	}
 	defer func() { sendReminderEmailFn = original }()
 
-	require.NoError(t, SendReminders(db, config.Config{UseResend: true, ResendAPIKey: "k", ResendFromEmail: "a@example.com", ReminderTime: "12:00"}))
+	require.NoError(t, SendReminders(db, config.Config{UseResend: true, ResendAPIKey: "k", ResendFromEmail: "a@example.com", ReminderTime: "12:00"}, clock.Real()))
 	assert.Zero(t, mailed)
 }

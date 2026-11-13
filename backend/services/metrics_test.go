@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"meerkat/clock"
 	"meerkat/config"
 	"meerkat/metrics"
 	"meerkat/models"
@@ -79,13 +80,13 @@ func TestReleaseJobLockRecordsSuccessTime(t *testing.T) {
 	old := time.Now().Add(-48 * time.Hour)
 	require.NoError(t, db.Create(&models.JobExecution{JobName: "j", LastRunAt: old, LockedBy: getInstanceID(), LockedAt: &old}).Error)
 
-	require.NoError(t, releaseJobLock(db, "j", false))
+	require.NoError(t, releaseJobLock(db, "j", false, time.Now()))
 	var j models.JobExecution
 	require.NoError(t, db.Where("job_name = ?", "j").First(&j).Error)
 	assert.Nil(t, j.LastSuccessAt, "a failed run is not a success")
 
 	require.NoError(t, db.Model(&j).Updates(map[string]any{"locked_by": getInstanceID(), "locked_at": old}).Error)
-	require.NoError(t, releaseJobLock(db, "j", true))
+	require.NoError(t, releaseJobLock(db, "j", true, time.Now()))
 	require.NoError(t, db.Where("job_name = ?", "j").First(&j).Error)
 	require.NotNil(t, j.LastSuccessAt)
 	assert.WithinDuration(t, time.Now(), *j.LastSuccessAt, time.Minute)
@@ -100,9 +101,9 @@ func TestRateLimitedJobsCountSkippedNotSuccess(t *testing.T) {
 	}
 	cfg := config.Config{CalDAVSyncIntervalHours: 1, CardDAVSyncIntervalHours: 1}
 	for job, run := range map[string]func(){
-		JobReminders:    func() { _ = SendRemindersWithRateLimit(db, cfg) },
-		JobCalendarSync: func() { SyncCalendarsWithRateLimit(db, cfg) },
-		JobContactSync:  func() { SyncContactsWithRateLimit(db, cfg) },
+		JobReminders:    func() { _ = SendRemindersWithRateLimit(db, cfg, clock.Real()) },
+		JobCalendarSync: func() { SyncCalendarsWithRateLimit(db, cfg, clock.Real()) },
+		JobContactSync:  func() { SyncContactsWithRateLimit(db, cfg, clock.Real()) },
 	} {
 		skipped := `meerkat_job_runs_total{job="` + job + `",result="skipped"}`
 		success := `meerkat_job_runs_total{job="` + job + `",result="success"}`
@@ -120,11 +121,11 @@ func TestWebhookDeliveryCountsResults(t *testing.T) {
 	f0, s0 := series(t, fail), series(t, ok)
 
 	msg := "boom"
-	finishWebhookDelivery(db, models.WebhookDelivery{}, 1, nil, &msg, false)
+	finishWebhookDelivery(db, models.WebhookDelivery{}, 1, nil, &msg, false, time.Now())
 	code := 500
-	finishWebhookDelivery(db, models.WebhookDelivery{}, 2, &code, &msg, false)
+	finishWebhookDelivery(db, models.WebhookDelivery{}, 2, &code, &msg, false, time.Now())
 	code = 204
-	finishWebhookDelivery(db, models.WebhookDelivery{}, 1, &code, nil, false)
+	finishWebhookDelivery(db, models.WebhookDelivery{}, 1, &code, nil, false, time.Now())
 
 	assert.Equal(t, f0+2, series(t, fail))
 	assert.Equal(t, s0+1, series(t, ok))

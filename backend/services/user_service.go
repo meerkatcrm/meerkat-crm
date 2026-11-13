@@ -5,6 +5,7 @@ import (
 	"meerkat/config"
 	"meerkat/middleware"
 	"meerkat/models"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -27,6 +28,6 @@ func HashPassword(password string) (string, error) {
 	return string(hashedPassword), nil
 }
 
-func GenerateToken(user models.User, cfg *config.Config) (string, error) {
-	return middleware.GenerateToken(user, cfg)
+func GenerateToken(user models.User, cfg *config.Config, now time.Time) (string, error) {
+	return middleware.GenerateToken(user, cfg, now)
 }

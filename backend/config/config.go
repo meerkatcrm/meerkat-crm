@@ -64,6 +64,7 @@ type Config struct {
 	MetricsEnabled           bool   // Serve Prometheus metrics (off by default)
 	MetricsToken             string // Optional bearer token required to read /metrics
 	MetricsAddr              string // Optional separate listen address (e.g. 127.0.0.1:9090); empty = /metrics on the main port
+	FakeNow                  string // FAKE_NOW (RFC 3339): the clock starts at this instant and keeps running; for demos and manual tests only
 	OIDC                     OIDCConfig
 }
 
@@ -139,6 +140,7 @@ func LoadConfig() *Config {
 	cfg.MetricsEnabled = getBoolEnv("METRICS_ENABLED", false)
 	cfg.MetricsToken = getEnv("METRICS_TOKEN", "")
 	cfg.MetricsAddr = getEnv("METRICS_ADDR", "")
+	cfg.FakeNow = getEnv("FAKE_NOW", "")
 
 	// An email channel is enabled only when it is fully configured
 	cfg.UseResend = cfg.ResendAPIKey != "" && cfg.ResendFromEmail != ""
@@ -285,6 +287,15 @@ func (c *Config) Validate() []ValidationError {
 
 	if msg := c.encryptionKeyProblem(); msg != "" {
 		errors = append(errors, ValidationError{Field: "ENCRYPTION_KEY", Message: msg})
+	}
+
+	if c.FakeNow != "" {
+		if _, err := time.Parse(time.RFC3339, c.FakeNow); err != nil {
+			errors = append(errors, ValidationError{
+				Field:   "FAKE_NOW",
+				Message: "FAKE_NOW must be an RFC 3339 time such as 2026-12-24T12:00:00Z, or empty.",
+			})
+		}
 	}
 
 	// Validate Database Path

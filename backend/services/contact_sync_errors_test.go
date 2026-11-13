@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"meerkat/clock"
 	"meerkat/models"
 
 	"github.com/stretchr/testify/assert"
@@ -41,7 +42,7 @@ func TestContactSyncTellsTheUserWhatWentWrong(t *testing.T) {
 	for _, tc := range cases {
 		env := setupContactSyncEnv(t, models.CardDAVDirectionTwoWay, &davRemote{proxyURL: tc.address, path: "/book/"})
 
-		_, err := env.service.SyncConnection(context.Background(), env.db, env.cfg, env.conn)
+		_, err := env.service.SyncConnection(context.Background(), env.db, env.cfg, env.conn, clock.Real())
 
 		assert.ErrorIs(t, err, tc.want, tc.name)
 		assert.Contains(t, env.conn.LastSyncError, tc.want.Error(), tc.name)

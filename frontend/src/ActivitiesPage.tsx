@@ -38,6 +38,7 @@ import { useSnackbar } from './context/SnackbarContext';
 import { handleError } from './utils/errorHandler';
 import { contactDisplayName } from './utils/contactName';
 import { responsiveTimelineSx } from './components/timelineLayout';
+import { now } from './utils/now';
 
 const ActivitiesPage: React.FC = () => {
   const { t } = useTranslation();
@@ -169,7 +170,7 @@ const ActivitiesPage: React.FC = () => {
         title: editValues.activityTitle,
         description: editValues.activityDescription || '',
         location: editValues.activityLocation || '',
-        date: parsedDate ? new Date(parsedDate).toISOString() : new Date().toISOString(),
+        date: parsedDate ? new Date(parsedDate).toISOString() : now().toISOString(),
         contact_ids: editValues.activityContacts?.map(c => c.ID) || [],
       });
       await applyImageChange('activities', editingActivity.ID, editValues.imageChange);

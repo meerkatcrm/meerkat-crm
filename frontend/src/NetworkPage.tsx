@@ -31,6 +31,7 @@ import { NetworkFilters, loadNetworkFilters, saveNetworkFilters } from './networ
 import { useDateFormat } from './DateFormatProvider';
 import { useSnackbar } from './context/SnackbarContext';
 import { handleError } from './utils/errorHandler';
+import { now } from './utils/now';
 
 export default function NetworkPage() {
   const { t } = useTranslation();
@@ -160,7 +161,7 @@ export default function NetworkPage() {
         title: editValues.activityTitle,
         description: editValues.activityDescription || '',
         location: editValues.activityLocation || '',
-        date: parsedDate ? new Date(parsedDate).toISOString() : new Date().toISOString(),
+        date: parsedDate ? new Date(parsedDate).toISOString() : now().toISOString(),
         contact_ids: editValues.activityContacts?.map(c => c.ID) || [],
       });
       await applyImageChange('activities', editingActivity.ID, editValues.imageChange);

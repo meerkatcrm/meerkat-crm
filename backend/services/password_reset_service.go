@@ -38,8 +38,8 @@ func HashPasswordResetToken(token string) string {
 }
 
 // PasswordResetExpiry returns when a reset token should expire.
-func PasswordResetExpiry() time.Time {
-	return time.Now().Add(passwordResetTTL)
+func PasswordResetExpiry(now time.Time) time.Time {
+	return now.Add(passwordResetTTL)
 }
 
 // SendPasswordResetEmail queues a reset email (sent in the background, retried by the
@@ -76,7 +76,7 @@ func SendPasswordResetEmail(db *gorm.DB, userID uint, email, token, lang string,
 		To:      email,
 		Subject: i18n.T(lang, "email.passwordReset.subject"),
 		HTML:    htmlBody,
-	}, PasswordResetExpiry()); err != nil {
+	}, PasswordResetExpiry(queueNow())); err != nil {
 		return err
 	}
 

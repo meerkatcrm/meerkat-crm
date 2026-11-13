@@ -1,5 +1,6 @@
 import { format } from 'date-fns';
 import { apiJson } from './client';
+import { now } from '../utils/now';
 
 export interface EmploymentHistoryEntry {
   ID: number;
@@ -62,6 +63,6 @@ export async function endEmploymentHistory(
   entryId: number
 ): Promise<{ employment_history: EmploymentHistoryEntry }> {
   // The user's local today, which can differ from the server's UTC date.
-  const today = format(new Date(), 'yyyy-MM-dd');
+  const today = format(now(), 'yyyy-MM-dd');
   return apiJson(`/contacts/${contactId}/employment-history/${entryId}/end?date=${today}`, { method: 'POST' });
 }

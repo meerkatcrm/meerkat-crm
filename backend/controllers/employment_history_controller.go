@@ -70,11 +70,11 @@ const maxUTCOffset = 14 * time.Hour
 // validatePeriodDates rejects a dated period (employment entry, relationship) whose EndDate is in the future or
 // before its StartDate. Either field may be empty (open-ended or undated), in
 // which case there is nothing to compare.
-func validatePeriodDates(startDate, endDate string) *apperrors.AppError {
+func validatePeriodDates(startDate, endDate string, now time.Time) *apperrors.AppError {
 	if endDate == "" {
 		return nil
 	}
-	if end, ok := models.PartialDateStart(endDate); ok && end.After(time.Now().UTC().Add(maxUTCOffset)) {
+	if end, ok := models.PartialDateStart(endDate); ok && end.After(now.UTC().Add(maxUTCOffset)) {
 		return apperrors.ErrInvalidInput("end_date", "End date must not be in the future")
 	}
 	if startDate == "" {
@@ -88,7 +88,7 @@ func validatePeriodDates(startDate, endDate string) *apperrors.AppError {
 	}
 
 	if end.Before(start) {
-		if start.After(time.Now().UTC()) {
+		if start.After(now.UTC()) {
 			return apperrors.ErrInvalidInput("end_date", "Start date is in the future; something that has not started cannot have ended")
 		}
 		return apperrors.ErrInvalidInput("end_date", "End date must not be before start date")
@@ -124,7 +124,7 @@ func CreateEmploymentHistory(c *gin.Context) {
 		return
 	}
 
-	if err := validatePeriodDates(input.StartDate, input.EndDate); err != nil {
+	if err := validatePeriodDates(input.StartDate, input.EndDate, middleware.RequestNow(c)); err != nil {
 		apperrors.AbortWithError(c, err)
 		return
 	}
@@ -152,7 +152,7 @@ func CreateEmploymentHistory(c *gin.Context) {
 		return
 	}
 
-	go services.TriggerWebhooks(db, currentConfig(c), userID, "employment_history.created", entry)
+	go services.TriggerWebhooks(db, currentConfig(c), userID, "employment_history.created", entry, middleware.RequestClock(c))
 	c.JSON(http.StatusCreated, gin.H{"employment_history": entry})
 }
 
@@ -193,7 +193,7 @@ func UpdateEmploymentHistory(c *gin.Context) {
 		return
 	}
 
-	if err := validatePeriodDates(input.StartDate, input.EndDate); err != nil {
+	if err := validatePeriodDates(input.StartDate, input.EndDate, middleware.RequestNow(c)); err != nil {
 		apperrors.AbortWithError(c, err)
 		return
 	}
@@ -217,7 +217,7 @@ func UpdateEmploymentHistory(c *gin.Context) {
 		return
 	}
 
-	go services.TriggerWebhooks(db, currentConfig(c), userID, "employment_history.updated", entry)
+	go services.TriggerWebhooks(db, currentConfig(c), userID, "employment_history.updated", entry, middleware.RequestClock(c))
 	c.JSON(http.StatusOK, gin.H{"employment_history": entry})
 }
 
@@ -249,7 +249,7 @@ func DeleteEmploymentHistory(c *gin.Context) {
 		return
 	}
 
-	go services.TriggerWebhooks(db, currentConfig(c), userID, "employment_history.deleted", gin.H{"id": entry.ID})
+	go services.TriggerWebhooks(db, currentConfig(c), userID, "employment_history.deleted", gin.H{"id": entry.ID}, middleware.RequestClock(c))
 	c.JSON(http.StatusOK, gin.H{"message": "Employment history entry deleted"})
 }
 
@@ -277,12 +277,12 @@ func EndEmploymentHistory(c *gin.Context) {
 
 	entry.EndDate = c.Query("date")
 	if entry.EndDate == "" {
-		entry.EndDate = time.Now().UTC().Format("2006-01-02")
+		entry.EndDate = middleware.RequestNow(c).UTC().Format("2006-01-02")
 	} else if _, err := time.Parse("2006-01-02", entry.EndDate); err != nil {
 		apperrors.AbortWithError(c, apperrors.ErrInvalidInput("date", "Date must be YYYY-MM-DD"))
 		return
 	}
-	if err := validatePeriodDates(entry.StartDate, entry.EndDate); err != nil {
+	if err := validatePeriodDates(entry.StartDate, entry.EndDate, middleware.RequestNow(c)); err != nil {
 		apperrors.AbortWithError(c, err)
 		return
 	}
@@ -298,6 +298,6 @@ func EndEmploymentHistory(c *gin.Context) {
 		return
 	}
 
-	go services.TriggerWebhooks(db, currentConfig(c), userID, "employment_history.updated", entry)
+	go services.TriggerWebhooks(db, currentConfig(c), userID, "employment_history.updated", entry, middleware.RequestClock(c))
 	c.JSON(http.StatusOK, gin.H{"employment_history": entry})
 }

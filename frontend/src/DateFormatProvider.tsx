@@ -1,4 +1,5 @@
 import { ReactNode, createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
+import { now } from './utils/now';
 
 export type DateFormat = "eu" | "us" | "iso";
 
@@ -94,7 +95,7 @@ export function calculateAgeFromBirthday(birthday: string): number | null {
   if (!birthday || birthday.startsWith('--')) {
     return null;
   }
-  return ageBetween(birthday, new Date());
+  return ageBetween(birthday, now());
 }
 
 /**
@@ -253,7 +254,7 @@ export function formatBirthdayWithFormat(birthday: string, format: DateFormat, i
     if (includeAge && year && year.length === 4) {
       const birthYear = parseInt(year, 10);
       if (!isNaN(birthYear)) {
-        const today = new Date();
+        const today = now();
         const birthDate = new Date(birthYear, parseInt(month, 10) - 1, parseInt(day, 10));
         let age = today.getFullYear() - birthYear;
         

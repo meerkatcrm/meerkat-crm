@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"image/jpeg"
+	"meerkat/clock"
 	"meerkat/config"
 	"meerkat/middleware"
 	"meerkat/models"
@@ -13,6 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -277,4 +279,16 @@ func TestImport_RejectsMalformedRequests(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, doJSON(t, f.router, http.MethodPost, "/import/vcf/confirm", gin.H{
 		"session_id": "x", "actions": []gin.H{{"row_index": 0, "action": "explode"}},
 	}).Code, "unknown action")
+}
+
+func TestSetImportClockIsUsedForSessionExpiry(t *testing.T) {
+	fake := clock.NewFake(time.Date(2031, 1, 2, 3, 4, 5, 0, time.UTC))
+	SetImportClock(fake)
+	t.Cleanup(func() { SetImportClock(clock.Real()) })
+
+	id := importSessions.CreateCSVSession(7, []string{"a"}, [][]string{{"x"}})
+	fake.Advance(time.Hour)
+	_, appErr := importSessions.PreviewCSV(nil, 7, models.ImportPreviewRequest{SessionID: id})
+	require.NotNil(t, appErr)
+	assert.Contains(t, appErr.Message, "expired")
 }

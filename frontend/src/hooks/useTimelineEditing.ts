@@ -6,6 +6,7 @@ import { updateActivity, deleteActivity, Activity } from '../api/activities';
 import { applyImageChange } from '../api/itemImages';
 import { handleError, ErrorNotifier } from '../utils/errorHandler';
 import type { TimelineItemValues } from '../components/EditTimelineItemDialog';
+import { now } from '../utils/now';
 
 export function useTimelineEditing(
   contactId: number | undefined,
@@ -60,7 +61,7 @@ export function useTimelineEditing(
       return undefined;
     }
     setEditTimelineDateError('');
-    return parsed ? new Date(parsed).toISOString() : new Date().toISOString();
+    return parsed ? new Date(parsed).toISOString() : now().toISOString();
   };
 
   const handleUpdateNote = async (noteId: number) => {
