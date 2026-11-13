@@ -161,3 +161,16 @@ func TestANonJSONMediaTypeIsInvalidInputWith400(t *testing.T) {
 		t.Fatalf("got %d %v", w.Code, body)
 	}
 }
+
+// huma can serve its spec and a docs UI; Mount leaves those paths unset, so the
+// API serves only its operations.
+func TestNoSpecOrDocsRoutesAreServed(t *testing.T) {
+	r := newTestRouter(t)
+	for _, path := range []string{"/api/v1/openapi", "/api/v1/openapi.json", "/api/v1/openapi.yaml", "/api/v1/docs", "/api/v1/schemas/Error.json"} {
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
+		if w.Code != http.StatusNotFound {
+			t.Errorf("GET %s: got %d, want 404", path, w.Code)
+		}
+	}
+}

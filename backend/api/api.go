@@ -150,7 +150,7 @@ func newError(status int, msg string, errs ...error) huma.StatusError {
 		for _, err := range errs {
 			d, ok := err.(huma.ErrorDetailer)
 			if !ok {
-				e.WithDetails("request", err.Error())
+				e.WithDetails(fieldOf(""), err.Error()) // not tied to a field: about the body as a whole
 				continue
 			}
 			detail := d.ErrorDetail()
