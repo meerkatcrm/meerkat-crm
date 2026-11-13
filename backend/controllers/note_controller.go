@@ -54,7 +54,7 @@ type NoteBody struct {
 	api.AcceptUnknownFields
 	Content   string    `json:"content" validate:"required,min=1,max=5000" maxLength:"5000"`
 	Date      time.Time `json:"date" validate:"required"`
-	ContactID *uint     `json:"contact_id,omitempty" nullable:"true" validate:"omitempty,gt=0" doc:"The contact the note is about. Ignored under /contacts/{id}/notes. On update, null or left out detaches the note."`
+	ContactID *uint     `json:"contact_id,omitempty" nullable:"true" minimum:"1" validate:"omitempty,gt=0" doc:"The contact the note is about. Ignored under /contacts/{id}/notes. On update, null or left out detaches the note."`
 }
 
 func (b *NoteBody) Resolve(_ huma.Context, prefix *huma.PathBuffer) []error {

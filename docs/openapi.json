@@ -120,7 +120,7 @@
           "contact_id": {
             "description": "The contact the note is about. Ignored under /contacts/{id}/notes. On update, null or left out detaches the note.",
             "format": "int64",
-            "minimum": 0,
+            "minimum": 1,
             "type": [
               "integer",
               "null"
