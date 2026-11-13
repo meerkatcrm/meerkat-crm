@@ -116,7 +116,7 @@ func (e *isolationEnv) seed(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 	create := func(row any) { require.NoError(t, e.db.Create(row).Error) }
 
-	contact := models.Contact{UserID: b, Firstname: "BSecretContact", VCardUID: "b-uid", Circles: []string{"friends"}}
+	contact := models.Contact{UserID: b, Firstname: "BSecretContact", Nickname: "BSecretNick", Email: "bsecret@example.com", Note: "BSecretContactNote", VCardUID: "b-uid", Circles: []string{"BSecretCircle"}}
 	create(&contact)
 	other := models.Contact{UserID: b, Firstname: "BSecretContactToo"}
 	create(&other)
@@ -395,10 +395,36 @@ func TestInvariants_NoMutatingRouteChangesAnotherUsersRows(t *testing.T) {
 	})
 	assert.Greater(t, walked, 60, "the walk must see the real route table")
 
-	// The snapshot sees B's rows; a copy of B's data into a row of A's is caught here.
-	var copied int64
-	require.NoError(t, e.db.Model(&models.Contact{}).Where("user_id = ? AND firstname LIKE ?", e.a.ID, secret+"%").Count(&copied).Error)
-	assert.Zero(t, copied, "a contact of A's carries B's data")
+	// The snapshot sees B's rows; a copy of B's data into anyone else's row is caught here.
+	assert.Empty(t, e.rowsOutsideBWith(t, secret), "rows outside B's carry B's data")
+}
+
+// rowsOutsideBWith returns "table: row" for every row, outside the ones the snapshot holds,
+// that has marker in any column.
+func (e *isolationEnv) rowsOutsideBWith(t *testing.T, marker string) []string {
+	t.Helper()
+	var tables []string
+	require.NoError(t, e.db.Raw("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name != 'schema_migrations' ORDER BY name").Scan(&tables).Error)
+	conds := e.snapshotConds(t)
+	var found []string
+	for _, table := range tables {
+		query, args := fmt.Sprintf("SELECT * FROM %q", table), []any{}
+		if c, ok := conds[table]; ok {
+			// COALESCE: with a NULL pointer column the OR is NULL, and NOT NULL would drop the row.
+			query += " WHERE NOT COALESCE(" + strings.Join(c, " OR ") + ", 0)"
+			args = append(args, map[string]any{"b": e.b.ID})
+		}
+		var rows []map[string]any
+		require.NoError(t, e.db.Raw(query, args...).Scan(&rows).Error, table)
+		for _, row := range rows {
+			data, err := json.Marshal(row)
+			require.NoError(t, err)
+			if strings.Contains(strings.ToLower(string(data)), strings.ToLower(marker)) {
+				found = append(found, table+": "+string(data))
+			}
+		}
+	}
+	return found
 }
 
 func TestInvariants_NoReadRouteShowsAnotherUsersRows(t *testing.T) {
