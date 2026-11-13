@@ -20,7 +20,7 @@ var migrationsFS embed.FS
 // InitDB initializes the database connection and runs migrations
 func InitDB(dbPath string) (*gorm.DB, error) {
 	// Open database connection for migrations
-	sqlDB, err := sql.Open("sqlite", dbPath)
+	sqlDB, err := sql.Open("sqlite", migrationDSN(dbPath))
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
@@ -28,11 +28,13 @@ func InitDB(dbPath string) (*gorm.DB, error) {
 
 	// Run migrations
 	if err := RunMigrations(sqlDB); err != nil {
-		return nil, fmt.Errorf("failed to run migrations: %w", err)
+		return nil, fmt.Errorf("failed to run migrations: %w%s", err, storageHint(err))
 	}
+	// Databases written while foreign keys were off may hold orphan rows.
+	warnForeignKeyViolations(sqlDB, dbPath)
 
 	// Open GORM connection
-	db, err := gorm.Open(sqlite.Open(immediateTxDSN(dbPath)), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(appDSN(dbPath)), &gorm.Config{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect with GORM: %w", err)
 	}
@@ -40,20 +42,96 @@ func InitDB(dbPath string) (*gorm.DB, error) {
 	return db, nil
 }
 
-// immediateTxDSN makes every transaction take SQLite's write lock at BEGIN.
+// Connection settings, applied by the driver to every pooled connection.
 //
-// By default a transaction starts as a reader and upgrades on its first write.
-// When another connection is already writing, that upgrade fails with
-// SQLITE_BUSY at once: SQLite does not apply busy_timeout, because waiting while
-// holding a read lock could deadlock. Any transaction that reads before writing
-// would be exposed to this. With BEGIN IMMEDIATE the wait happens at BEGIN, where
-// the driver's 5s busy_timeout applies.
-func immediateTxDSN(dbPath string) string {
+//   - busy_timeout=5000: a connection that finds the database locked waits up to
+//     5s instead of failing at once. The driver defaults to this too; it is set
+//     here because _txlock=immediate below relies on it.
+//   - journal_mode=WAL: readers no longer block on a writer, and a commit appends
+//     to the -wal file instead of rewriting pages. It persists in the database file.
+//     The -wal and -shm files must stay next to the database.
+//   - synchronous=NORMAL: in WAL mode a crash can lose the last commits but never
+//     corrupts the database, and commits skip one fsync each.
+//   - foreign_keys=ON: the schema's REFERENCES and ON DELETE CASCADE take effect.
+//   - _txlock=immediate: every transaction takes the write lock at BEGIN. By default
+//     a transaction starts as a reader and upgrades on its first write; when another
+//     connection is already writing, that upgrade fails with SQLITE_BUSY at once,
+//     because waiting while holding a read lock could deadlock. With BEGIN IMMEDIATE
+//     the wait happens at BEGIN, where busy_timeout applies.
+const (
+	pragmaBusyTimeout = "_pragma=busy_timeout(5000)"
+	pragmaWAL         = "_pragma=journal_mode(WAL)"
+	pragmaSyncNormal  = "_pragma=synchronous(NORMAL)"
+	pragmaForeignKeys = "_pragma=foreign_keys(1)"
+	txLockImmediate   = "_txlock=immediate"
+)
+
+// appDSN is the DSN of the application's connection pool.
+func appDSN(dbPath string) string {
+	return withDSNParams(dbPath, pragmaBusyTimeout, pragmaWAL, pragmaSyncNormal, pragmaForeignKeys, txLockImmediate)
+}
+
+// migrationDSN leaves foreign keys off: migrations recreate tables, which with
+// enforcement on would cascade deletes into, or fail on, the dependent rows.
+func migrationDSN(dbPath string) string {
+	return withDSNParams(dbPath, pragmaBusyTimeout, pragmaWAL, pragmaSyncNormal)
+}
+
+func withDSNParams(dbPath string, params ...string) string {
 	sep := "?"
 	if strings.Contains(dbPath, "?") {
 		sep = "&"
 	}
-	return dbPath + sep + "_txlock=immediate"
+	return dbPath + sep + strings.Join(params, "&")
+}
+
+// storageHint explains the errors SQLite gives when the database sits on a
+// filesystem without the shared memory and locking WAL needs (NFS, SMB). They
+// surface on the first query, which is the migration run.
+func storageHint(err error) string {
+	msg := strings.ToLower(err.Error())
+	for _, symptom := range []string{"disk i/o error", "unable to open database file", "locking protocol"} {
+		if strings.Contains(msg, symptom) {
+			return " (the database runs in WAL mode, which needs a local disk or Docker volume: " +
+				"if SQLITE_DB_PATH is on an NFS or SMB mount, move it; otherwise check that its directory exists and is writable)"
+		}
+	}
+	return ""
+}
+
+// foreignKeyViolations counts the rows PRAGMA foreign_key_check reports, per
+// "table -> parent". It holds no row data.
+func foreignKeyViolations(db *sql.DB) (map[string]int, error) {
+	rows, err := db.Query("PRAGMA foreign_key_check")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	counts := map[string]int{}
+	for rows.Next() {
+		var table, parent string
+		var rowid, fkid sql.NullInt64
+		if err := rows.Scan(&table, &rowid, &parent, &fkid); err != nil {
+			return nil, err
+		}
+		counts[table+" -> "+parent]++
+	}
+	return counts, rows.Err()
+}
+
+func warnForeignKeyViolations(db *sql.DB, dbPath string) {
+	counts, err := foreignKeyViolations(db)
+	if err != nil {
+		logger.Warn().Err(err).Msg("Could not run the foreign key check")
+		return
+	}
+	// The check runs on every start (it takes milliseconds on a CRM-sized database),
+	// so the warning repeats until the rows are cleaned up.
+	for relation, n := range counts {
+		logger.Warn().Str("relation", relation).Str("db", dbPath).Int("rows", n).
+			Msgf(`Rows reference a parent that no longer exists; changing them can fail now that foreign keys are enforced. `+
+				`List them with: sqlite3 %q "PRAGMA foreign_key_check", then delete them or point them at an existing parent`, dbPath)
+	}
 }
 
 // RunMigrations runs all pending database migrations
@@ -116,7 +194,7 @@ func RunMigrations(db *sql.DB) error {
 
 // MigrateDown rolls back the last migration (use with caution)
 func MigrateDown(dbPath string) error {
-	sqlDB, err := sql.Open("sqlite", dbPath)
+	sqlDB, err := sql.Open("sqlite", migrationDSN(dbPath))
 	if err != nil {
 		return fmt.Errorf("failed to open database: %w", err)
 	}
