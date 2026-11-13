@@ -26,6 +26,7 @@ import (
 // decision: anything not listed here must reject anonymous requests.
 var publicRoutes = map[string]bool{
 	"GET /health":                          true,
+	"GET /api/v1/auth/config":              true,
 	"GET /api/v1/auth/oidc/config":         true,
 	"GET /api/v1/auth/oidc/login":          true,
 	"GET /api/v1/auth/oidc/callback":       true,

@@ -30,6 +30,9 @@ func RegisterRoutes(router *gin.Engine, cfg *config.Config, db *gorm.DB, oidcPro
 	v1 := router.Group("/api/v1")
 	v1.Use(middleware.NumericIDParamsMiddleware())
 	{
+		// Which sign-in methods are offered (public, for the login page)
+		v1.GET("/auth/config", controllers.AuthConfigHandler(cfg))
+
 		// OIDC routes (config always public; login/callback only when OIDC is enabled)
 		v1.GET("/auth/oidc/config", controllers.OIDCConfigHandler(cfg))
 		if cfg.OIDC.Enabled && oidcProvider != nil {

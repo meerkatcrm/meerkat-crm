@@ -33,3 +33,25 @@ func TestValidateJWTMaxSessionHours(t *testing.T) {
 		})
 	}
 }
+
+func TestPasswordLoginAndRegistrationEnabled(t *testing.T) {
+	tests := []struct {
+		name                         string
+		oidc, pwDisabled, regDisable bool
+		wantPassword, wantRegister   bool
+	}{
+		{"defaults", false, false, false, true, true},
+		{"registration disabled", false, false, true, true, false},
+		{"password disable ignored without OIDC", false, true, false, true, true},
+		{"OIDC alongside passwords", true, false, false, true, true},
+		{"SSO only", true, true, false, false, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &Config{PasswordLoginDisabled: tt.pwDisabled, RegistrationDisabled: tt.regDisable}
+			c.OIDC.Enabled = tt.oidc
+			assert.Equal(t, tt.wantPassword, c.PasswordLoginEnabled())
+			assert.Equal(t, tt.wantRegister, c.RegistrationEnabled())
+		})
+	}
+}
