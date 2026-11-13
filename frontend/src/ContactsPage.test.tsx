@@ -15,8 +15,14 @@ vi.mock('./api/admin', () => ({ getCurrentUser: vi.fn(async () => ({})) }));
 vi.mock('./components/AddContactDialog', () => ({ default: () => null }));
 vi.mock('./components/ImportContactsDialog', () => ({ default: () => null }));
 vi.mock('./components/BulkEditContactsDialog', () => ({
-  default: ({ open, contactIds }: { open: boolean; contactIds: number[] }) =>
-    open ? <div data-testid="bulk-dialog">{[...contactIds].sort((a, b) => a - b).join(',')}</div> : null,
+  default: ({ open, contactIds, onComplete }: { open: boolean; contactIds: number[]; onComplete: (n: number) => void }) =>
+    open ? (
+      <div data-testid="bulk-dialog">
+        {[...contactIds].sort((a, b) => a - b).join(',')}
+        <button onClick={() => onComplete(2)}>finish-2</button>
+        <button onClick={() => onComplete(0)}>finish-0</button>
+      </div>
+    ) : null,
 }));
 
 const lastParams = () => vi.mocked(useContacts).mock.calls.at(-1)![0];
@@ -184,4 +190,19 @@ test('select all keeps nothing when the filters change while it collects', async
   fireEvent.click(screen.getByRole('switch', { name: 'Show archived' }));
   await act(async () => resolve({ contacts: [1, 2, 3, 4, 5].map(id => contact(id, 'X')), total: 5, page: 1, limit: 100 }));
   expect(screen.getByText('0 selected')).toBeInTheDocument();
+});
+
+test('after a bulk edit the message says how many contacts changed, or that none needed to', async () => {
+  mockList([contact(1, 'Ann'), contact(2, 'Bob')]);
+  renderAt('/contacts');
+  fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Select all on this page' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Edit selected' }));
+  fireEvent.click(screen.getByText('finish-2'));
+  expect(await screen.findByText('Updated 2 contacts')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Select all on this page' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Edit selected' }));
+  fireEvent.click(screen.getByText('finish-0'));
+  expect(await screen.findByText(/Nothing needed changing/)).toBeInTheDocument();
 });

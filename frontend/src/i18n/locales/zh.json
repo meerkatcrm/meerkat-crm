@@ -318,7 +318,8 @@
       "apply_one": "应用到 {{count}} 个联系人",
       "apply_other": "应用到 {{count}} 个联系人",
       "success_one": "已更新 {{count}} 个联系人",
-      "success_other": "已更新 {{count}} 个联系人"
+      "success_other": "已更新 {{count}} 个联系人",
+      "noneChanged": "无需更改：所选联系人已经是这些值"
     }
   },
   "timeline": {

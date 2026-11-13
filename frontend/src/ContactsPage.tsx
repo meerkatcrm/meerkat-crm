@@ -60,7 +60,7 @@ export default function ContactsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
   const [selectingAll, setSelectingAll] = useState(false);
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
-  const { showError, showSuccess } = useSnackbar();
+  const { showError, showSuccess, showInfo } = useSnackbar();
   const pageSize = 10;
 
   // While searching, the default order is the best match first (the server ranks when no
@@ -232,7 +232,11 @@ export default function ContactsPage() {
   const handleBulkEditComplete = async (updated: number) => {
     setBulkEditOpen(false);
     setSelectedIds(new Set());
-    showSuccess(t('contacts.bulkEdit.success', { count: updated }));
+    if (updated > 0) {
+      showSuccess(t('contacts.bulkEdit.success', { count: updated }));
+    } else {
+      showInfo(t('contacts.bulkEdit.noneChanged'));
+    }
     await refetch();
     await refreshCircles();
   };

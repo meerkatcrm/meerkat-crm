@@ -318,7 +318,8 @@
       "apply_one": "Auf {{count}} Kontakt anwenden",
       "apply_other": "Auf {{count}} Kontakte anwenden",
       "success_one": "{{count}} Kontakt aktualisiert",
-      "success_other": "{{count}} Kontakte aktualisiert"
+      "success_other": "{{count}} Kontakte aktualisiert",
+      "noneChanged": "Keine Änderung nötig: Die ausgewählten Kontakte hatten diese Werte bereits"
     }
   },
   "timeline": {

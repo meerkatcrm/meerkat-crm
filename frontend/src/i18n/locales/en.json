@@ -318,7 +318,8 @@
       "apply_one": "Apply to {{count}} contact",
       "apply_other": "Apply to {{count}} contacts",
       "success_one": "Updated {{count}} contact",
-      "success_other": "Updated {{count}} contacts"
+      "success_other": "Updated {{count}} contacts",
+      "noneChanged": "Nothing needed changing: the selected contacts already had these values"
     }
   },
   "timeline": {

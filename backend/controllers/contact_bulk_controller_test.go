@@ -274,3 +274,25 @@ func TestBulkUpdateContacts_WritesOnlyItsColumns(t *testing.T) {
 	assert.NotEqual(t, before.ETag, got.ETag, "the ETag moves so CardDAV clients pick up the change")
 	assert.True(t, got.UpdatedAt.After(before.UpdatedAt))
 }
+
+// Bulk edit is a deliberate write, like an import, so it doesn't apply the stale-client
+// guard of PUT /contacts/:id: setting the organization of an ended job opens a new current
+// entry for it, and the ended entry stays as it was.
+func TestBulkUpdateContacts_EmploymentFollowsImportSemantics(t *testing.T) {
+	db, router, user := setupBulkRouter(t)
+	ct := models.Contact{UserID: user.ID, Firstname: "Erin"}
+	require.NoError(t, db.Create(&ct).Error)
+	ended := models.EmploymentHistory{UserID: user.ID, ContactID: ct.ID, Organization: "Acme", StartDate: "2015-01-01", EndDate: "2020-01-01"}
+	require.NoError(t, db.Create(&ended).Error)
+
+	w := postBulk(router, gin.H{"contact_ids": []uint{ct.ID}, "organization": "Acme"})
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	assert.Equal(t, "Acme", loadContact(t, db, ct.ID).Organization)
+	var jobs []models.EmploymentHistory
+	require.NoError(t, db.Where("contact_id = ?", ct.ID).Order("id").Find(&jobs).Error)
+	require.Len(t, jobs, 2)
+	assert.Equal(t, "2020-01-01", jobs[0].EndDate, "the ended job is left alone")
+	assert.Equal(t, "Acme", jobs[1].Organization)
+	assert.Empty(t, jobs[1].EndDate, "a new current job is opened")
+}
