@@ -214,9 +214,11 @@ func RemovePhotoFromContact(c *gin.Context, cfg *config.Config) {
 	}
 
 	old := contact
-	contact.Photo, contact.PhotoThumbnailFile, contact.LegacyThumbnail = "", "", ""
-	// Save (not Updates) so empty strings are written and the CardDAV ETag changes.
-	if err := db.Save(&contact).Error; err != nil {
+	// Only the photo columns: a full Save would write back every other field as read
+	// above and undo an edit made in the meantime. UpdatedAt still moves, so AfterSave
+	// gives the contact a new CardDAV ETag.
+	if err := db.Model(&contact).Select("photo", "photo_thumbnail_file", "photo_thumbnail").
+		Updates(map[string]any{"photo": "", "photo_thumbnail_file": "", "photo_thumbnail": ""}).Error; err != nil {
 		apperrors.AbortWithError(c, apperrors.ErrDatabase("update").WithError(err))
 		return
 	}
