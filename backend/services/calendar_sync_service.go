@@ -755,7 +755,7 @@ func SyncCalendarsWithRateLimit(db *gorm.DB, cfg config.Config, clk clock.Clock)
 		minInterval = 30 * time.Minute
 	}
 
-	acquired, err := acquireJobLock(db, models.JobNameCalendarSync, minInterval, clk.Now())
+	acquired, err := acquireJobLock(db, models.JobNameCalendarSync, minInterval, clock.Real().Now())
 	if err != nil {
 		logger.Error().Err(err).Msg("Error checking calendar sync job lock")
 		metrics.JobResult(JobCalendarSync, metrics.ResultFailure)
@@ -769,7 +769,7 @@ func SyncCalendarsWithRateLimit(db *gorm.DB, cfg config.Config, clk clock.Clock)
 
 	SyncAllCalendars(db, cfg, clk)
 
-	if err := releaseJobLock(db, models.JobNameCalendarSync, true, clk.Now()); err != nil {
+	if err := releaseJobLock(db, models.JobNameCalendarSync, true, clock.Real().Now()); err != nil {
 		logger.Error().Err(err).Msg("Error releasing calendar sync job lock")
 	}
 	metrics.JobResult(JobCalendarSync, metrics.ResultSuccess)

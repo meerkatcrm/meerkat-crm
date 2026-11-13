@@ -113,7 +113,7 @@ func TriggerWebhooks(db *gorm.DB, cfg config.Config, userID uint, eventType stri
 			continue
 		}
 
-		d, err := enqueueWebhookDelivery(db, wh.ID, eventType, body, clk.Now())
+		d, err := enqueueWebhookDelivery(db, wh.ID, eventType, body, queueNow())
 		if err != nil {
 			logger.Error().Err(err).Uint("webhook_id", wh.ID).Msg("Failed to queue webhook delivery")
 			continue
@@ -124,8 +124,8 @@ func TriggerWebhooks(db *gorm.DB, cfg config.Config, userID uint, eventType stri
 			deliverySem <- struct{}{}
 			defer func() { <-deliverySem }()
 			// Claim only once a slot is free: a claim held while waiting would age.
-			if claimWebhookDelivery(db, d, clk.Now()) {
-				deliverWebhook(db, cfg, wh, d, clk)
+			if claimWebhookDelivery(db, d, queueNow()) {
+				deliverWebhook(db, cfg, wh, d)
 			}
 		})
 	}
@@ -143,16 +143,16 @@ func TestWebhookDelivery(db *gorm.DB, cfg config.Config, wh models.Webhook, clk 
 		db.Create(&d)
 		return d
 	}
-	d, err := enqueueWebhookDelivery(db, wh.ID, "test", body, clk.Now())
+	d, err := enqueueWebhookDelivery(db, wh.ID, "test", body, queueNow())
 	if err != nil {
 		logger.Error().Err(err).Uint("webhook_id", wh.ID).Msg("Failed to queue test webhook delivery")
 		errStr := webhookErrDeliveryFailed
 		return models.WebhookDelivery{WebhookID: wh.ID, EventType: "test", Error: &errStr, Status: models.OutboxDead}
 	}
-	if !claimWebhookDelivery(db, d, clk.Now()) {
+	if !claimWebhookDelivery(db, d, queueNow()) {
 		return d
 	}
-	return deliverWebhook(db, cfg, wh, d, clk)
+	return deliverWebhook(db, cfg, wh, d)
 }
 
 // enqueueWebhookDelivery writes the delivery as pending, due now. This row is the queue:
@@ -184,10 +184,10 @@ func claimWebhookDelivery(db *gorm.DB, d models.WebhookDelivery, now time.Time) 
 
 // deliverWebhook makes one try for a claimed delivery and records the outcome on the same
 // row: delivered, pending with the next try time (backoff), or dead.
-func deliverWebhook(db *gorm.DB, cfg config.Config, wh models.Webhook, d models.WebhookDelivery, clk clock.Clock) models.WebhookDelivery {
+func deliverWebhook(db *gorm.DB, cfg config.Config, wh models.Webhook, d models.WebhookDelivery) models.WebhookDelivery {
 	statusCode, errStr, permanent := sendWebhook(cfg, wh, d.EventType, []byte(d.Payload))
 	// Read after the HTTP call, which can take long: the next try is scheduled from when this one ended.
-	return finishWebhookDelivery(db, d, d.Attempts+1, statusCode, errStr, permanent, clk.Now())
+	return finishWebhookDelivery(db, d, d.Attempts+1, statusCode, errStr, permanent, queueNow())
 }
 
 // sendWebhook performs the HTTP call. permanent marks a refusal that retrying cannot fix.
@@ -265,8 +265,8 @@ func computeSignature(secret string, body []byte) string {
 // ProcessWebhookOutbox delivers every pending delivery whose time has come: first tries
 // that a restart interrupted, and retries after a failure. It returns when all are done.
 // A delivery whose webhook was deleted or disabled, or whose owner was deleted, is dead.
-func ProcessWebhookOutbox(db *gorm.DB, cfg config.Config, clk clock.Clock) {
-	now := clk.Now()
+func ProcessWebhookOutbox(db *gorm.DB, cfg config.Config) {
+	now := queueNow()
 	var due []models.WebhookDelivery
 	if err := db.Where("status = ? AND next_retry_at <= ? AND (locked_at IS NULL OR locked_at < ?)",
 		models.OutboxPending, now, now.Add(-outboxLockTimeout)).
@@ -291,9 +291,9 @@ func ProcessWebhookOutbox(db *gorm.DB, cfg config.Config, clk clock.Clock) {
 			deliverySem <- struct{}{}
 			defer func() { <-deliverySem }()
 			// Claim inside the slot: a claim made up front would age while queued.
-			if claimWebhookDelivery(db, d, clk.Now()) {
+			if claimWebhookDelivery(db, d, queueNow()) {
 				// The original payload is replayed, so retries share the event ID and timestamp.
-				deliverWebhook(db, cfg, wh, d, clk)
+				deliverWebhook(db, cfg, wh, d)
 			}
 		}()
 	}

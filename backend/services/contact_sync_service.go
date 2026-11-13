@@ -1361,7 +1361,7 @@ func SyncContactsWithRateLimit(db *gorm.DB, cfg config.Config, clk clock.Clock) 
 		minInterval = 30 * time.Minute
 	}
 
-	acquired, err := acquireJobLock(db, models.JobNameContactSync, minInterval, clk.Now())
+	acquired, err := acquireJobLock(db, models.JobNameContactSync, minInterval, clock.Real().Now())
 	if err != nil {
 		logger.Error().Err(err).Msg("Error checking contact sync job lock")
 		metrics.JobResult(JobContactSync, metrics.ResultFailure)
@@ -1375,7 +1375,7 @@ func SyncContactsWithRateLimit(db *gorm.DB, cfg config.Config, clk clock.Clock) 
 
 	SyncAllContactConnections(db, cfg, clk)
 
-	if err := releaseJobLock(db, models.JobNameContactSync, true, clk.Now()); err != nil {
+	if err := releaseJobLock(db, models.JobNameContactSync, true, clock.Real().Now()); err != nil {
 		logger.Error().Err(err).Msg("Error releasing contact sync job lock")
 	}
 	metrics.JobResult(JobContactSync, metrics.ResultSuccess)

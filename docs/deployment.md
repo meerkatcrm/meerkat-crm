@@ -255,7 +255,7 @@ the file name as version, which the browser caches.
 `FAKE_NOW` (an RFC 3339 time such as `2026-12-24T12:00:00Z`) starts the server clock at that instant and lets it run, so a demo or a manual test can walk through time: a birthday next week, a reminder due tomorrow, a password reset link about to expire. **Do not set it on a real instance.** The server logs a warning at startup. While it is set:
 
 - the delivery queue purge is skipped, because a clock set into the future would delete data for good;
-- the schedule of the background jobs still follows the real time: the fake clock changes what a job does, not when it starts;
+- scheduling still follows the real time: when background jobs start, the job locks that stop them running twice, when queued emails and webhooks are sent and retried, and login lockouts. The fake clock changes what a job does, not when it runs;
 - stored timestamps (`created_at`, `updated_at`, sync times) use the fake time, so contact sync against a real CardDAV server compares real remote revisions with fake local ones;
 - the browser does not follow it: dates the web app computes itself (the default date of a new note, "overdue") use the browser clock.
 

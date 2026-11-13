@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"meerkat/clock"
+	"meerkat/config"
 	"meerkat/database"
 	"meerkat/models"
 
@@ -153,4 +155,18 @@ func TestAcquireJobLock_SkipsWhileAnotherInstanceHoldsLock(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.False(t, acquired)
+}
+
+// Job locks decide when a job runs, so they follow the wall clock even under a fake
+// clock: a last_run_at stamped in the future would block the job once the clock changes.
+func TestJobLockIgnoresFakeClock(t *testing.T) {
+	db := setupFileDB(t)
+	future := clock.NewFake(time.Date(2031, 12, 24, 12, 0, 0, 0, time.UTC))
+	cfg := config.Config{ReminderTime: "12:00"}
+
+	require.NoError(t, SendRemindersWithRateLimit(db, cfg, future))
+
+	var job models.JobExecution
+	require.NoError(t, db.Where("job_name = ?", models.JobNameDailyReminders).First(&job).Error)
+	assert.WithinDuration(t, time.Now(), job.LastRunAt, time.Minute)
 }

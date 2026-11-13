@@ -78,11 +78,12 @@ func RegisterUser(cfg *config.Config) gin.HandlerFunc {
 	}
 }
 
-// accountLockedError is the 429 for a login that is locked out after repeated failures.
-func accountLockedError(retryAfterSecs int, now time.Time) *apperrors.AppError {
+// accountLockedError is the 429 for a login that is locked out after repeated failures. The
+// rate limiter counts the lockout on the wall clock, so its end is on the wall clock too.
+func accountLockedError(retryAfterSecs int) *apperrors.AppError {
 	return apperrors.NewError(apperrors.ErrCodeRateLimitExceeded, "Too many failed login attempts. Please try again later.", http.StatusTooManyRequests).
 		WithDetails("retry_after", retryAfterSecs).
-		WithDetails("retry_after_at", now.Add(time.Duration(retryAfterSecs)*time.Second).Format(time.RFC3339))
+		WithDetails("retry_after_at", clock.Real().Now().Add(time.Duration(retryAfterSecs)*time.Second).Format(time.RFC3339))
 }
 
 // LoginInput represents the DTO for login requests
@@ -124,7 +125,7 @@ func LoginUser(context *gin.Context, cfg *config.Config) {
 	// Check per-account rate limiting before attempting authentication
 	accountLimiter := middleware.GetAccountRateLimiter()
 	if isLocked, remainingSecs := accountLimiter.IsLocked(identifier); isLocked {
-		apperrors.AbortWithError(context, accountLockedError(remainingSecs, middleware.RequestNow(context)))
+		apperrors.AbortWithError(context, accountLockedError(remainingSecs))
 		return
 	}
 
@@ -156,7 +157,7 @@ func LoginUser(context *gin.Context, cfg *config.Config) {
 		// Record failed attempt for password mismatch
 		isLocked, lockoutSecs := accountLimiter.RecordFailedAttempt(identifier)
 		if isLocked {
-			apperrors.AbortWithError(context, accountLockedError(lockoutSecs, middleware.RequestNow(context)))
+			apperrors.AbortWithError(context, accountLockedError(lockoutSecs))
 			return
 		}
 		apperrors.AbortWithError(context, apperrors.ErrInvalidCredentials())
@@ -299,7 +300,7 @@ func processPasswordResetRequest(db *gorm.DB, cfg *config.Config, log *zerolog.L
 		return
 	}
 
-	if err := services.SendPasswordResetEmail(db, user.ID, user.Email, token, user.Language, cfg, clk); err != nil {
+	if err := services.SendPasswordResetEmail(db, user.ID, user.Email, token, user.Language, cfg); err != nil {
 		log.Error().Err(err).Uint("user_id", user.ID).Msg("Failed to queue password reset email")
 		// Nothing was delivered, so a retry should not have to wait out the cooldown
 		if err := db.Model(&models.User{}).Where("id = ?", user.ID).Update("password_reset_requested_at", nil).Error; err != nil {

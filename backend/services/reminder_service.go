@@ -37,7 +37,9 @@ func getInstanceID() string {
 	return fmt.Sprintf("%s-%d", hostname, os.Getpid())
 }
 
-// acquireJobLock attempts to acquire a lock for the given job.
+// acquireJobLock attempts to acquire a lock for the given job. Callers pass the wall clock
+// (clock.Real), never FAKE_NOW: the lock decides when a job runs, and a last_run_at stamped
+// by a fake clock would block the job once the clock changes.
 // Returns true if the lock was acquired, false if the job was run recently
 // or is currently locked by another instance. A database failure is returned as
 // an error, because the job did not run and the caller should say so.
@@ -167,9 +169,9 @@ func reminderJobRanToday(db *gorm.DB, cfg config.Config, now time.Time) bool {
 // to prevent duplicate sends during rapid restarts
 func SendRemindersWithRateLimit(db *gorm.DB, cfg config.Config, clk clock.Clock) error {
 	// Read before the lock is taken: acquiring it for the first time stamps LastRunAt.
-	dailyEvents := !reminderJobRanToday(db, cfg, clk.Now())
+	dailyEvents := !reminderJobRanToday(db, cfg, clock.Real().Now())
 
-	acquired, err := acquireJobLock(db, models.JobNameDailyReminders, ReminderMinInterval, clk.Now())
+	acquired, err := acquireJobLock(db, models.JobNameDailyReminders, ReminderMinInterval, clock.Real().Now())
 	if err != nil {
 		logger.Error().Err(err).Msg("Error checking job lock")
 		metrics.JobResult(JobReminders, metrics.ResultFailure)
@@ -186,7 +188,7 @@ func SendRemindersWithRateLimit(db *gorm.DB, cfg config.Config, clk clock.Clock)
 	err = sendReminders(db, cfg, dailyEvents, clk)
 
 	// Release the lock, marking success if no error
-	if releaseErr := releaseJobLock(db, models.JobNameDailyReminders, err == nil, clk.Now()); releaseErr != nil {
+	if releaseErr := releaseJobLock(db, models.JobNameDailyReminders, err == nil, clock.Real().Now()); releaseErr != nil {
 		logger.Error().Err(releaseErr).Msg("Error releasing job lock")
 	}
 	metrics.JobDone(JobReminders, err)
@@ -499,7 +501,7 @@ func sendReminderEmail(user models.User, reminders []models.Reminder, config con
 		To:      user.Email,
 		Subject: i18n.T(lang, "email.reminder.subject"),
 		HTML:    htmlContent,
-	}, clk); err != nil {
+	}); err != nil {
 		logger.Error().Err(err).Uint("user_id", user.ID).Msg("Failed to queue reminder email")
 		return err
 	}

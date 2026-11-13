@@ -104,7 +104,7 @@ func TestProcessWebhookOutboxSkipsDeletedUsers(t *testing.T) {
 	require.NoError(t, db.Create(&orphanDelivery).Error)
 	require.NoError(t, db.Delete(&deleted).Error)
 
-	ProcessWebhookOutbox(db, config.Config{}, clock.Real())
+	ProcessWebhookOutbox(db, config.Config{})
 
 	// The live retry is recorded on the same row and waits for the next try
 	var reloaded models.WebhookDelivery

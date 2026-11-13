@@ -135,8 +135,8 @@ func main() {
 	// The delivery outbox (webhook and email retries, and first tries a restart interrupted).
 	// Singleton: a run that outlasts the interval must not overlap with the next one.
 	schedule(s.Every(1).Minute().SingletonMode().Do(func() {
-		services.ProcessWebhookOutbox(db, *cfg, clk)
-		services.ProcessEmailOutbox(db, *cfg, clk)
+		services.ProcessWebhookOutbox(db, *cfg)
+		services.ProcessEmailOutbox(db, *cfg)
 	}))
 	schedule(s.Every(1).Hour().Do(func() {
 		if fakeClock {
