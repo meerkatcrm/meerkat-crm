@@ -95,7 +95,7 @@ Every request and response carries an `X-Request-ID` header created by the middl
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/contacts` | List contacts (supports search and circle filter). `search` matches name, nickname, e-mail addresses and phone numbers, and the names of relationships without a contact of their own: case and accents are ignored (`zoe` finds `Zoë`), and every word must match the start of a word, in any order (`mül zo`). Without `sort` the best match comes first. Terms with only digits and phone punctuation (`795550`), with no letters or digits, or in a script written without spaces between words (Chinese, Japanese, Korean, Thai, Lao, Khmer, Myanmar, Tibetan) are substring searches. `search` on `/notes` and `/activities` matches the same way but keeps date order |
+| `GET` | `/contacts` | List contacts (supports search and circle filter). `search` matches name, nickname, e-mail addresses and phone numbers: case and accents are ignored (`zoe` finds `Zoë`), and every word must match the start of a word, in any order (`mül zo`). It also matches the names of relationships without a contact of their own, anywhere in the name. Without `sort` the best match comes first (for a substring search: names that start with the term). Terms with only digits and phone punctuation (`795550`), with no letters or digits, or in a script written without spaces between words (Chinese, Japanese, Korean, Thai, Lao, Khmer, Myanmar, Tibetan) are substring searches. `search` on `/notes` and `/activities` matches the same way but keeps date order |
 | `POST` | `/contacts` | Create a contact |
 | `GET` | `/contacts/:id` | Get a contact (supports filtering the returned fields) |
 | `PUT` | `/contacts/:id` | Update a contact |

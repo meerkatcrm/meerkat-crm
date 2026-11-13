@@ -19,6 +19,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // contactSelectableFields lists the columns a client may request via ?fields=.
@@ -209,9 +210,17 @@ func GetContacts(c *gin.Context) {
 	if includeArchived && searchTerm != "" {
 		query = query.Order("archived ASC")
 	}
-	// A full-text search lists the best match first, unless the caller asked for an order
+	// A search lists the best match first, unless the caller asked for an order: the index
+	// rank, or for a substring search, names that start with the term
 	if match != "" && c.Query("sort") == "" {
 		query = query.Order("hits.hit_rank IS NULL, hits.hit_rank, contacts.id DESC")
+	} else if searchTerm != "" && c.Query("sort") == "" {
+		prefix := strings.TrimPrefix(searchArg(searchTerm).Value.(string), "%")
+		query = query.Order(clause.OrderBy{Expression: clause.Expr{
+			SQL:                `(firstname LIKE ? ESCAPE '\' OR lastname LIKE ? ESCAPE '\') DESC, contacts.id DESC`,
+			Vars:               []any{prefix, prefix},
+			WithoutParentheses: true,
+		}})
 	} else if sortField == "random" {
 		query = query.Order("RANDOM()")
 	} else {

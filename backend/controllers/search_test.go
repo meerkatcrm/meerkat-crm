@@ -168,6 +168,15 @@ func TestContactSearchRanksUnlessASortIsRequested(t *testing.T) {
 	assert.EqualValues(t, 3, paged["total"])
 }
 
+func TestSubstringSearchListsNamesStartingWithTheTermFirst(t *testing.T) {
+	db, r, u := searchRouter(t)
+	require.NoError(t, db.Create(&models.Contact{UserID: u.ID, Firstname: "太郎", Lastname: "山田"}).Error)
+	require.NoError(t, db.Create(&models.Contact{UserID: u.ID, Firstname: "花子", Lastname: "小山田"}).Error)
+	assert.Equal(t, []string{"太郎", "花子"}, contactField(getJSON(t, r, "/contacts", url.Values{"search": {"山田"}}), "firstname"),
+		"name starting with the term first, although it is older")
+	assert.Equal(t, []string{"花子", "太郎"}, contactField(getJSON(t, r, "/contacts", url.Values{"search": {"山田"}, "sort": {"id"}}), "firstname"))
+}
+
 func TestNoteAndActivitySearch(t *testing.T) {
 	db, r, u := searchRouter(t)
 	other := models.User{Username: "other", Password: "password123", Email: "other@example.com"}
