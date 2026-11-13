@@ -204,3 +204,38 @@ func TestBulkUpdateContacts_KeepsLegacyThumbnail(t *testing.T) {
 	assert.Equal(t, "tea", got.FoodPreference)
 	assert.Equal(t, "data:image/png;base64,AAAA", got.LegacyThumbnail, "the column it doesn't load is not wiped")
 }
+
+func TestBulkUpdateContacts_SkipsContactsDeletedSinceSelected(t *testing.T) {
+	db, router, user := setupBulkRouter(t)
+	kept := models.Contact{UserID: user.ID, Firstname: "Kept"}
+	gone := models.Contact{UserID: user.ID, Firstname: "Gone"}
+	require.NoError(t, db.Create(&kept).Error)
+	require.NoError(t, db.Create(&gone).Error)
+	require.NoError(t, models.DeleteContactCascade(db, user.ID, gone.ID))
+
+	w := postBulk(router, gin.H{"contact_ids": []uint{kept.ID, gone.ID}, "food_preference": "tea"})
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var resp map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, float64(1), resp["updated"])
+	assert.Equal(t, "tea", loadContact(t, db, kept.ID).FoodPreference)
+
+	var deleted models.Contact
+	require.NoError(t, db.Unscoped().First(&deleted, gone.ID).Error)
+	assert.Empty(t, deleted.FoodPreference, "a deleted contact is not written")
+}
+
+func TestBulkUpdateContacts_AnotherUsersDeletedContactStillFails(t *testing.T) {
+	db, router, user := setupBulkRouter(t)
+	other := models.User{Username: "other", Password: "password123", Email: "other@example.com"}
+	require.NoError(t, db.Create(&other).Error)
+	mine := models.Contact{UserID: user.ID, Firstname: "Mine"}
+	theirs := models.Contact{UserID: other.ID, Firstname: "Theirs"}
+	require.NoError(t, db.Create(&mine).Error)
+	require.NoError(t, db.Create(&theirs).Error)
+	require.NoError(t, models.DeleteContactCascade(db, other.ID, theirs.ID))
+
+	w := postBulk(router, gin.H{"contact_ids": []uint{mine.ID, theirs.ID}, "food_preference": "tea"})
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	assert.Empty(t, loadContact(t, db, mine.ID).FoodPreference)
+}

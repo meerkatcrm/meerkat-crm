@@ -90,8 +90,17 @@ func BulkUpdateContacts(c *gin.Context) {
 			return apperrors.ErrDatabase("Failed to load contacts").WithError(err)
 		}
 		if len(contacts) != len(ids) {
-			// One of them is gone or someone else's: change none rather than some.
-			return apperrors.ErrNotFound("Contact")
+			// A contact the user deleted since selecting it can't be edited and is
+			// skipped. Any other id is unknown or someone else's: change none rather than some.
+			var deleted int64
+			if err := tx.Unscoped().Model(&models.Contact{}).
+				Where("user_id = ? AND id IN ? AND deleted_at IS NOT NULL", userID, ids).
+				Count(&deleted).Error; err != nil {
+				return apperrors.ErrDatabase("Failed to load contacts").WithError(err)
+			}
+			if len(contacts)+int(deleted) != len(ids) {
+				return apperrors.ErrNotFound("Contact")
+			}
 		}
 		for i := range contacts {
 			contact := &contacts[i]
