@@ -62,6 +62,9 @@ func TestSelfContactRoundTrip(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, put(alice.ID))
 	assert.EqualValues(t, alice.ID, self())
+	// Marking the same contact again (a double click) is not an error.
+	assert.Equal(t, http.StatusOK, put(alice.ID))
+	assert.EqualValues(t, alice.ID, self())
 
 	// Marking another contact moves the mark: exactly one contact is "me".
 	assert.Equal(t, http.StatusOK, put(bob.ID))
