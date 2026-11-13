@@ -42,6 +42,11 @@ type ImportSessionManager struct {
 	clock    atomic.Pointer[clock.Clock]
 }
 
+// ImportSessionNotFound is the message of the error both import session stores (CSV/vCard and
+// Monica) give for an unknown session id. The route invariant tests look for it to find the
+// routes keyed by a session.
+const ImportSessionNotFound = "Import session expired or not found"
+
 // NewImportSessionManager creates an empty session manager.
 func NewImportSessionManager() *ImportSessionManager {
 	m := &ImportSessionManager{sessions: make(map[string]*importSessionData)}
@@ -105,7 +110,7 @@ func (m *ImportSessionManager) get(sessionID string, userID uint) (*importSessio
 	m.mu.RUnlock()
 
 	if !exists {
-		return nil, apperrors.ErrNotFound("Import session expired or not found")
+		return nil, apperrors.ErrNotFound(ImportSessionNotFound)
 	}
 
 	if sessionData.session.UserID != userID {

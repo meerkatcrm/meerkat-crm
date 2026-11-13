@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -20,6 +21,7 @@ import (
 	"meerkat/database"
 	"meerkat/middleware"
 	"meerkat/models"
+	"meerkat/services"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -68,10 +70,6 @@ var sessionKeyed = map[string]proof{
 	"POST /api/v1/contacts/import/monica/confirm":   {"controllers/monica_import_controller_test.go", "TestMonicaSessionOwnershipEnforced"},
 	"DELETE /api/v1/contacts/import/monica/session": {"controllers/monica_import_controller_test.go", "TestMonicaSessionOwnershipEnforced"},
 }
-
-// sessionNotFound is how both import session stores answer the walk's made-up session id; a
-// mutating route that answers with it must be in sessionKeyed.
-const sessionNotFound = "Import session expired or not found"
 
 const isolationPassword = "Correct-horse-1!"
 
@@ -327,7 +325,9 @@ func (e *isolationEnv) targets(route string) (out []target, ok bool) {
 }
 
 // refuses checks the answer to a request aimed at B's data. The JSON API answers 403 or 404;
-// go-webdav answers CardDAV with several codes (404, 405, 501, ...), so there any non-2xx will do.
+// go-webdav answers CardDAV with several codes, so there any non-2xx will do. That includes
+// 500: the backend refuses an unknown or unsupported address book with a plain error, which
+// go-webdav sends as 500, so a crash would pass here too. The snapshot still catches any write.
 func refuses(path string, code int) bool {
 	if strings.HasPrefix(path, "/carddav/") {
 		return code < 200 || code >= 300
@@ -369,25 +369,35 @@ func (e *isolationEnv) walk(t *testing.T, methods func(string) bool, check func(
 
 // body carries every field the JSON routes require, with B's ids wherever a field names one
 // of B's rows or B's user id, so a route that trusts the body over the owner shows up in the
-// snapshot. Only the field names listed here are probed: a route that takes a row id under a
-// new name needs that name added, or the walk sends it nothing of B's.
+// snapshot. Only the id field names in idFields are probed.
 func (e *isolationEnv) body() []byte {
 	c1, c2 := e.ids["contacts"], e.contact2
-	data, _ := json.Marshal(map[string]any{
+	fields := map[string]any{
 		"firstname": "Mine", "title": "Mine", "name": "Mine", "message": "Mine", "content": "Mine",
 		"type": "Friend", "organization": "Mine", "date": time.Now().UTC().Format(time.RFC3339),
 		"remind_at": time.Now().UTC().Add(24 * time.Hour).Format(time.RFC3339), "recurrence": "once",
-		"contact_id": c1, "contact_ids": []uint{c1, c2}, "related_contact_id": c2, "source_id": c2,
-		"user_id": e.b.ID, "reminder_id": e.ids["reminders"], "webhook_id": e.ids["webhooks"],
-		"subscription_id": e.ids["calendars"], "connection_id": e.ids["carddav-connection"], "activity_id": e.ids["activities"],
-		"contact_a_id": c1, "contact_b_id": c2, "url": "https://127.0.0.1:1/x", "base_url": "https://127.0.0.1:1/",
+		"contact_ids": []uint{c1, c2}, "url": "https://127.0.0.1:1/x", "base_url": "https://127.0.0.1:1/",
 		"address_book_path": "/ab/", "events": []string{"contact.created"}, "language": "de",
 		"date_format": "iso", "mode": "all", "circles": []string{"x"}, "hide_empty_contact_fields": true,
 		"names": []string{"x"}, "fields": []string{"email"}, "session_id": "b-session", "api_token": "t", "mappings": []any{}, "actions": []any{},
-	}) // No password fields, and the circle filter mode "all": either would hide CardDAV from A
+	} // No password fields, and the circle filter mode "all": either would hide CardDAV from A
 	// for the rest of the walk.
-
+	for name, id := range e.idFields() {
+		fields[name] = id
+	}
+	data, _ := json.Marshal(fields)
 	return data
+}
+
+// idFields are the request fields that name one of B's rows, or B. body() and the query string
+// both carry them; a route that takes a row id under another name needs it added here.
+func (e *isolationEnv) idFields() map[string]uint {
+	c1, c2 := e.ids["contacts"], e.contact2
+	return map[string]uint{
+		"contact_id": c1, "related_contact_id": c2, "source_id": c2, "contact_a_id": c1, "contact_b_id": c2,
+		"user_id": e.b.ID, "reminder_id": e.ids["reminders"], "webhook_id": e.ids["webhooks"],
+		"subscription_id": e.ids["calendars"], "connection_id": e.ids["carddav-connection"], "activity_id": e.ids["activities"],
+	}
 }
 
 // cardDAVBody returns a well-formed body for method, so a CardDAV request is refused for the
@@ -407,8 +417,11 @@ func cardDAVBody(method string) (body, contentType string) {
 
 func (e *isolationEnv) send(method, path string) *httptest.ResponseRecorder {
 	if !strings.HasPrefix(path, "/carddav/") {
-		// query fields, with B's ids as in body()
-		path += "?source_id=" + strconv.Itoa(int(e.contact2)) + "&session_id=b-session&search=" + strings.ToLower(secret)
+		query := url.Values{"session_id": {"b-session"}, "search": {strings.ToLower(secret)}}
+		for name, id := range e.idFields() {
+			query.Set(name, strconv.Itoa(int(id)))
+		}
+		path += "?" + query.Encode()
 	}
 	return request(e.router, method, path, func(r *http.Request) {
 		if strings.HasPrefix(path, "/carddav/") {
@@ -437,7 +450,7 @@ func TestInvariants_NoMutatingRouteChangesAnotherUsersRows(t *testing.T) {
 
 	walked := e.walk(t, func(m string) bool { return mutating[m] }, func(method string, tg target, w *httptest.ResponseRecorder) {
 		assert.False(t, showsSecret(w.Body.String()), "%s %s shows B's data to A", method, tg.path)
-		if _, listed := sessionKeyed[method+" "+tg.path]; !listed && strings.Contains(w.Body.String(), sessionNotFound) {
+		if _, listed := sessionKeyed[method+" "+tg.path]; !listed && strings.Contains(w.Body.String(), services.ImportSessionNotFound) {
 			t.Errorf("%s %s looks up an import session: add it to sessionKeyed with the test that proves its isolation", method, tg.path)
 		}
 		// Stop at the first change: the rest of the walk would run against B's damaged rows.
