@@ -9,7 +9,7 @@ import (
 
 func TestDeleteContactCascade(t *testing.T) {
 	db := setupTestDB(t)
-	if err := db.AutoMigrate(&Reminder{}, &Note{}, &Relationship{}, &Activity{}); err != nil {
+	if err := db.AutoMigrate(&Reminder{}, &Note{}, &Relationship{}, &Activity{}, &User{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 
@@ -19,6 +19,15 @@ func TestDeleteContactCascade(t *testing.T) {
 	for _, c := range []*Contact{&gone, &kept, &foreign} {
 		if err := db.Create(c).Error; err != nil {
 			t.Fatalf("create contact: %v", err)
+		}
+	}
+	// Only the deleted contact's "me" mark goes, never another user's.
+	for _, u := range []User{
+		{Model: gorm.Model{ID: 1}, Username: "one", Email: "one@example.com", SelfContactID: &gone.ID},
+		{Model: gorm.Model{ID: 2}, Username: "two", Email: "two@example.com", SelfContactID: &foreign.ID},
+	} {
+		if err := db.Create(&u).Error; err != nil {
+			t.Fatalf("create user: %v", err)
 		}
 	}
 	activity := Activity{UserID: 1, Title: "Dinner", Date: time.Now(), Contacts: []Contact{gone, kept}}
@@ -44,6 +53,9 @@ func TestDeleteContactCascade(t *testing.T) {
 	if n := count(t, db, &Contact{}, "id = ?", gone.ID); n != 1 {
 		t.Fatalf("another user's cascade deleted the contact")
 	}
+	if n := count(t, db, &User{}, "id = 1 AND self_contact_id = ?", gone.ID); n != 1 {
+		t.Fatalf("another user's cascade cleared the self contact mark")
+	}
 
 	if err := db.Transaction(func(tx *gorm.DB) error { return DeleteContactCascade(tx, 1, gone.ID) }); err != nil {
 		t.Fatalf("cascade: %v", err)
@@ -57,6 +69,7 @@ func TestDeleteContactCascade(t *testing.T) {
 		"own relationships":   count(t, db, &Relationship{}, "contact_id = ?", gone.ID),
 		"incoming link":       count(t, db, &Relationship{}, "related_contact_id = ?", gone.ID),
 		"activity membership": countRaw(t, db, "SELECT COUNT(*) FROM activity_contacts WHERE contact_id = ?", gone.ID),
+		"self contact mark":   count(t, db, &User{}, "id = 1 AND self_contact_id IS NOT NULL"),
 	} {
 		if got != 0 {
 			t.Errorf("%s: %d rows left", name, got)
@@ -68,6 +81,7 @@ func TestDeleteContactCascade(t *testing.T) {
 		"incoming relationship itself": count(t, db, &Relationship{}, "contact_id = ? AND name = ?", kept.ID, "Gone"),
 		"activity":                     count(t, db, &Activity{}, "id = ?", activity.ID),
 		"other activity membership":    countRaw(t, db, "SELECT COUNT(*) FROM activity_contacts WHERE contact_id = ?", kept.ID),
+		"other user's self mark":       count(t, db, &User{}, "id = 2 AND self_contact_id = ?", foreign.ID),
 	} {
 		if got != 1 {
 			t.Errorf("%s: want 1 row, got %d", name, got)

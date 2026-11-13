@@ -18,7 +18,10 @@ import {
   useTheme,
   Autocomplete,
   TextField,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import NetworkGraph from './components/NetworkGraph';
 import NetworkLegend from './components/NetworkLegend';
 import EditTimelineItemDialog from './components/EditTimelineItemDialog';
@@ -27,6 +30,7 @@ import { GraphNode } from './types/graph';
 import { Activity, getActivity, updateActivity, deleteActivity } from './api/activities';
 import { applyImageChange, ImageChange } from './api/itemImages';
 import { Contact } from './api/contacts';
+import { getCurrentUser } from './api/admin';
 import { NetworkFilters, loadNetworkFilters, saveNetworkFilters } from './networkFilters';
 import { useDateFormat } from './DateFormatProvider';
 import { useSnackbar } from './context/SnackbarContext';
@@ -47,6 +51,7 @@ export default function NetworkPage() {
   const [centeredNodeId, setCenteredNodeId] = useState<string | null>(() => {
     return localStorage.getItem('network-centered-node-id');
   });
+  const [selfContactId, setSelfContactId] = useState<number | null>(null);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   const [editValues, setEditValues] = useState<{
     activityTitle?: string;
@@ -67,6 +72,13 @@ export default function NetworkPage() {
   useEffect(() => {
     saveNetworkFilters(filters);
   }, [filters]);
+
+  // The contact marked as "me" gets a one-click way to center the graph on it.
+  useEffect(() => {
+    getCurrentUser()
+      .then(user => setSelfContactId(user.self_contact_id ?? null))
+      .catch(err => console.error('Error fetching current user:', err));
+  }, []);
 
   useEffect(() => {
     if (centeredNodeId !== null) {
@@ -110,6 +122,11 @@ export default function NetworkPage() {
     if (!data) return [];
     return data.nodes.filter(n => n.type === 'contact').sort((a, b) => a.label.localeCompare(b.label));
   }, [data]);
+
+  const selfNode = useMemo(
+    () => (selfContactId === null ? undefined : contactNodes.find(n => n.id === `c-${selfContactId}`)),
+    [contactNodes, selfContactId]
+  );
 
   // Handle node click - navigate to contact detail
   const handleNodeClick = (node: GraphNode) => {
@@ -242,6 +259,19 @@ export default function NetworkPage() {
           overflow: 'visible',
         }}
       >
+        {selfNode && (
+          <Tooltip title={t('network.centerOnMe')}>
+            <IconButton
+              aria-label={t('network.centerOnMe')}
+              aria-pressed={centeredNodeId === selfNode.id}
+              color={centeredNodeId === selfNode.id ? 'primary' : 'default'}
+              onClick={() => setCenteredNodeId(centeredNodeId === selfNode.id ? null : selfNode.id)}
+            >
+              <AccountCircleIcon />
+            </IconButton>
+          </Tooltip>
+        )}
+
         <Autocomplete
           size="small"
           sx={{ minWidth: 200 }}

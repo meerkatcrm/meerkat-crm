@@ -22,6 +22,11 @@ func DeleteContactCascade(tx *gorm.DB, userID, contactID uint) error {
 		return err
 	}
 
+	// A deleted contact can no longer be the user's own.
+	if err := ClearSelfContact(tx, userID, contactID); err != nil {
+		return err
+	}
+
 	// Activities are shared with other contacts: only this contact's link goes.
 	if err := tx.Exec("DELETE FROM activity_contacts WHERE contact_id = ? AND activity_id IN (SELECT id FROM activities WHERE user_id = ?)", contactID, userID).Error; err != nil {
 		return err
@@ -41,4 +46,11 @@ func ReleaseDeletedVCardUID(tx *gorm.DB, userID uint, uid string) error {
 	return tx.Unscoped().Model(&Contact{}).
 		Where("user_id = ? AND vcard_uid = ? AND deleted_at IS NOT NULL", userID, uid).
 		UpdateColumn("vcard_uid", gorm.Expr("vcard_uid || '-deleted-' || id")).Error
+}
+
+// ClearSelfContact drops the user's "me" mark if it points at contactID.
+func ClearSelfContact(tx *gorm.DB, userID, contactID uint) error {
+	return tx.Model(&User{}).
+		Where("id = ? AND self_contact_id = ?", userID, contactID).
+		Update("self_contact_id", nil).Error
 }

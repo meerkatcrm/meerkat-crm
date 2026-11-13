@@ -314,6 +314,12 @@ func MergeContacts(db *gorm.DB, userID, targetID, sourceID uint, resolutions map
 				return err
 			}
 		}
+		// Merging "me" into a duplicate keeps the merged contact as "me".
+		if err := tx.Model(&models.User{}).
+			Where("id = ? AND self_contact_id = ?", userID, sourceID).
+			Update("self_contact_id", targetID).Error; err != nil {
+			return err
+		}
 		if err := tx.Delete(source).Error; err != nil {
 			return err
 		}

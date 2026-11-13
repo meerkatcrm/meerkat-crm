@@ -360,3 +360,20 @@ func TestMergeRelationshipDatesFillPerField(t *testing.T) {
 		})
 	}
 }
+
+// TestMergeContactsKeepsSelfMark verifies that merging the contact marked as "me" into a
+// duplicate moves the mark to the merged contact instead of leaving it on the deleted one.
+func TestMergeContactsKeepsSelfMark(t *testing.T) {
+	db, userID := setupMergeDB(t)
+	target := createContact(t, db, models.Contact{UserID: userID, Firstname: "Me"})
+	source := createContact(t, db, models.Contact{UserID: userID, Firstname: "Me"})
+	require.NoError(t, db.Model(&models.User{}).Where("id = ?", userID).Update("self_contact_id", source.ID).Error)
+
+	_, err := MergeContacts(db, userID, target.ID, source.ID, nil)
+	require.NoError(t, err)
+
+	var user models.User
+	require.NoError(t, db.First(&user, userID).Error)
+	require.NotNil(t, user.SelfContactID)
+	assert.Equal(t, target.ID, *user.SelfContactID)
+}

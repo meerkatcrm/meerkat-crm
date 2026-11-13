@@ -27,6 +27,8 @@ func GetUpcomingBirthdays(db *gorm.DB, userID uint, now time.Time) ([]models.Bir
 		Where("user_id = ?", userID).
 		Where("archived = ?", false).
 		Where("is_deceased = ?", false).
+		// The user's own birthday is not one they need reminding of.
+		Where("id NOT IN (SELECT self_contact_id FROM users WHERE id = ? AND self_contact_id IS NOT NULL)", userID).
 		Where("birthday IS NOT NULL AND birthday != ''").
 		Where(
 			db.Where("SUBSTR(birthday, LENGTH(birthday) - 4, 2) = ? AND SUBSTR(birthday, LENGTH(birthday) - 1, 2) >= ?", currentMonth, currentDay).

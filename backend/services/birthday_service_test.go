@@ -134,3 +134,41 @@ func TestGetUpcomingBirthdays_KeepsEndedRelationship(t *testing.T) {
 	}
 	assert.Contains(t, names, "FormerSpouse")
 }
+
+// TestGetUpcomingBirthdays_ExcludesSelfContact verifies that the contact marked as the user
+// themself ("me") is left out of upcoming birthdays, while birthdays of their relationships
+// (e.g. a child without a contact of their own) still show.
+func TestGetUpcomingBirthdays_ExcludesSelfContact(t *testing.T) {
+	db, _ := setupRouter()
+
+	user := models.User{Username: "self-user", Password: "password123", Email: "self@example.com"}
+	require.NoError(t, db.Create(&user).Error)
+
+	today := time.Now()
+	birthday := fmt.Sprintf("2000-%02d-%02d", today.Month(), today.Day())
+
+	me := models.Contact{UserID: user.ID, Firstname: "Me", Birthday: birthday}
+	require.NoError(t, db.Create(&me).Error)
+	friend := models.Contact{UserID: user.ID, Firstname: "Friend", Birthday: birthday}
+	require.NoError(t, db.Create(&friend).Error)
+	require.NoError(t, db.Create(&models.Relationship{UserID: user.ID, ContactID: me.ID, Name: "Kid", Type: "child", Birthday: birthday}).Error)
+
+	names := func() []string {
+		birthdays, err := GetUpcomingBirthdays(db, user.ID, today)
+		require.NoError(t, err)
+		names := make([]string, 0, len(birthdays))
+		for _, b := range birthdays {
+			names = append(names, b.Name)
+		}
+		return names
+	}
+
+	// Without a self contact, nothing changes.
+	assert.Subset(t, names(), []string{"Me", "Friend", "Kid"})
+
+	require.NoError(t, db.Model(&user).Update("self_contact_id", me.ID).Error)
+	got := names()
+	assert.NotContains(t, got, "Me")
+	assert.Contains(t, got, "Friend")
+	assert.Contains(t, got, "Kid")
+}

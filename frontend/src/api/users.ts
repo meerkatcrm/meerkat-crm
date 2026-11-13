@@ -68,6 +68,23 @@ export async function updateEnabledContactFields(fields: string[]): Promise<stri
   return data?.enabled_contact_fields || fields;
 }
 
+/**
+ * Marks a contact as the user themself ("me"), or clears the mark with null.
+ * At most one contact is "me": marking another one moves the mark.
+ */
+export async function setSelfContact(contactId: number | null): Promise<number | null> {
+  if (contactId === null) {
+    await apiJson('/users/self-contact', { method: 'DELETE', errorMessage: 'Unable to update which contact is you.' });
+    return null;
+  }
+  await apiJson('/users/self-contact', {
+    method: 'PUT',
+    body: JSON.stringify({ contact_id: contactId }),
+    errorMessage: 'Unable to update which contact is you.',
+  });
+  return contactId;
+}
+
 export async function updateContactFieldDisplay(hideEmpty: boolean): Promise<boolean> {
   const data = await apiJson<{ hide_empty_contact_fields?: boolean } | undefined>('/users/contact-field-display', {
     method: 'PATCH',

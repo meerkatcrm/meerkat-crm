@@ -393,6 +393,13 @@
       "next": "Successivo",
       "position": "{{position}} di {{total}}",
       "gone": "Quel contatto non è più nell'elenco"
+    },
+    "self": {
+      "badge": "Io",
+      "mark": "Questo sono io",
+      "unmark": "Questo non sono io",
+      "marked": "Contrassegnato come te",
+      "unmarked": "Non più contrassegnato come te"
     }
   },
   "noteDialog": {
@@ -916,7 +923,8 @@
       "circleEdge": "Appartenenza a Cerchia"
     },
     "filterByContact": "Centra sul Contatto",
-    "showCircles": "Cerchie"
+    "showCircles": "Cerchie",
+    "centerOnMe": "Centra su di me"
   },
   "employmentHistory": {
     "title": "Storico lavorativo",
