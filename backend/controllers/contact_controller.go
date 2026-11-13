@@ -222,8 +222,12 @@ func GetContacts(c *gin.Context) {
 		}})
 	} else if sortField == "random" {
 		query = query.Order("RANDOM()")
+	} else if sortField == "id" {
+		query = query.Order("contacts.id " + sortOrder)
 	} else {
-		query = query.Order(sortField + " " + sortOrder)
+		// Equal names are ordered by id, so a page of the list holds the same contacts
+		// on every request: the detail page steps through the list one page at a time.
+		query = query.Order(sortField + " " + sortOrder + ", contacts.id " + sortOrder)
 	}
 
 	if len(selectedFields) > 0 {

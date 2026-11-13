@@ -1165,3 +1165,39 @@ func TestUpdateContact_NotePersistsAndIsSelectable(t *testing.T) {
 	require.Len(t, resp.Contacts, 1)
 	assert.Equal(t, "Met at a wedding.\nPrefers tea.", resp.Contacts[0]["note"])
 }
+
+// Paging one contact at a time (previous / next on the detail page) must visit every
+// contact once, also among equal names.
+func TestGetContactsEqualNamesKeepAStableOrder(t *testing.T) {
+	db, router := setupRouter()
+	var user models.User
+	db.First(&user)
+	router.GET("/contacts", GetContacts)
+
+	var ids []uint
+	for range 3 {
+		ct := models.Contact{UserID: user.ID, Firstname: "Sam"}
+		require.NoError(t, db.Create(&ct).Error)
+		ids = append(ids, ct.ID)
+	}
+
+	pageIDs := func(order string) []uint {
+		var got []uint
+		for page := 1; page <= 3; page++ {
+			req, _ := http.NewRequest("GET", "/contacts?sort=firstname&order="+order+"&limit=1&page="+strconv.Itoa(page), nil)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+			var body struct {
+				Contacts []struct{ ID uint } `json:"contacts"`
+			}
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
+			require.Len(t, body.Contacts, 1)
+			got = append(got, body.Contacts[0].ID)
+		}
+		return got
+	}
+
+	assert.Equal(t, ids, pageIDs("asc"))
+	assert.Equal(t, []uint{ids[2], ids[1], ids[0]}, pageIDs("desc"))
+}

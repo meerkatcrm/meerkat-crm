@@ -7,6 +7,7 @@ import (
 	"meerkat/models"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 	"time"
 
@@ -142,7 +143,7 @@ func TestBulkUpdateContacts_RejectsBadInput(t *testing.T) {
 		"add and remove":       {"contact_ids": []uint{ct.ID}, "add_circles": []string{"a"}, "remove_circles": []string{"a"}},
 		"blank circles only":   {"contact_ids": []uint{ct.ID}, "add_circles": []string{" "}},
 		"field over max":       {"contact_ids": []uint{ct.ID}, "role": string(make([]byte, 201))},
-		"too many contacts":    {"contact_ids": make([]uint, models.MaxBulkContacts+1), "city": "x"},
+		"too many contacts":    {"contact_ids": slices.Repeat([]uint{ct.ID}, models.MaxBulkContacts+1), "city": "x"},
 		"circle name too long": {"contact_ids": []uint{ct.ID}, "add_circles": []string{string(bytes.Repeat([]byte("a"), 101))}},
 	}
 	for name, body := range cases {

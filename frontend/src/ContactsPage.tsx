@@ -204,7 +204,8 @@ export default function ContactsPage() {
       const ids = new Set<number>();
       const limit = 100;
       for (let p = 1; ids.size < MAX_BULK_CONTACTS; p++) {
-        const result = await getContacts({ ...listParams, page: p, limit });
+        // A fixed order, whatever the list shows: pages of a random one would overlap
+        const result = await getContacts({ ...listParams, sort: 'id', order: 'desc', page: p, limit });
         result.contacts.forEach(c => ids.add(c.ID));
         if (result.contacts.length < limit || p * limit >= result.total) break;
       }

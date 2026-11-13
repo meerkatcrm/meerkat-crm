@@ -127,9 +127,9 @@ test('select all collects every matching contact across pages', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Select' }));
   fireEvent.click(screen.getByRole('button', { name: 'Select all 150' }));
   await waitFor(() => expect(screen.getByText('150 selected')).toBeInTheDocument());
-  expect(vi.mocked(getContacts).mock.calls.map(([p]) => [p.page, p.limit, p.search])).toEqual([
-    [1, 100, 'x'],
-    [2, 100, 'x'],
+  expect(vi.mocked(getContacts).mock.calls.map(([p]) => [p.page, p.limit, p.search, p.sort, p.order])).toEqual([
+    [1, 100, 'x', 'id', 'desc'],
+    [2, 100, 'x', 'id', 'desc'],
   ]);
 });
 
