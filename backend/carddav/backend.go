@@ -139,6 +139,31 @@ func (b *Backend) GetAddressBook(ctx context.Context, urlPath string) (*carddav.
 	}, nil
 }
 
+// ownAddressBook is the caller's one address book collection, without a
+// trailing slash.
+func (b *Backend) ownAddressBook(ctx context.Context) string {
+	return "/carddav/addressbooks/" + b.getUsername(ctx) + "/contacts"
+}
+
+// requireOwnAddressBook answers 404 unless urlPath is the caller's own address
+// book. Every query is scoped to the caller anyway; this keeps a request under
+// another user's path from quietly landing in the caller's own address book.
+func (b *Backend) requireOwnAddressBook(ctx context.Context, urlPath string) error {
+	if b.getUsername(ctx) == "" || path.Clean(urlPath) != b.ownAddressBook(ctx) {
+		return webdav.NewHTTPError(http.StatusNotFound, fmt.Errorf("address book not found"))
+	}
+	return nil
+}
+
+// requireOwnAddressObject answers 404 unless urlPath names an object directly
+// inside the caller's own address book.
+func (b *Backend) requireOwnAddressObject(ctx context.Context, urlPath string) error {
+	if b.getUsername(ctx) == "" || path.Dir(path.Clean(urlPath)) != b.ownAddressBook(ctx) {
+		return webdav.NewHTTPError(http.StatusNotFound, fmt.Errorf("contact not found"))
+	}
+	return nil
+}
+
 // CreateAddressBook creates a new address book (not supported - single address book per user)
 func (b *Backend) CreateAddressBook(ctx context.Context, addressBook *carddav.AddressBook) error {
 	return fmt.Errorf("creating address books is not supported")
@@ -153,6 +178,9 @@ func (b *Backend) DeleteAddressBook(ctx context.Context, urlPath string) error {
 func (b *Backend) GetAddressObject(ctx context.Context, urlPath string, req *carddav.AddressDataRequest) (*carddav.AddressObject, error) {
 	userID, err := b.getUserID(ctx)
 	if err != nil {
+		return nil, err
+	}
+	if err := b.requireOwnAddressObject(ctx, urlPath); err != nil {
 		return nil, err
 	}
 
@@ -198,6 +226,9 @@ func (b *Backend) ListAddressObjects(ctx context.Context, urlPath string, req *c
 	if err != nil {
 		return nil, err
 	}
+	if err := b.requireOwnAddressBook(ctx, urlPath); err != nil {
+		return nil, err
+	}
 
 	db := b.getDB(ctx)
 	var contacts []models.Contact
@@ -236,6 +267,9 @@ func (b *Backend) QueryAddressObjects(ctx context.Context, urlPath string, query
 func (b *Backend) PutAddressObject(ctx context.Context, urlPath string, card vcard.Card, opts *carddav.PutAddressObjectOptions) (*carddav.AddressObject, error) {
 	userID, err := b.getUserID(ctx)
 	if err != nil {
+		return nil, err
+	}
+	if err := b.requireOwnAddressObject(ctx, urlPath); err != nil {
 		return nil, err
 	}
 
@@ -380,6 +414,9 @@ func (b *Backend) PutAddressObject(ctx context.Context, urlPath string, card vca
 func (b *Backend) DeleteAddressObject(ctx context.Context, urlPath string) error {
 	userID, err := b.getUserID(ctx)
 	if err != nil {
+		return err
+	}
+	if err := b.requireOwnAddressObject(ctx, urlPath); err != nil {
 		return err
 	}
 
