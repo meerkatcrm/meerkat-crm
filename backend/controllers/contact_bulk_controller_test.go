@@ -1,0 +1,313 @@
+package controllers
+
+import (
+	"bytes"
+	"encoding/json"
+	"meerkat/middleware"
+	"meerkat/models"
+	"net/http"
+	"net/http/httptest"
+	"slices"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
+)
+
+func setupBulkRouter(t *testing.T) (*gorm.DB, *gin.Engine, models.User) {
+	t.Helper()
+	db, router := setupRouter()
+	var user models.User
+	require.NoError(t, db.First(&user).Error)
+	router.POST("/contacts/bulk-update", middleware.ValidateJSONMiddleware(&models.ContactBulkUpdateInput{}), BulkUpdateContacts)
+	return db, router, user
+}
+
+func postBulk(router *gin.Engine, body any) *httptest.ResponseRecorder {
+	payload, _ := json.Marshal(body)
+	req, _ := http.NewRequest(http.MethodPost, "/contacts/bulk-update", bytes.NewBuffer(payload))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	return w
+}
+
+func TestBulkUpdateContacts_CirclesAndFields(t *testing.T) {
+	db, router, user := setupBulkRouter(t)
+
+	alice := models.Contact{UserID: user.ID, Firstname: "Alice", Circles: []string{"friends", "old"}, FoodPreference: "vegan"}
+	bob := models.Contact{UserID: user.ID, Firstname: "Bob", Note: "keep me",
+		Addresses: []models.ContactAddress{{Type: "work", Street: "1 Main St", City: "Berlin"}}}
+	carol := models.Contact{UserID: user.ID, Firstname: "Carol", Address: "Legacy street 5"}
+	untouched := models.Contact{UserID: user.ID, Firstname: "Dave", Circles: []string{"old"}}
+	for _, ct := range []*models.Contact{&alice, &bob, &carol, &untouched} {
+		require.NoError(t, db.Create(ct).Error)
+	}
+
+	w := postBulk(router, gin.H{
+		"contact_ids":     []uint{alice.ID, bob.ID, carol.ID, alice.ID},
+		"add_circles":     []string{" work ", "friends"},
+		"remove_circles":  []string{"old"},
+		"food_preference": "  no nuts ",
+		"organization":    "Acme",
+		"city":            "Hamburg",
+	})
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var resp map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, float64(3), resp["updated"])
+
+	got := loadContact(t, db, alice.ID)
+	assert.Equal(t, []string{"friends", "work"}, got.Circles)
+	assert.Equal(t, "no nuts", got.FoodPreference)
+	assert.Equal(t, "Acme", got.Organization)
+	assert.Equal(t, []models.ContactAddress{{Type: "home", City: "Hamburg"}}, got.Addresses)
+
+	got = loadContact(t, db, bob.ID)
+	assert.Equal(t, []string{"work", "friends"}, got.Circles)
+	assert.Equal(t, "keep me", got.Note, "fields not in the request are kept")
+	assert.Equal(t, []models.ContactAddress{{Type: "work", Street: "1 Main St", City: "Hamburg"}}, got.Addresses)
+	assert.Equal(t, "1 Main St, Hamburg", got.Address)
+
+	got = loadContact(t, db, carol.ID)
+	assert.Equal(t, []models.ContactAddress{{Type: "home", Street: "Legacy street 5", City: "Hamburg"}}, got.Addresses)
+
+	// The organization reaches the employment history like a single save does
+	var jobs []models.EmploymentHistory
+	require.NoError(t, db.Where("contact_id = ?", alice.ID).Find(&jobs).Error)
+	require.Len(t, jobs, 1)
+	assert.Equal(t, "Acme", jobs[0].Organization)
+
+	got = loadContact(t, db, untouched.ID)
+	assert.Equal(t, []string{"old"}, got.Circles)
+	assert.Empty(t, got.FoodPreference)
+}
+
+func TestBulkUpdateContacts_ArchiveDropsReminders(t *testing.T) {
+	db, router, user := setupBulkRouter(t)
+
+	a := models.Contact{UserID: user.ID, Firstname: "A"}
+	b := models.Contact{UserID: user.ID, Firstname: "B"}
+	require.NoError(t, db.Create(&a).Error)
+	require.NoError(t, db.Create(&b).Error)
+	contactID := a.ID
+	require.NoError(t, db.Create(&models.Reminder{UserID: user.ID, ContactID: &contactID, Message: "call", RemindAt: time.Now().Add(time.Hour), Recurrence: "once"}).Error)
+
+	w := postBulk(router, gin.H{"contact_ids": []uint{a.ID, b.ID}, "archived": true})
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	var archived int64
+	db.Model(&models.Contact{}).Where("archived = ?", true).Count(&archived)
+	assert.Equal(t, int64(2), archived)
+	var reminders int64
+	db.Model(&models.Reminder{}).Where("contact_id = ?", a.ID).Count(&reminders)
+	assert.Zero(t, reminders)
+
+	w = postBulk(router, gin.H{"contact_ids": []uint{a.ID}, "archived": false})
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	got := loadContact(t, db, a.ID)
+	assert.False(t, got.Archived)
+}
+
+func TestBulkUpdateContacts_OtherUsersContactChangesNothing(t *testing.T) {
+	db, router, user := setupBulkRouter(t)
+
+	other := models.User{Username: "other", Password: "password123", Email: "other@example.com"}
+	require.NoError(t, db.Create(&other).Error)
+	mine := models.Contact{UserID: user.ID, Firstname: "Mine"}
+	theirs := models.Contact{UserID: other.ID, Firstname: "Theirs"}
+	require.NoError(t, db.Create(&mine).Error)
+	require.NoError(t, db.Create(&theirs).Error)
+
+	w := postBulk(router, gin.H{"contact_ids": []uint{mine.ID, theirs.ID}, "food_preference": "pizza"})
+	assert.Equal(t, http.StatusNotFound, w.Code)
+
+	got := loadContact(t, db, mine.ID)
+	assert.Empty(t, got.FoodPreference, "all or nothing")
+	got = loadContact(t, db, theirs.ID)
+	assert.Empty(t, got.FoodPreference)
+}
+
+// The validate tag's max and models.MaxBulkContacts must agree: exactly the cap is accepted.
+func TestBulkUpdateContacts_AcceptsUpToTheCap(t *testing.T) {
+	db, router, user := setupBulkRouter(t)
+	ct := models.Contact{UserID: user.ID, Firstname: "A"}
+	require.NoError(t, db.Create(&ct).Error)
+
+	w := postBulk(router, gin.H{"contact_ids": slices.Repeat([]uint{ct.ID}, models.MaxBulkContacts), "city": "x"})
+	assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
+}
+
+func TestBulkUpdateContacts_RejectsBadInput(t *testing.T) {
+	db, router, user := setupBulkRouter(t)
+	ct := models.Contact{UserID: user.ID, Firstname: "A"}
+	require.NoError(t, db.Create(&ct).Error)
+
+	cases := map[string]gin.H{
+		"no contacts":          {"contact_ids": []uint{}, "food_preference": "x"},
+		"no change":            {"contact_ids": []uint{ct.ID}},
+		"blank field":          {"contact_ids": []uint{ct.ID}, "city": "   "},
+		"add and remove":       {"contact_ids": []uint{ct.ID}, "add_circles": []string{"a"}, "remove_circles": []string{"a"}},
+		"blank circles only":   {"contact_ids": []uint{ct.ID}, "add_circles": []string{" "}},
+		"field over max":       {"contact_ids": []uint{ct.ID}, "role": string(make([]byte, 201))},
+		"too many contacts":    {"contact_ids": slices.Repeat([]uint{ct.ID}, models.MaxBulkContacts+1), "city": "x"},
+		"circle name too long": {"contact_ids": []uint{ct.ID}, "add_circles": []string{string(bytes.Repeat([]byte("a"), 101))}},
+	}
+	for name, body := range cases {
+		t.Run(name, func(t *testing.T) {
+			w := postBulk(router, body)
+			assert.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+		})
+	}
+}
+
+func loadContact(t *testing.T, db *gorm.DB, id uint) models.Contact {
+	t.Helper()
+	var ct models.Contact
+	require.NoError(t, db.First(&ct, id).Error)
+	return ct
+}
+
+func TestBulkUpdateContacts_UnchangedContactsAreNotSaved(t *testing.T) {
+	db, router, user := setupBulkRouter(t)
+
+	active := models.Contact{UserID: user.ID, Firstname: "Active", Circles: []string{"friends"}}
+	archived := models.Contact{UserID: user.ID, Firstname: "Archived", Archived: true}
+	require.NoError(t, db.Create(&active).Error)
+	require.NoError(t, db.Create(&archived).Error)
+	etag := loadContact(t, db, active.ID).ETag
+
+	w := postBulk(router, gin.H{"contact_ids": []uint{active.ID, archived.ID}, "archived": false, "add_circles": []string{"friends"}})
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var resp map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, float64(1), resp["updated"], "only the archived contact changes")
+
+	assert.Equal(t, etag, loadContact(t, db, active.ID).ETag, "an unchanged contact keeps its ETag")
+	got := loadContact(t, db, archived.ID)
+	assert.False(t, got.Archived)
+	assert.Equal(t, []string{"friends"}, got.Circles)
+}
+
+func TestBulkUpdateContacts_KeepsLegacyThumbnail(t *testing.T) {
+	db, router, user := setupBulkRouter(t)
+	ct := models.Contact{UserID: user.ID, Firstname: "Old", LegacyThumbnail: "data:image/png;base64,AAAA"}
+	require.NoError(t, db.Create(&ct).Error)
+
+	w := postBulk(router, gin.H{"contact_ids": []uint{ct.ID}, "food_preference": "tea"})
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	got := loadContact(t, db, ct.ID)
+	assert.Equal(t, "tea", got.FoodPreference)
+	assert.Equal(t, "data:image/png;base64,AAAA", got.LegacyThumbnail, "the column it doesn't load is not wiped")
+}
+
+func TestBulkUpdateContacts_SkipsContactsDeletedSinceSelected(t *testing.T) {
+	db, router, user := setupBulkRouter(t)
+	kept := models.Contact{UserID: user.ID, Firstname: "Kept"}
+	gone := models.Contact{UserID: user.ID, Firstname: "Gone"}
+	require.NoError(t, db.Create(&kept).Error)
+	require.NoError(t, db.Create(&gone).Error)
+	require.NoError(t, models.DeleteContactCascade(db, user.ID, gone.ID))
+
+	w := postBulk(router, gin.H{"contact_ids": []uint{kept.ID, gone.ID}, "food_preference": "tea"})
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var resp map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, float64(1), resp["updated"])
+	assert.Equal(t, "tea", loadContact(t, db, kept.ID).FoodPreference)
+
+	var deleted models.Contact
+	require.NoError(t, db.Unscoped().First(&deleted, gone.ID).Error)
+	assert.Empty(t, deleted.FoodPreference, "a deleted contact is not written")
+}
+
+func TestBulkUpdateContacts_AnotherUsersDeletedContactStillFails(t *testing.T) {
+	db, router, user := setupBulkRouter(t)
+	other := models.User{Username: "other", Password: "password123", Email: "other@example.com"}
+	require.NoError(t, db.Create(&other).Error)
+	mine := models.Contact{UserID: user.ID, Firstname: "Mine"}
+	theirs := models.Contact{UserID: other.ID, Firstname: "Theirs"}
+	require.NoError(t, db.Create(&mine).Error)
+	require.NoError(t, db.Create(&theirs).Error)
+	require.NoError(t, models.DeleteContactCascade(db, other.ID, theirs.ID))
+
+	w := postBulk(router, gin.H{"contact_ids": []uint{mine.ID, theirs.ID}, "food_preference": "tea"})
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	assert.Empty(t, loadContact(t, db, mine.ID).FoodPreference)
+}
+
+// A bulk update writes only its own columns: a field changed elsewhere since the
+// contacts were loaded is kept, and the ETag still moves.
+func TestBulkUpdateContacts_WritesOnlyItsColumns(t *testing.T) {
+	db, router, user := setupBulkRouter(t)
+	ct := models.Contact{UserID: user.ID, Firstname: "A", Note: "old note"}
+	require.NoError(t, db.Create(&ct).Error)
+	before := loadContact(t, db, ct.ID)
+
+	// An edit landing between the bulk load and its write survives only if the
+	// UPDATE leaves unrelated columns out, so check the statement's columns.
+	var statements []string
+	require.NoError(t, db.Callback().Update().After("gorm:update").Register("test:capture", func(tx *gorm.DB) {
+		statements = append(statements, tx.Statement.SQL.String())
+	}))
+	defer db.Callback().Update().Remove("test:capture")
+
+	time.Sleep(2 * time.Millisecond)
+	w := postBulk(router, gin.H{"contact_ids": []uint{ct.ID}, "city": "Rome"})
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	// The hooks' own updates (the ETag) finish first, so find the bulk write by its columns
+	idx := slices.IndexFunc(statements, func(sql string) bool { return strings.Contains(sql, "`addresses`") })
+	require.NotEqual(t, -1, idx, "%q", statements)
+	assert.NotContains(t, statements[idx], "`note`")
+	assert.NotContains(t, statements[idx], "`firstname`")
+
+	got := loadContact(t, db, ct.ID)
+	assert.Equal(t, "Rome", got.Addresses[0].City)
+	assert.Equal(t, "Rome", got.Address, "the address scalar follows the addresses")
+	assert.Equal(t, "old note", got.Note)
+	assert.NotEqual(t, before.ETag, got.ETag, "the ETag moves so CardDAV clients pick up the change")
+	assert.True(t, got.UpdatedAt.After(before.UpdatedAt))
+}
+
+// Bulk edit is a deliberate write, like an import, so it doesn't apply the stale-client
+// guard of PUT /contacts/:id: setting the organization of an ended job opens a new current
+// entry for it, and the ended entry stays as it was.
+func TestBulkUpdateContacts_EmploymentFollowsImportSemantics(t *testing.T) {
+	db, router, user := setupBulkRouter(t)
+	ct := models.Contact{UserID: user.ID, Firstname: "Erin"}
+	require.NoError(t, db.Create(&ct).Error)
+	ended := models.EmploymentHistory{UserID: user.ID, ContactID: ct.ID, Organization: "Acme", StartDate: "2015-01-01", EndDate: "2020-01-01"}
+	require.NoError(t, db.Create(&ended).Error)
+
+	w := postBulk(router, gin.H{"contact_ids": []uint{ct.ID}, "organization": "Acme"})
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	assert.Equal(t, "Acme", loadContact(t, db, ct.ID).Organization)
+	var jobs []models.EmploymentHistory
+	require.NoError(t, db.Where("contact_id = ?", ct.ID).Order("id").Find(&jobs).Error)
+	require.Len(t, jobs, 2)
+	assert.Equal(t, "2020-01-01", jobs[0].EndDate, "the ended job is left alone")
+	assert.Equal(t, "Acme", jobs[1].Organization)
+	assert.Empty(t, jobs[1].EndDate, "a new current job is opened")
+}
+
+// Circle names that differ only in case are one circle, as a single contact save
+// (unique_circles) treats them.
+func TestBulkUpdateContacts_CirclesIgnoreCase(t *testing.T) {
+	db, router, user := setupBulkRouter(t)
+	ct := models.Contact{UserID: user.ID, Firstname: "A", Circles: []string{"friends", "Old Work"}}
+	require.NoError(t, db.Create(&ct).Error)
+
+	w := postBulk(router, gin.H{"contact_ids": []uint{ct.ID}, "add_circles": []string{"Friends", "gym", "GYM"}, "remove_circles": []string{"old work"}})
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.Equal(t, []string{"friends", "gym"}, loadContact(t, db, ct.ID).Circles)
+
+	w = postBulk(router, gin.H{"contact_ids": []uint{ct.ID}, "add_circles": []string{"Gym"}, "remove_circles": []string{"gym"}})
+	assert.Equal(t, http.StatusBadRequest, w.Code, "adding and removing one circle is rejected whatever its case")
+}

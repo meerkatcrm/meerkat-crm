@@ -65,6 +65,7 @@ import MergeContactsDialog from './components/MergeContactsDialog';
 import { useEmploymentHistory } from './hooks/useEmploymentHistory';
 import AddEmploymentHistoryDialog from './components/AddEmploymentHistoryDialog';
 import { useSnackbar } from './context/SnackbarContext';
+import ContactListNavigator from './components/ContactListNavigator';
 import { useConfirm } from './components/ConfirmDialog';
 import { ApiError } from './api/client';
 import { handleFetchError } from './utils/errorHandler';
@@ -93,7 +94,14 @@ export const CONTACT_DETAIL_COLUMNS = [
 // onto the next one.
 export default function ContactDetailPage() {
   const { id } = useParams<{ id: string }>();
-  return <ContactDetail key={id} />;
+  // Outside the keyed part, so the previous / next buttons stay put while the
+  // next contact loads.
+  return (
+    <>
+      <ContactListNavigator />
+      <ContactDetail key={id} />
+    </>
+  );
 }
 
 function ContactDetail() {

@@ -288,6 +288,38 @@
       "notDeceased": "Not deceased",
       "active": "Active",
       "archivedRemovesReminders": "Archived (its reminders are deleted)"
+    },
+    "select": {
+      "button": "Select",
+      "done": "Done",
+      "page": "Select all on this page",
+      "count_one": "{{count}} selected",
+      "count_other": "{{count}} selected",
+      "all_one": "Select all {{count}}",
+      "all_other": "Select all {{count}}",
+      "clear": "Clear selection",
+      "edit": "Edit selected"
+    },
+    "bulkEdit": {
+      "title_one": "Edit {{count}} contact",
+      "title_other": "Edit {{count}} contacts",
+      "description": "Only what you fill in is changed. Empty fields keep each contact's own value.",
+      "addCircles": "Add to circles",
+      "addCirclesHelp": "Pick a circle or type a new one",
+      "removeCircles": "Remove from circles",
+      "circleConflict": "A circle can't be added and removed at once: {{circles}}",
+      "setFields": "Set for every contact",
+      "cityHelp": "Written to each contact's primary address; one is added if a contact has none",
+      "archiveLabel": "Archive",
+      "noChange": "No change",
+      "archive": "Archive",
+      "unarchive": "Unarchive",
+      "archiveWarning": "Archiving also deletes the reminders of these contacts.",
+      "apply_one": "Apply to {{count}} contact",
+      "apply_other": "Apply to {{count}} contacts",
+      "success_one": "Updated {{count}} contact",
+      "success_other": "Updated {{count}} contacts",
+      "noneChanged": "Nothing needed changing: the selected contacts already had these values"
     }
   },
   "timeline": {
@@ -352,7 +384,14 @@
     "exportVcardError": "Failed to export contact as vCard. Please try again.",
     "showAllFields": "Show all fields",
     "hideEmptyFields": "Hide empty fields",
-    "noFilledFields": "No details filled in yet."
+    "noFilledFields": "No details filled in yet.",
+    "listNav": {
+      "label": "Contact list",
+      "previous": "Previous",
+      "next": "Next",
+      "position": "{{position}} of {{total}}",
+      "gone": "That contact is no longer in the list"
+    }
   },
   "noteDialog": {
     "title": "Add Note",

@@ -288,6 +288,38 @@
       "notDeceased": "Nicht verstorben",
       "active": "Aktiv",
       "archivedRemovesReminders": "Archiviert (Erinnerungen werden gelöscht)"
+    },
+    "select": {
+      "button": "Auswählen",
+      "done": "Fertig",
+      "page": "Alle auf dieser Seite auswählen",
+      "count_one": "{{count}} ausgewählt",
+      "count_other": "{{count}} ausgewählt",
+      "all_one": "Alle {{count}} auswählen",
+      "all_other": "Alle {{count}} auswählen",
+      "clear": "Auswahl aufheben",
+      "edit": "Auswahl bearbeiten"
+    },
+    "bulkEdit": {
+      "title_one": "{{count}} Kontakt bearbeiten",
+      "title_other": "{{count}} Kontakte bearbeiten",
+      "description": "Nur was du ausfüllst, wird geändert. Leere Felder behalten den Wert jedes Kontakts.",
+      "addCircles": "Zu Kreisen hinzufügen",
+      "addCirclesHelp": "Wähle einen Kreis oder gib einen neuen ein",
+      "removeCircles": "Aus Kreisen entfernen",
+      "circleConflict": "Ein Kreis kann nicht gleichzeitig hinzugefügt und entfernt werden: {{circles}}",
+      "setFields": "Für jeden Kontakt setzen",
+      "cityHelp": "Wird in die Hauptadresse jedes Kontakts geschrieben; fehlt sie, wird eine angelegt",
+      "archiveLabel": "Archiv",
+      "noChange": "Keine Änderung",
+      "archive": "Archivieren",
+      "unarchive": "Wiederherstellen",
+      "archiveWarning": "Beim Archivieren werden auch die Erinnerungen dieser Kontakte gelöscht.",
+      "apply_one": "Auf {{count}} Kontakt anwenden",
+      "apply_other": "Auf {{count}} Kontakte anwenden",
+      "success_one": "{{count}} Kontakt aktualisiert",
+      "success_other": "{{count}} Kontakte aktualisiert",
+      "noneChanged": "Keine Änderung nötig: Die ausgewählten Kontakte hatten diese Werte bereits"
     }
   },
   "timeline": {
@@ -352,7 +384,14 @@
     "exportVcardError": "Kontakt konnte nicht als vCard exportiert werden. Bitte versuchen Sie es erneut.",
     "showAllFields": "Alle Felder anzeigen",
     "hideEmptyFields": "Leere Felder ausblenden",
-    "noFilledFields": "Noch keine Angaben ausgefüllt."
+    "noFilledFields": "Noch keine Angaben ausgefüllt.",
+    "listNav": {
+      "label": "Kontaktliste",
+      "previous": "Zurück",
+      "next": "Weiter",
+      "position": "{{position}} von {{total}}",
+      "gone": "Dieser Kontakt ist nicht mehr in der Liste"
+    }
   },
   "noteDialog": {
     "title": "Notiz hinzufügen",

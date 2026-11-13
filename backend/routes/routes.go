@@ -79,6 +79,7 @@ func RegisterRoutes(router *gin.Engine, cfg *config.Config, db *gorm.DB, oidcPro
 			protected.GET("/contacts/duplicates", controllers.GetDuplicateContacts)
 			protected.POST("/contacts/duplicates/dismiss", middleware.ValidateJSONMiddleware(&models.DuplicateDismissInput{}), controllers.DismissDuplicateContacts)
 			protected.POST("/contacts", middleware.ValidateJSONMiddleware(&models.ContactInput{}), controllers.CreateContact)
+			protected.POST("/contacts/bulk-update", middleware.ValidateJSONMiddleware(&models.ContactBulkUpdateInput{}), controllers.BulkUpdateContacts)
 			protected.GET("/contacts/:id", controllers.GetContact)
 			protected.PUT("/contacts/:id", middleware.ValidateJSONMiddleware(&models.ContactInput{}), controllers.UpdateContact)
 			protected.DELETE("/contacts/:id", controllers.DeleteContact)
