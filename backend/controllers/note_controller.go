@@ -184,7 +184,7 @@ type listNotesInput struct {
 	// Strings, so a value that does not parse falls back to its default instead of failing.
 	Page     string `query:"page" doc:"Page number, from 1 (default 1)"`
 	Limit    string `query:"limit" doc:"Page size, 1 to 100 (default 25)"`
-	Search   string `query:"search" doc:"Words the content contains, each matching the start of a word; case and accents are ignored. Digits-only and Chinese/Japanese/Korean text match anywhere"`
+	Search   string `query:"search" doc:"Words the content contains, each matching the start of a word; case and accents are ignored. Digits-only text, and scripts written without spaces (Chinese, Japanese, Korean, Thai, Lao, Khmer, Myanmar, Tibetan), match anywhere"`
 	FromDate string `query:"fromDate" doc:"First day, YYYY-MM-DD; ignored when not a date"`
 	ToDate   string `query:"toDate" doc:"Last day, inclusive, YYYY-MM-DD; ignored when not a date"`
 }

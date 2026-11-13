@@ -36,7 +36,8 @@ func TestFTSMatch(t *testing.T) {
 	// LIKE handles these: no words, phone-like digits, scripts without spaces
 	for _, in := range []string{"", "   ", "+", "-*", `""`, "%_",
 		"795550", "+41 79", "(030) 1234", "555-0101", "1.2.3",
-		"山田", "やまだ", "ヤマダ", "김민수", "Yamada 山田"} {
+		"山田", "やまだ", "ヤマダ", "김민수", "Yamada 山田",
+		"มชาย", "ສົມ", "សុខ", "မောင်", "བཀྲ"} {
 		_, ok := ftsMatch(in)
 		assert.False(t, ok, in)
 	}
@@ -106,10 +107,11 @@ func TestContactSearchKeepsSubstringMatchingForPhonesAndCJK(t *testing.T) {
 		{UserID: u.ID, Firstname: "Spaced", Phones: []models.ContactPhone{{Value: "030 1234567"}}},
 		{UserID: u.ID, Firstname: "太郎", Lastname: "山田"},
 		{UserID: u.ID, Firstname: "민수", Lastname: "김"},
+		{UserID: u.ID, Firstname: "สมชาย"},
 	}).Error)
 	for term, want := range map[string]string{
 		"795550": "Plain", "+4179": "Plain", "1234567": "Spaced", "030 123": "Spaced",
-		"山田": "太郎", "太": "太郎", "민수": "민수",
+		"山田": "太郎", "太": "太郎", "민수": "민수", "มชาย": "สมชาย",
 	} {
 		assert.Equal(t, []string{want}, contactField(getJSON(t, r, "/contacts", url.Values{"search": {term}}), "firstname"), term)
 	}

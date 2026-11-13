@@ -203,7 +203,7 @@ export interface operations {
                 page?: string;
                 /** @description Page size, 1 to 100 (default 25) */
                 limit?: string;
-                /** @description Words the content contains, each matching the start of a word; case and accents are ignored. Digits-only and Chinese/Japanese/Korean text match anywhere */
+                /** @description Words the content contains, each matching the start of a word; case and accents are ignored. Digits-only text, and scripts written without spaces (Chinese, Japanese, Korean, Thai, Lao, Khmer, Myanmar, Tibetan), match anywhere */
                 search?: string;
                 /** @description First day, YYYY-MM-DD; ignored when not a date */
                 fromDate?: string;

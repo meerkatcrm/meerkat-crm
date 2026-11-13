@@ -52,12 +52,19 @@ const (
 // "+41 79 5550101", which a word-prefix index cannot do.
 var phoneLike = regexp.MustCompile(`^[\d\s+()./-]*\d[\d\s+()./-]*$`)
 
+// unspacedScripts are written without spaces between words, so the tokenizer indexes a
+// whole phrase as one word and a prefix search cannot find a word inside it.
+var unspacedScripts = []*unicode.RangeTable{
+	unicode.Han, unicode.Hiragana, unicode.Katakana, unicode.Hangul,
+	unicode.Thai, unicode.Lao, unicode.Khmer, unicode.Myanmar, unicode.Tibetan,
+}
+
 // ftsMatch turns a typed search term into an FTS5 MATCH expression for the *_fts tables of
 // migration 41: every word must match the start of an indexed word, in any order ("mül zo"
 // finds "Zoë Müller"; case and accents are ignored by the tokenizer). Each word is quoted, so
 // FTS5 syntax in the input is plain text. ok is false when the caller should use the LIKE
-// search instead: no letters or digits, phone-like digits, or Han/Kana/Hangul text, which
-// has no spaces between words, so a typed part of it must match anywhere.
+// search instead: no letters or digits, phone-like digits, or text in a script written
+// without spaces between words (unspacedScripts), where a typed part must match anywhere.
 func ftsMatch(term string) (match string, ok bool) {
 	if r := []rune(term); len(r) > maxSearchRunes {
 		term = string(r[:maxSearchRunes])
@@ -66,7 +73,7 @@ func ftsMatch(term string) (match string, ok bool) {
 		return "", false
 	}
 	for _, r := range term {
-		if unicode.In(r, unicode.Han, unicode.Hiragana, unicode.Katakana, unicode.Hangul) {
+		if unicode.In(r, unspacedScripts...) {
 			return "", false
 		}
 	}
