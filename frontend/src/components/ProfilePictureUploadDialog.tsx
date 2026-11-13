@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import Cropper, { Area } from 'react-easy-crop';
 import {
@@ -20,7 +20,7 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import LinkIcon from '@mui/icons-material/Link';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { handleError, getErrorMessage } from '../utils/errorHandler';
-import { API_BASE_URL, apiFetch, parseErrorResponse } from '../api/client';
+import { API_BASE_URL, ApiError, apiFetch, parseErrorResponse } from '../api/client';
 
 interface ProfilePictureUploadDialogProps {
   open: boolean;
@@ -114,7 +114,12 @@ export default function ProfilePictureUploadDialog({
     setCroppedAreaPixels(croppedAreaPixels);
   }, []);
 
+  // Picker, drop, paste and URL fetch all load through loadFile; FileReader is async, so
+  // only the most recently started load may set the image, whatever order they finish in.
+  const loadGeneration = useRef(0);
+
   const loadFile = useCallback((file: File) => {
+    const generation = ++loadGeneration.current;
     setError(null);
 
     // Validate file type
@@ -131,6 +136,7 @@ export default function ProfilePictureUploadDialog({
 
     const reader = new FileReader();
     reader.addEventListener('load', () => {
+      if (generation !== loadGeneration.current) return;
       setImageSrc(reader.result as string);
       setCrop({ x: 0, y: 0 });
       setZoom(1);
@@ -244,13 +250,17 @@ export default function ProfilePictureUploadDialog({
       }
     } catch (err) {
       handleError(err, { operation: 'removing profile picture' });
-      setError(getErrorMessage(err) || t('profilePicture.removeError'));
+      // The server's reason (e.g. demo mode) when there is one; network errors and
+      // timeouts arrive as untranslated plain Errors, so those get the locale string.
+      setError(err instanceof ApiError ? err.getDisplayMessage() : t('profilePicture.removeError'));
     } finally {
       setRemoving(false);
     }
   };
 
   const handleClose = () => {
+    // A read still in flight must not put its image into the dialog when it is reopened.
+    loadGeneration.current++;
     setImageSrc(null);
     setCrop({ x: 0, y: 0 });
     setZoom(1);

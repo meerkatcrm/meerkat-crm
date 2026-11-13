@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import i18n from '../i18n/config';
 import ProfilePictureUploadDialog from './ProfilePictureUploadDialog';
 import * as client from '../api/client';
@@ -51,6 +51,16 @@ describe('ProfilePictureUploadDialog remove photo', () => {
     await i18n.changeLanguage('en');
   });
 
+  test('a network failure shows the translated message, not the raw error', async () => {
+    const onRemove = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+    render(<ProfilePictureUploadDialog open onClose={() => {}} onUpload={async () => {}} onRemove={onRemove} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove photo' }));
+
+    expect(await screen.findByText('Failed to remove profile picture')).toBeInTheDocument();
+    expect(screen.queryByText('Failed to fetch')).not.toBeInTheDocument();
+  });
+
   test('there is no remove button when the contact has no photo', () => {
     render(<ProfilePictureUploadDialog open onClose={() => {}} onUpload={async () => {}} />);
     expect(screen.queryByRole('button', { name: 'Remove photo' })).not.toBeInTheDocument();
@@ -80,7 +90,9 @@ describe('ProfilePictureUploadDialog remove photo', () => {
   });
 
   test('a failed removal shows the reason and keeps the dialog open', async () => {
-    const onRemove = vi.fn().mockRejectedValue(new Error('Photo changes are disabled in demo mode'));
+    const onRemove = vi.fn().mockRejectedValue(
+      new client.ApiError('Photo changes are disabled in demo mode', 'FORBIDDEN', 403),
+    );
     const onClose = vi.fn();
     render(<ProfilePictureUploadDialog open onClose={onClose} onUpload={async () => {}} onRemove={onRemove} />);
 
@@ -148,6 +160,39 @@ describe('ProfilePictureUploadDialog paste from clipboard', () => {
     expect(event.defaultPrevented).toBe(false);
     finish(new Response(null, { status: 503 }));
     expect(await screen.findByText('Failed to fetch image from URL')).toBeInTheDocument();
+  });
+
+  test('the image started last wins, whichever read finishes first', async () => {
+    const readers: { result: string; listener: () => void; file: File }[] = [];
+    class ControlledReader {
+      result = '';
+      private entry?: { result: string; listener: () => void; file: File };
+      addEventListener(_type: string, listener: () => void) {
+        this.entry = { result: '', listener, file: new File([], '') };
+      }
+      readAsDataURL(file: File) {
+        const entry = this.entry!;
+        entry.file = file;
+        entry.listener = entry.listener.bind(this);
+        readers.push(entry);
+        this.result = `data:${file.type};name=${file.name}`;
+      }
+    }
+    vi.stubGlobal('FileReader', ControlledReader);
+    try {
+      render(<ProfilePictureUploadDialog open onClose={() => {}} onUpload={async () => {}} />);
+      paste(document, [new File([new Uint8Array([1])], 'first.png', { type: 'image/png' })]);
+      paste(document, [new File([new Uint8Array([2])], 'second.png', { type: 'image/png' })]);
+      expect(readers).toHaveLength(2);
+
+      act(() => readers[1].listener());
+      act(() => readers[0].listener());
+
+      await screen.findByRole('slider', { name: 'Zoom' });
+      expect(document.querySelector('img')?.getAttribute('src')).toContain('second.png');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   test('a closed dialog ignores pastes', () => {
