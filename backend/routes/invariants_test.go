@@ -203,9 +203,8 @@ func (e *isolationEnv) columns(t *testing.T) (withUser []string, pointers map[st
 	return withUser, pointers
 }
 
-// snapshot renders B's user row, every row B owns, and every row, of anyone, that points at
-// one of B's rows through a column columns() reports.
-func (e *isolationEnv) snapshot(t *testing.T) string {
+// snapshotConds returns, per table, the conditions that select the rows the snapshot holds.
+func (e *isolationEnv) snapshotConds(t *testing.T) map[string][]string {
 	t.Helper()
 	withUser, pointers := e.columns(t)
 	conds := map[string][]string{"users": {"id = @b"}}
@@ -217,6 +216,14 @@ func (e *isolationEnv) snapshot(t *testing.T) string {
 			conds[table] = append(conds[table], fmt.Sprintf("%q IN (SELECT id FROM %q WHERE user_id = @b)", p.col, p.target))
 		}
 	}
+	return conds
+}
+
+// snapshot renders B's user row, every row B owns, and every row, of anyone, that points at
+// one of B's rows through a column columns() reports.
+func (e *isolationEnv) snapshot(t *testing.T) string {
+	t.Helper()
+	conds := e.snapshotConds(t)
 	tables := make([]string, 0, len(conds))
 	for table := range conds {
 		tables = append(tables, table)
@@ -225,14 +232,19 @@ func (e *isolationEnv) snapshot(t *testing.T) string {
 
 	var out strings.Builder
 	for _, table := range tables {
-		var rows []map[string]any
-		query := fmt.Sprintf("SELECT * FROM %q WHERE %s ORDER BY rowid", table, strings.Join(conds[table], " OR "))
-		require.NoError(t, e.db.Raw(query, map[string]any{"b": e.b.ID}).Scan(&rows).Error, table)
-		data, err := json.Marshal(rows)
+		data, err := json.Marshal(e.snapshotRows(t, table, conds[table]))
 		require.NoError(t, err)
 		fmt.Fprintf(&out, "%s %s\n", table, data)
 	}
 	return out.String()
+}
+
+func (e *isolationEnv) snapshotRows(t *testing.T, table string, conds []string) []map[string]any {
+	t.Helper()
+	var rows []map[string]any
+	query := fmt.Sprintf("SELECT * FROM %q WHERE %s ORDER BY rowid", table, strings.Join(conds, " OR "))
+	require.NoError(t, e.db.Raw(query, map[string]any{"b": e.b.ID}).Scan(&rows).Error, table)
+	return rows
 }
 
 // target is one request of the walk. aimed is set when a path parameter names one of B's rows.
@@ -242,7 +254,9 @@ type target struct {
 }
 
 // targets returns the requests that aim a route at B's rows. ok is false when a path
-// parameter follows a segment the walk does not know.
+// parameter follows a segment the walk does not know. Every parameter is substituted with a
+// numeric row id: NumericIDParamsMiddleware answers 400 to any other value under /api/v1, so
+// a username or token parameter cannot exist there.
 func (e *isolationEnv) targets(route string) (out []target, ok bool) {
 	if strings.HasPrefix(route, "/carddav/") {
 		// One wildcard route serves every CardDAV path, so the walk picks them: A's own address
@@ -409,6 +423,25 @@ func TestInvariants_EveryUserTableIsSeededForTheWalk(t *testing.T) {
 	}
 	for table := range unseeded {
 		assert.True(t, have[table], "unseeded lists %s, which has no user_id column", table)
+	}
+
+	// After seeding, every row but A's user row is B's or hangs off B's, so the snapshot must
+	// hold all of them. A table it misses (no user_id, no pointer columns() recognizes) is a
+	// table the walk would not protect.
+	var tables []string
+	require.NoError(t, e.db.Raw("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name != 'schema_migrations'").Scan(&tables).Error)
+	conds := e.snapshotConds(t)
+	for _, table := range tables {
+		var total int64
+		require.NoError(t, e.db.Table(table).Count(&total).Error)
+		if table == "users" {
+			total-- // A
+		}
+		var held int
+		if c, ok := conds[table]; ok {
+			held = len(e.snapshotRows(t, table, c))
+		}
+		assert.EqualValues(t, total, held, "the snapshot holds %d of the %d seeded rows in %s: give it a user_id, a foreign key, or a *contact*_id column", held, total, table)
 	}
 }
 
