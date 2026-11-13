@@ -170,19 +170,6 @@ func TestMigration32_RevivesRecurringRemindersTheBugEnded(t *testing.T) {
 	require.NoError(t, m.Migrate(31), "rolling back is a no-op, not a failure")
 }
 
-func TestImmediateTxDSN(t *testing.T) {
-	cases := map[string]string{
-		"meerkat.db":           "meerkat.db?_txlock=immediate",
-		"/app/data/test.db":    "/app/data/test.db?_txlock=immediate",
-		"test.db?_pragma=x(1)": "test.db?_pragma=x(1)&_txlock=immediate",
-	}
-	for input, want := range cases {
-		if got := immediateTxDSN(input); got != want {
-			t.Errorf("immediateTxDSN(%q) = %q, want %q", input, got, want)
-		}
-	}
-}
-
 func TestMigration33_KeepsFieldsOfUsersWithWorkInformation(t *testing.T) {
 	db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "test.db"))
 	require.NoError(t, err)

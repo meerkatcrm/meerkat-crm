@@ -61,7 +61,7 @@
 - Fixtures and assertions speak CardDAV over HTTP rather than touching a backing store, so covering another server means adding a `davRemote` constructor, not new scenarios.
 
 **Data & Integrations**
-- SQLite lives at `SQLITE_DB_PATH` (default meerkat.db); migrations in [backend/database/migrations](backend/database/migrations) are embedded into the binary and auto-run on startup.
+- SQLite lives at `SQLITE_DB_PATH` (default meerkat.db); migrations in [backend/database/migrations](backend/database/migrations) are embedded into the binary and auto-run on startup. The database runs in WAL mode with foreign keys enforced ([backend/database/migrate.go](backend/database/migrate.go)): the `-wal` and `-shm` files next to it are part of the database, so mount and back up the whole directory, or copy a running database with `sqlite3 meerkat.db ".backup copy.db"`.
 - JWT expiry, HTTP timeouts, trusted proxies, and Resend email settings are declared in [backend/config/config.go](backend/config/config.go) and loaded based on environment variables; use Config.Validate to catch misconfigurations.
 - File uploads stream through [backend/controllers/photo_controller.go](backend/controllers/photo_controller.go) and land in `static/photos`; served through protected routes to enforce auth.
 - API consumers expect consistent field casing (e.g., `Firstname` in responses vs. lower-case in queries); follow existing JSON tags in [backend/models/contact.go](backend/models/contact.go).
