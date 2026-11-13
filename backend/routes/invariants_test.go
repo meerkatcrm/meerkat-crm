@@ -45,7 +45,7 @@ var mutating = map[string]bool{
 // walk has nothing to protect in them. Every entry needs a reason.
 var unseeded = map[string]string{
 	"email_outbox": "a queue only the mail engine reads; no route returns or changes its rows",
-	"carddav_sync": "unused table; no code reads or writes it",
+	"carddav_sync": "only the admin user-delete flow touches it; no user-facing route reads or writes it",
 }
 
 // proof names a top-level Go test, in a file relative to backend/, that shows the isolation.
@@ -100,6 +100,9 @@ func newIsolationEnv(t *testing.T) *isolationEnv {
 	return e
 }
 
+// secret is in every text field of B's seeded rows; no response to A may contain it.
+const secret = "BSecret"
+
 // seed gives B a row in every table with a user_id that the routes reach.
 func (e *isolationEnv) seed(t *testing.T) {
 	t.Helper()
@@ -107,30 +110,30 @@ func (e *isolationEnv) seed(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 	create := func(row any) { require.NoError(t, e.db.Create(row).Error) }
 
-	contact := models.Contact{UserID: b, Firstname: "Theirs", VCardUID: "b-uid", Circles: []string{"friends"}}
+	contact := models.Contact{UserID: b, Firstname: "BSecretContact", VCardUID: "b-uid", Circles: []string{"friends"}}
 	create(&contact)
-	other := models.Contact{UserID: b, Firstname: "Theirs too"}
+	other := models.Contact{UserID: b, Firstname: "BSecretContactToo"}
 	create(&other)
 	e.contact2 = other.ID
 
-	activity := models.Activity{UserID: b, Title: "Lunch", Date: now, Contacts: []models.Contact{contact}}
+	activity := models.Activity{UserID: b, Title: "BSecretActivity", Date: now, Contacts: []models.Contact{contact}}
 	create(&activity)
-	note := models.Note{UserID: b, Content: "private", Date: now, ContactID: &contact.ID}
+	note := models.Note{UserID: b, Content: "BSecretNote", Date: now, ContactID: &contact.ID}
 	create(&note)
-	relationship := models.Relationship{UserID: b, ContactID: contact.ID, Name: "Sib", Type: "Sibling", RelatedContactID: &other.ID}
+	relationship := models.Relationship{UserID: b, ContactID: contact.ID, Name: "BSecretRelation", Type: "Sibling", RelatedContactID: &other.ID}
 	create(&relationship)
-	job := models.EmploymentHistory{UserID: b, ContactID: contact.ID, Organization: "Acme"}
+	job := models.EmploymentHistory{UserID: b, ContactID: contact.ID, Organization: "BSecretOrg"}
 	create(&job)
-	reminder := models.Reminder{UserID: b, ContactID: &contact.ID, Message: "call", RemindAt: now, Recurrence: "once"}
+	reminder := models.Reminder{UserID: b, ContactID: &contact.ID, Message: "BSecretReminder", RemindAt: now, Recurrence: "once"}
 	create(&reminder)
-	completion := models.ReminderCompletion{UserID: b, ReminderID: &reminder.ID, ContactID: contact.ID, Message: "called", CompletedAt: now}
+	completion := models.ReminderCompletion{UserID: b, ReminderID: &reminder.ID, ContactID: contact.ID, Message: "BSecretCompletion", CompletedAt: now}
 	create(&completion)
-	token := models.ApiToken{UserID: b, Name: "cli", TokenHash: "b-hash"}
+	token := models.ApiToken{UserID: b, Name: "BSecretToken", TokenHash: "b-hash"}
 	create(&token)
-	webhook := models.Webhook{UserID: b, Name: "hook", URL: "https://example.com/hook", Secret: "s", Events: []string{"contact.created"}, IsActive: true}
+	webhook := models.Webhook{UserID: b, Name: "BSecretHook", URL: "https://example.com/hook", Secret: "s", Events: []string{"contact.created"}, IsActive: true}
 	create(&webhook)
 	create(&models.WebhookDelivery{WebhookID: webhook.ID, EventType: "contact.created", Payload: "{}"})
-	calendar := models.CalendarSubscription{UserID: b, Name: "cal", URL: "https://example.com/cal.ics"}
+	calendar := models.CalendarSubscription{UserID: b, Name: "BSecretCalendar", URL: "https://example.com/cal.ics"}
 	create(&calendar)
 	create(&models.CalendarEventLink{SubscriptionID: calendar.ID, UserID: b, UID: "ev", ActivityID: activity.ID, ContentHash: "h"})
 	connection := models.CardDAVConnection{UserID: b, BaseURL: "https://dav.example.com", AddressBookPath: "/ab/"}
@@ -199,32 +202,78 @@ func (e *isolationEnv) snapshot(t *testing.T) string {
 	return out.String()
 }
 
-// targets returns the concrete paths that aim a route at B's rows, and whether a path
-// parameter picked one of them. ok is false when a parameter follows a segment the walk
-// does not know.
-func (e *isolationEnv) targets(route string) (paths []string, aimed, ok bool) {
+// target is one request of the walk. aimed is set when the path names one of B's rows or
+// B's CardDAV address book.
+type target struct {
+	path  string
+	aimed bool
+}
+
+// targets returns the requests that aim a route at B's rows. ok is false when a path
+// parameter follows a segment the walk does not know.
+func (e *isolationEnv) targets(route string) (out []target, ok bool) {
 	if strings.HasPrefix(route, "/carddav/") {
+		// One wildcard route serves every CardDAV path, so the walk picks them: B's contact
+		// reached through A's address book by UID and by id, and B's address book itself.
 		id := strconv.Itoa(int(e.ids["contacts"]))
-		return []string{
-			"/carddav/addressbooks/a/contacts/b-uid.vcf",
-			"/carddav/addressbooks/a/contacts/" + id + ".vcf",
-			"/carddav/addressbooks/b/contacts/b-uid.vcf",
-			"/carddav/addressbooks/b/contacts/",
-		}, false, true
+		return []target{
+			{"/carddav/addressbooks/a/contacts/b-uid.vcf", false},
+			{"/carddav/addressbooks/a/contacts/" + id + ".vcf", false},
+			{"/carddav/addressbooks/b/contacts/b-uid.vcf", true},
+			{"/carddav/addressbooks/b/contacts/", true},
+		}, true
 	}
 	segments := strings.Split(route, "/")
+	aimed := false
 	for i, s := range segments {
 		if !strings.HasPrefix(s, ":") {
 			continue
 		}
 		id, known := e.ids[segments[i-1]]
 		if !known {
-			return nil, false, false
+			return nil, false
 		}
 		segments[i] = strconv.Itoa(int(id))
 		aimed = true
 	}
-	return []string{strings.Join(segments, "/")}, aimed, true
+	return []target{{strings.Join(segments, "/"), aimed}}, true
+}
+
+// refuses checks the answer to a request aimed at B's rows. The JSON API answers 403 or 404;
+// go-webdav answers CardDAV with several codes, so there any non-2xx will do.
+func refuses(path string, code int) bool {
+	if strings.HasPrefix(path, "/carddav/") {
+		return code < 200 || code >= 300
+	}
+	return code == http.StatusForbidden || code == http.StatusNotFound
+}
+
+// walk sends every route of the given methods as A and calls check with each answer. It fails
+// a request that A's credentials did not get through, so a lockout cannot hollow out the walk.
+func (e *isolationEnv) walk(t *testing.T, methods func(string) bool, check func(method string, tg target, w *httptest.ResponseRecorder)) int {
+	t.Helper()
+	walked := 0
+	for _, route := range e.router.Routes() {
+		key := routeKey(route)
+		if !methods(route.Method) || publicRoutes[key] {
+			continue
+		}
+		targets, ok := e.targets(route.Path)
+		if !assert.True(t, ok, "%s: seed a row of B's for its path parameter and add it to isolationEnv.ids", key) {
+			continue
+		}
+		for _, tg := range targets {
+			walked++
+			w := e.send(route.Method, tg.path)
+			assert.NotContains(t, []int{http.StatusUnauthorized, http.StatusTooManyRequests}, w.Code,
+				"%s %s: A's credentials did not get through, so the request proves nothing", route.Method, tg.path)
+			if tg.aimed {
+				assert.True(t, refuses(tg.path, w.Code), "%s %s aims at B's data and answered %d: %.300s", route.Method, tg.path, w.Code, w.Body.String())
+			}
+			check(route.Method, tg, w)
+		}
+	}
+	return walked
 }
 
 // body carries every field the JSON routes require, with B's ids wherever a field names a
@@ -248,6 +297,9 @@ func (e *isolationEnv) body() []byte {
 const isolationVCard = "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:b-uid\r\nFN:Hacked\r\nN:Hacked;;;;\r\nEND:VCARD\r\n"
 
 func (e *isolationEnv) send(method, path string) *httptest.ResponseRecorder {
+	if !strings.HasPrefix(path, "/carddav/") {
+		path += "?source_id=" + strconv.Itoa(int(e.contact2)) // query fields, B's id as in body()
+	}
 	return request(e.router, method, path, func(r *http.Request) {
 		if strings.HasPrefix(path, "/carddav/") {
 			r.Body = io.NopCloser(strings.NewReader(isolationVCard))
@@ -266,29 +318,27 @@ func TestInvariants_NoMutatingRouteChangesAnotherUsersRows(t *testing.T) {
 	e := newIsolationEnv(t)
 	before := e.snapshot(t)
 
-	walked := 0
-	for _, route := range e.router.Routes() {
-		key := routeKey(route)
-		if !mutating[route.Method] || publicRoutes[key] {
-			continue
+	walked := e.walk(t, func(m string) bool { return mutating[m] }, func(method string, tg target, _ *httptest.ResponseRecorder) {
+		if after := e.snapshot(t); !assert.Equal(t, before, after, "%s %s changed B's rows", method, tg.path) {
+			before = after // report each route once
 		}
-		paths, aimed, ok := e.targets(route.Path)
-		if !assert.True(t, ok, "%s: seed a row of B's for its path parameter and add it to isolationEnv.ids", key) {
-			continue
-		}
-		for _, path := range paths {
-			walked++
-			w := e.send(route.Method, path)
-			if aimed {
-				assert.Contains(t, []int{http.StatusForbidden, http.StatusNotFound}, w.Code,
-					"%s %s aims at B's row and answered %d: %s", route.Method, path, w.Code, w.Body.String())
-			}
-			if after := e.snapshot(t); !assert.Equal(t, before, after, "%s %s changed B's rows", route.Method, path) {
-				before = after // report each route once
-			}
-		}
-	}
+	})
 	assert.Greater(t, walked, 60, "the walk must see the real route table")
+
+	// The snapshot sees B's rows; a copy of B's data into a row of A's is caught here.
+	var copied int64
+	require.NoError(t, e.db.Model(&models.Contact{}).Where("user_id = ? AND firstname LIKE ?", e.a.ID, secret+"%").Count(&copied).Error)
+	assert.Zero(t, copied, "a contact of A's carries B's data")
+}
+
+func TestInvariants_NoReadRouteShowsAnotherUsersRows(t *testing.T) {
+	e := newIsolationEnv(t)
+	reads := map[string]bool{"GET": true, "PROPFIND": true, "REPORT": true}
+
+	walked := e.walk(t, func(m string) bool { return reads[m] }, func(method string, tg target, w *httptest.ResponseRecorder) {
+		assert.NotContains(t, w.Body.String(), secret, "%s %s shows B's data to A", method, tg.path)
+	})
+	assert.Greater(t, walked, 30, "the walk must see the real route table")
 }
 
 func TestInvariants_EveryUserTableIsSeededForTheWalk(t *testing.T) {
