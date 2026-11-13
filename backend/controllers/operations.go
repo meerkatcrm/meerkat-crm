@@ -29,19 +29,21 @@ func requestOf(ctx context.Context) (request, error) {
 	if !ok {
 		return request{}, apperrors.ErrUnauthorized("Authentication required")
 	}
-	db, _ := c.Value("db").(*gorm.DB)
+	db, ok := c.Value("db").(*gorm.DB)
+	if !ok {
+		return request{}, apperrors.ErrInternal("no database on the request")
+	}
 	return request{c: c, db: db, userID: userID}, nil
 }
 
 func (r request) cfg() config.Config { return currentConfig(r.c) }
 
+// out is the output of an operation whose response is just a JSON body.
+type out[T any] struct{ Body T }
+
+func respond[T any](body T) *out[T] { return &out[T]{Body: body} }
+
 // MessageBody is the body of responses that only confirm what happened.
 type MessageBody struct {
 	Message string `json:"message"`
-}
-
-type messageOutput struct{ Body MessageBody }
-
-func message(text string) *messageOutput {
-	return &messageOutput{Body: MessageBody{Message: text}}
 }

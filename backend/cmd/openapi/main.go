@@ -8,9 +8,12 @@ import (
 	"os"
 
 	"meerkat/routes"
+
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
+	gin.SetMode(gin.ReleaseMode) // no route debug lines on stdout, where the document goes
 	doc, err := routes.OpenAPISpec()
 	if err == nil && len(os.Args) > 1 {
 		err = os.WriteFile(os.Args[1], doc, 0o644)

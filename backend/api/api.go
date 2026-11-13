@@ -7,6 +7,7 @@
 //
 // Writing an operation:
 //
+//   - Register it with Register, not huma.Register.
 //   - The handler is func(ctx context.Context, in *Input) (*Output, error). Gin(ctx)
 //     returns the request's Gin context, for the db, user and config the middleware set.
 //   - Return *apperrors.AppError for failures, as Gin handlers do.
@@ -74,6 +75,15 @@ func Mount(engine *gin.Engine, group *gin.RouterGroup, spec *huma.OpenAPI) huma.
 	return a
 }
 
+// Register is huma.Register with the body size limit the global body-limit
+// middleware enforces (huma's own default is 1 MiB). Use it for every operation.
+func Register[I, O any](a huma.API, op huma.Operation, handler func(context.Context, *I) (*O, error)) {
+	if op.MaxBodyBytes == 0 {
+		op.MaxBodyBytes = middleware.DefaultMaxBodySize
+	}
+	huma.Register(a, op, handler)
+}
+
 // AcceptUnknownFields, embedded in a request body type, makes the body ignore
 // properties it does not declare instead of rejecting them.
 type AcceptUnknownFields struct {
@@ -88,7 +98,8 @@ func Gin(ctx context.Context) *gin.Context {
 	return c
 }
 
-// ValidateBody runs the `validate` tags of body. Call it from the body type's Resolve
+// ValidateBody runs the `validate` tags of body, keyed by JSON field name like
+// huma's own errors. Call it from the body type's Resolve
 // method:
 //
 //	func (b *NoteBody) Resolve(_ huma.Context, prefix *huma.PathBuffer) []error {
@@ -96,7 +107,7 @@ func Gin(ctx context.Context) *gin.Context {
 //	}
 func ValidateBody(prefix *huma.PathBuffer, body any) []error {
 	var errs []error
-	for _, ve := range middleware.ValidateStruct(body) {
+	for _, ve := range middleware.ValidateStructJSON(body) {
 		errs = append(errs, &huma.ErrorDetail{Message: ve.Message, Location: prefix.With(ve.Field)})
 	}
 	return errs
@@ -152,9 +163,9 @@ func newError(status int, msg string, errs ...error) huma.StatusError {
 			e.WithDetails(fieldOf(detail.Location), detail.Message)
 		}
 		// A missing field also fails its validate:"required" tag, which says so in the
-		// project's wording under the Go field name; keep huma's message only when not.
+		// project's wording; keep huma's report only for a field without that tag.
 		for _, field := range required {
-			if !hasDetailFold(e, field) {
+			if _, reported := e.Details[field]; !reported {
 				e.WithDetails(field, field+" is required")
 			}
 		}
@@ -177,15 +188,6 @@ func newError(status int, msg string, errs ...error) huma.StatusError {
 		e = e.WithError(errs[0]) // logged, never sent
 	}
 	return wrap(e)
-}
-
-func hasDetailFold(e *apperrors.AppError, field string) bool {
-	for key := range e.Details {
-		if strings.EqualFold(key, field) {
-			return true
-		}
-	}
-	return false
 }
 
 func codeFor(status int) string {

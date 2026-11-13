@@ -382,6 +382,17 @@ func TestUpdateNote_DetachesFromContact(t *testing.T) {
 	assert.Nil(t, stored.ContactID, "a note saved without contact_id must be detached")
 }
 
+// Note ids are typed as integers, so a non-numeric one is refused before any
+// query runs (the numeric id middleware refuses it first in production).
+func TestNoteOperationsRefuseANonNumericID(t *testing.T) {
+	_, router := setupRouter()
+	mountNotes(router)
+	for _, path := range []string{"/notes/abc", "/notes/" + url.PathEscape("1 OR 1=1"), "/contacts/abc/notes"} {
+		w := doRequest(router, http.MethodGet, path, nil, "")
+		assert.Equal(t, http.StatusBadRequest, w.Code, path)
+	}
+}
+
 // mountNotes serves the note operations on router, as routes.go does.
 func mountNotes(router *gin.Engine) {
 	RegisterNoteOperations(api.Mount(router, &router.RouterGroup, api.NewSpec()))

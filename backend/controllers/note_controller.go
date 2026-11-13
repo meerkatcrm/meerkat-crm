@@ -19,31 +19,31 @@ import (
 // RegisterNoteOperations adds the note operations to a, the authenticated API.
 func RegisterNoteOperations(a huma.API) {
 	tags := []string{"notes"}
-	huma.Register(a, huma.Operation{
+	api.Register(a, huma.Operation{
 		OperationID: "list-contact-notes", Method: http.MethodGet, Path: "/contacts/{id}/notes",
 		Summary: "List the notes about a contact", Tags: tags,
 	}, listContactNotes)
-	huma.Register(a, huma.Operation{
+	api.Register(a, huma.Operation{
 		OperationID: "create-contact-note", Method: http.MethodPost, Path: "/contacts/{id}/notes",
 		Summary: "Add a note about a contact", Tags: tags,
 	}, createContactNote)
-	huma.Register(a, huma.Operation{
+	api.Register(a, huma.Operation{
 		OperationID: "list-unassigned-notes", Method: http.MethodGet, Path: "/notes",
 		Summary: "List the notes without a contact, with search, date range and paging", Tags: tags,
 	}, listUnassignedNotes)
-	huma.Register(a, huma.Operation{
+	api.Register(a, huma.Operation{
 		OperationID: "create-note", Method: http.MethodPost, Path: "/notes",
 		Summary: "Add a note, about a contact or without one", Tags: tags,
 	}, createNote)
-	huma.Register(a, huma.Operation{
+	api.Register(a, huma.Operation{
 		OperationID: "get-note", Method: http.MethodGet, Path: "/notes/{id}",
 		Summary: "Get a note", Tags: tags,
 	}, getNote)
-	huma.Register(a, huma.Operation{
+	api.Register(a, huma.Operation{
 		OperationID: "update-note", Method: http.MethodPut, Path: "/notes/{id}",
 		Summary: "Replace a note's content, date and contact", Tags: tags,
 	}, updateNote)
-	huma.Register(a, huma.Operation{
+	api.Register(a, huma.Operation{
 		OperationID: "delete-note", Method: http.MethodDelete, Path: "/notes/{id}",
 		Summary: "Delete a note", Tags: tags,
 	}, deleteNote)
@@ -87,15 +87,11 @@ func toNotes(rows []models.Note) []Note {
 	return notes
 }
 
-type noteOutput struct{ Body Note }
-
 // NoteSaved is the response to creating or updating a note.
 type NoteSaved struct {
 	Message string `json:"message"`
 	Note    Note   `json:"note"`
 }
-
-type noteSavedOutput struct{ Body NoteSaved }
 
 // ContactNotes is the list of a contact's notes.
 type ContactNotes struct {
@@ -123,7 +119,7 @@ type idNoteBodyInput struct {
 	Body NoteBody
 }
 
-func listContactNotes(ctx context.Context, in *idInput) (*struct{ Body ContactNotes }, error) {
+func listContactNotes(ctx context.Context, in *idInput) (*out[ContactNotes], error) {
 	r, err := requestOf(ctx)
 	if err != nil {
 		return nil, err
@@ -135,10 +131,10 @@ func listContactNotes(ctx context.Context, in *idInput) (*struct{ Body ContactNo
 	if err := r.db.Where("contact_id = ? AND user_id = ?", in.ID, r.userID).Find(&notes).Error; err != nil {
 		return nil, apperrors.ErrDatabase("Failed to retrieve notes").WithError(err)
 	}
-	return &struct{ Body ContactNotes }{ContactNotes{Notes: toNotes(notes)}}, nil
+	return respond(ContactNotes{Notes: toNotes(notes)}), nil
 }
 
-func createContactNote(ctx context.Context, in *idNoteBodyInput) (*noteSavedOutput, error) {
+func createContactNote(ctx context.Context, in *idNoteBodyInput) (*out[NoteSaved], error) {
 	r, err := requestOf(ctx)
 	if err != nil {
 		return nil, err
@@ -150,7 +146,7 @@ func createContactNote(ctx context.Context, in *idNoteBodyInput) (*noteSavedOutp
 	return saveNewNote(r, in.Body, &contact.ID)
 }
 
-func createNote(ctx context.Context, in *noteBodyInput) (*noteSavedOutput, error) {
+func createNote(ctx context.Context, in *noteBodyInput) (*out[NoteSaved], error) {
 	r, err := requestOf(ctx)
 	if err != nil {
 		return nil, err
@@ -163,16 +159,16 @@ func createNote(ctx context.Context, in *noteBodyInput) (*noteSavedOutput, error
 	return saveNewNote(r, in.Body, in.Body.ContactID)
 }
 
-func saveNewNote(r request, body NoteBody, contactID *uint) (*noteSavedOutput, error) {
+func saveNewNote(r request, body NoteBody, contactID *uint) (*out[NoteSaved], error) {
 	note := models.Note{UserID: r.userID, Content: body.Content, Date: body.Date, ContactID: contactID}
 	if err := r.db.Create(&note).Error; err != nil {
 		return nil, apperrors.ErrDatabase("Failed to save note").WithError(err)
 	}
 	go services.TriggerWebhooks(r.db, r.cfg(), r.userID, "note.created", note)
-	return &noteSavedOutput{NoteSaved{Message: "Note created successfully", Note: toNote(note)}}, nil
+	return respond(NoteSaved{Message: "Note created successfully", Note: toNote(note)}), nil
 }
 
-func getNote(ctx context.Context, in *idInput) (*noteOutput, error) {
+func getNote(ctx context.Context, in *idInput) (*out[Note], error) {
 	r, err := requestOf(ctx)
 	if err != nil {
 		return nil, err
@@ -181,7 +177,7 @@ func getNote(ctx context.Context, in *idInput) (*noteOutput, error) {
 	if appErr != nil {
 		return nil, appErr
 	}
-	return &noteOutput{toNote(note)}, nil
+	return respond(toNote(note)), nil
 }
 
 type listNotesInput struct {
@@ -193,7 +189,7 @@ type listNotesInput struct {
 	ToDate   string `query:"toDate" doc:"Last day, inclusive, YYYY-MM-DD; ignored when not a date"`
 }
 
-func listUnassignedNotes(ctx context.Context, in *listNotesInput) (*struct{ Body NotePage }, error) {
+func listUnassignedNotes(ctx context.Context, in *listNotesInput) (*out[NotePage], error) {
 	r, err := requestOf(ctx)
 	if err != nil {
 		return nil, err
@@ -223,10 +219,10 @@ func listUnassignedNotes(ctx context.Context, in *listNotesInput) (*struct{ Body
 		Find(&notes).Error; err != nil {
 		return nil, apperrors.ErrDatabase("Failed to retrieve unassigned notes").WithError(err)
 	}
-	return &struct{ Body NotePage }{NotePage{Notes: toNotes(notes), Total: total, Page: pagination.Page, Limit: pagination.Limit}}, nil
+	return respond(NotePage{Notes: toNotes(notes), Total: total, Page: pagination.Page, Limit: pagination.Limit}), nil
 }
 
-func updateNote(ctx context.Context, in *idNoteBodyInput) (*noteSavedOutput, error) {
+func updateNote(ctx context.Context, in *idNoteBodyInput) (*out[NoteSaved], error) {
 	r, err := requestOf(ctx)
 	if err != nil {
 		return nil, err
@@ -250,10 +246,10 @@ func updateNote(ctx context.Context, in *idNoteBodyInput) (*noteSavedOutput, err
 		return nil, apperrors.ErrDatabase("Failed to update note").WithError(err)
 	}
 	go services.TriggerWebhooks(r.db, r.cfg(), r.userID, "note.updated", note)
-	return &noteSavedOutput{NoteSaved{Message: "Note updated successfully", Note: toNote(note)}}, nil
+	return respond(NoteSaved{Message: "Note updated successfully", Note: toNote(note)}), nil
 }
 
-func deleteNote(ctx context.Context, in *idInput) (*messageOutput, error) {
+func deleteNote(ctx context.Context, in *idInput) (*out[MessageBody], error) {
 	r, err := requestOf(ctx)
 	if err != nil {
 		return nil, err
@@ -267,5 +263,5 @@ func deleteNote(ctx context.Context, in *idInput) (*messageOutput, error) {
 	}
 	carddav.RemoveContactPhotoFile(r.cfg().ProfilePhotoDir, note.Image)
 	go services.TriggerWebhooks(r.db, r.cfg(), r.userID, "note.deleted", gin.H{"id": note.ID})
-	return message("Note deleted"), nil
+	return respond(MessageBody{Message: "Note deleted"}), nil
 }

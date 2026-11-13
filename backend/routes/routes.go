@@ -265,7 +265,6 @@ func RegisterOperations(protected huma.API) {
 // OpenAPISpec returns the OpenAPI document of every huma operation, as committed
 // in docs/openapi.json.
 func OpenAPISpec() ([]byte, error) {
-	gin.SetMode(gin.ReleaseMode)
 	engine := gin.New()
 	spec := api.NewSpec()
 	RegisterOperations(api.Mount(engine, engine.Group("/api/v1"), spec))

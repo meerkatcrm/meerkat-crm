@@ -16,7 +16,7 @@ import (
 
 type thingBody struct {
 	AcceptUnknownFields
-	Name  string `json:"name" validate:"required,max=5"`
+	Name  string `json:"full_name" validate:"required,max=5"` // Go and JSON names differ on purpose
 	Count int    `json:"count,omitempty" validate:"omitempty,min=1"`
 }
 
@@ -47,7 +47,7 @@ func newTestRouter(t *testing.T) *gin.Engine {
 		c.Next()
 	})
 	a := Mount(r, group, NewSpec())
-	huma.Register(a, huma.Operation{OperationID: "put-thing", Method: http.MethodPut, Path: "/things/{id}"},
+	Register(a, huma.Operation{OperationID: "put-thing", Method: http.MethodPut, Path: "/things/{id}"},
 		func(ctx context.Context, in *thingInput) (*thingOutput, error) {
 			if in.ID == 404 {
 				return nil, apperrors.ErrNotFound("Thing")
@@ -84,14 +84,14 @@ func errorOf(t *testing.T, body map[string]any) (code string, details map[string
 }
 
 func TestOperationSeesTheGinContext(t *testing.T) {
-	status, body := put(t, newTestRouter(t), "/api/v1/things/1", `{"name":"ok","extra":true}`)
+	status, body := put(t, newTestRouter(t), "/api/v1/things/1", `{"full_name":"ok","extra":true}`)
 	if status != http.StatusOK || body["name"] != "ok" || body["user_id"] != float64(7) {
 		t.Fatalf("got %d %v", status, body)
 	}
 }
 
 func TestAppErrorKeepsItsStatusAndFormat(t *testing.T) {
-	status, body := put(t, newTestRouter(t), "/api/v1/things/404", `{"name":"ok"}`)
+	status, body := put(t, newTestRouter(t), "/api/v1/things/404", `{"full_name":"ok"}`)
 	code, _ := errorOf(t, body)
 	if status != http.StatusNotFound || code != apperrors.ErrCodeNotFound {
 		t.Fatalf("got %d %s", status, code)
@@ -102,12 +102,12 @@ func TestAppErrorKeepsItsStatusAndFormat(t *testing.T) {
 }
 
 func TestValidationErrorsAre400WithDetailsPerField(t *testing.T) {
-	status, body := put(t, newTestRouter(t), "/api/v1/things/1", `{"name":"too long","count":-1}`)
+	status, body := put(t, newTestRouter(t), "/api/v1/things/1", `{"full_name":"too long","count":-1}`)
 	code, details := errorOf(t, body)
 	if status != http.StatusBadRequest || code != apperrors.ErrCodeValidation {
 		t.Fatalf("got %d %s", status, code)
 	}
-	if details["Name"] != "Name must be at most 5 characters" || details["Count"] == nil {
+	if details["full_name"] != "full_name must be at most 5 characters" || details["count"] == nil {
 		t.Fatalf("details: %v", details)
 	}
 }
@@ -115,18 +115,34 @@ func TestValidationErrorsAre400WithDetailsPerField(t *testing.T) {
 func TestAMissingFieldIsReportedOnce(t *testing.T) {
 	_, body := put(t, newTestRouter(t), "/api/v1/things/1", `{}`)
 	_, details := errorOf(t, body)
-	if len(details) != 1 || details["Name"] != "Name is required" {
+	if len(details) != 1 || details["full_name"] != "full_name is required" {
 		t.Fatalf("details: %v", details)
 	}
 }
 
 func TestMalformedJSONIsInvalidInput(t *testing.T) {
-	status, body := put(t, newTestRouter(t), "/api/v1/things/1", `{"name":`)
+	status, body := put(t, newTestRouter(t), "/api/v1/things/1", `{"full_name":`)
 	code, details := errorOf(t, body)
 	if status != http.StatusBadRequest || code != apperrors.ErrCodeInvalidInput {
 		t.Fatalf("got %d %s", status, code)
 	}
 	if details["field"] != "request body" || details["reason"] == "" || details["reason"] == "validation failed" {
 		t.Fatalf("details: %v", details)
+	}
+}
+
+func TestBodiesUpToTheGlobalLimitAreAccepted(t *testing.T) {
+	big := `{"full_name":"ok","extra":"` + strings.Repeat("x", 2<<20) + `"}` // 2 MiB, over huma's 1 MiB default
+	status, body := put(t, newTestRouter(t), "/api/v1/things/1", big)
+	if status != http.StatusOK {
+		t.Fatalf("got %d %v", status, body)
+	}
+}
+
+func TestAnEmptyBodyIsInvalidInput(t *testing.T) {
+	status, body := put(t, newTestRouter(t), "/api/v1/things/1", ``)
+	code, details := errorOf(t, body)
+	if status != http.StatusBadRequest || code != apperrors.ErrCodeInvalidInput || details["field"] != "request body" {
+		t.Fatalf("got %d %v", status, body)
 	}
 }
