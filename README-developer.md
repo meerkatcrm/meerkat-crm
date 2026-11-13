@@ -38,6 +38,7 @@
 - Backend Go tests (`go test ./...` or `make test`) spin up in-memory SQLite in helpers like [backend/controllers/activity_controller_test.go](backend/controllers/activity_controller_test.go); mirror that pattern for new suites.
 - Validation and middleware behavior has dedicated coverage in [backend/middleware/validation_test.go](backend/middleware/validation_test.go) and related files—extend these before touching shared validators.
 - Reminder scheduling is covered in [backend/services/reminder_service_test.go](backend/services/reminder_service_test.go) with clock control helpers; keep cron changes tested there.
+- Route security invariants, enforced from the live route table: [backend/routes/routes_test.go](backend/routes/routes_test.go) makes every route outside `publicRoutes` answer `401` to an anonymous request, and [backend/routes/invariants_test.go](backend/routes/invariants_test.go) sends every mutating route as user A, aimed at user B's rows, and fails if B's data changes. A new route needs nothing unless it takes an id the walk doesn't know (then seed B a row and add it to `isolationEnv.ids`). A new table with a `user_id` needs a row for B in `isolationEnv.seed`. A new route keyed by an in-memory session id instead of a row needs an entry in `sessionKeyed` naming the controller test that proves its isolation.
 - Frontend unit tests run with `yarn test` and rely on React Testing Library setup in [frontend/src/setupTests.ts](frontend/src/setupTests.ts), which already registers jest-dom.
 
 **E2E Testing (Playwright)**

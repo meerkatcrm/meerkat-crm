@@ -143,7 +143,7 @@ func (m *MonicaImportManager) get(sessionID string, userID uint) (*monicaImportS
 	s, exists := m.sessions[sessionID]
 	m.mu.RUnlock()
 	if !exists {
-		return nil, apperrors.ErrNotFound("Import session expired or not found")
+		return nil, apperrors.ErrNotFound(ImportSessionNotFound)
 	}
 	if s.userID != userID {
 		return nil, apperrors.ErrUnauthorized("Session does not belong to current user")
