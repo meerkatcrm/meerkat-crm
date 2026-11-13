@@ -166,6 +166,35 @@ func (e *isolationEnv) seed(t *testing.T) {
 	}
 }
 
+// tables returns the tables that hold rows of their own. It leaves out the full-text indexes
+// (FTS5 virtual tables and their shadow tables): triggers fill them from contacts, notes and
+// activities, which the snapshot covers, and every search joins back to those tables. The read
+// walk's search term is what checks that a search does not show B's rows.
+func (e *isolationEnv) tables(t *testing.T) []string {
+	t.Helper()
+	var all []struct{ Name, SQL string }
+	require.NoError(t, e.db.Raw("SELECT name, COALESCE(sql, '') AS sql FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name != 'schema_migrations' ORDER BY name").Scan(&all).Error)
+	var virtual []string
+	for _, tb := range all {
+		if strings.HasPrefix(strings.ToUpper(tb.SQL), "CREATE VIRTUAL TABLE") {
+			virtual = append(virtual, tb.Name)
+		}
+	}
+	var out []string
+	for _, tb := range all {
+		derived := false
+		for _, v := range virtual {
+			if tb.Name == v || strings.HasPrefix(tb.Name, v+"_") {
+				derived = true
+			}
+		}
+		if !derived {
+			out = append(out, tb.Name)
+		}
+	}
+	return out
+}
+
 // pointer is a column that holds the id of a row in another table.
 type pointer struct{ col, target string }
 
@@ -175,15 +204,14 @@ type pointer struct{ col, target string }
 // duplicate-dismissal pair) declare no foreign key.
 func (e *isolationEnv) columns(t *testing.T) (withUser []string, pointers map[string][]pointer) {
 	t.Helper()
-	var tables []string
-	require.NoError(t, e.db.Raw("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name != 'schema_migrations' ORDER BY name").Scan(&tables).Error)
+	tables := e.tables(t)
 	owned := map[string]bool{}
 	named := map[string][]string{}
 	for _, table := range tables {
-		cols, err := e.db.Migrator().ColumnTypes(table)
-		require.NoError(t, err)
+		var cols []struct{ Name string }
+		require.NoError(t, e.db.Raw(fmt.Sprintf("PRAGMA table_info(%q)", table)).Scan(&cols).Error)
 		for _, c := range cols {
-			if name := c.Name(); name == "user_id" {
+			if name := c.Name; name == "user_id" {
 				withUser = append(withUser, table)
 				owned[table] = true
 			} else if strings.Contains(name, "contact") && strings.HasSuffix(name, "_id") {
@@ -380,7 +408,7 @@ func cardDAVBody(method string) (body, contentType string) {
 func (e *isolationEnv) send(method, path string) *httptest.ResponseRecorder {
 	if !strings.HasPrefix(path, "/carddav/") {
 		// query fields, with B's ids as in body()
-		path += "?source_id=" + strconv.Itoa(int(e.contact2)) + "&session_id=b-session"
+		path += "?source_id=" + strconv.Itoa(int(e.contact2)) + "&session_id=b-session&search=" + strings.ToLower(secret)
 	}
 	return request(e.router, method, path, func(r *http.Request) {
 		if strings.HasPrefix(path, "/carddav/") {
@@ -424,8 +452,7 @@ func TestInvariants_NoMutatingRouteChangesAnotherUsersRows(t *testing.T) {
 // holds, that has the marker in any column.
 func (e *isolationEnv) rowsOutsideBWithSecret(t *testing.T) []string {
 	t.Helper()
-	var tables []string
-	require.NoError(t, e.db.Raw("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name != 'schema_migrations' ORDER BY name").Scan(&tables).Error)
+	tables := e.tables(t)
 	conds := e.snapshotConds(t)
 	var found []string
 	for _, table := range tables {
@@ -491,10 +518,8 @@ func TestInvariants_EveryUserTableIsSeededForTheWalk(t *testing.T) {
 	// After seeding, every row but A's user row is B's or hangs off B's, so the snapshot must
 	// hold all of them. A table it misses (no user_id, no pointer columns() recognizes) is a
 	// table the walk would not protect.
-	var tables []string
-	require.NoError(t, e.db.Raw("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name != 'schema_migrations'").Scan(&tables).Error)
 	conds := e.snapshotConds(t)
-	for _, table := range tables {
+	for _, table := range e.tables(t) {
 		var total int64
 		require.NoError(t, e.db.Table(table).Count(&total).Error)
 		if table == "users" {
