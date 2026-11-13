@@ -1,0 +1,172 @@
+package controllers
+
+import (
+	apperrors "meerkat/errors"
+	"meerkat/middleware"
+	"meerkat/models"
+	"meerkat/services"
+	"net/http"
+	"slices"
+	"strings"
+
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+)
+
+// bulkTextField pairs a bulk-update input value with the contact field it sets.
+type bulkTextField struct {
+	name  string
+	value *string
+	set   func(*models.Contact, string)
+}
+
+// BulkUpdateContacts applies one change (circles added or removed, text fields set,
+// archived or restored) to every listed contact of the caller, all or nothing.
+func BulkUpdateContacts(c *gin.Context) {
+	db := c.MustGet("db").(*gorm.DB)
+
+	userID, ok := currentUserID(c)
+	if !ok {
+		return
+	}
+
+	input, appErr := middleware.GetValidated[models.ContactBulkUpdateInput](c)
+	if appErr != nil {
+		apperrors.AbortWithError(c, appErr)
+		return
+	}
+
+	fields := []bulkTextField{
+		{"how_we_met", input.HowWeMet, func(ct *models.Contact, v string) { ct.HowWeMet = v }},
+		{"food_preference", input.FoodPreference, func(ct *models.Contact, v string) { ct.FoodPreference = v }},
+		{"work_information", input.WorkInformation, func(ct *models.Contact, v string) { ct.WorkInformation = v }},
+		{"organization", input.Organization, func(ct *models.Contact, v string) { ct.Organization = v }},
+		{"department", input.Department, func(ct *models.Contact, v string) { ct.Department = v }},
+		{"job_title", input.JobTitle, func(ct *models.Contact, v string) { ct.JobTitle = v }},
+		{"role", input.Role, func(ct *models.Contact, v string) { ct.Role = v }},
+		{"city", input.City, setPrimaryCity},
+	}
+
+	addCircles := cleanCircles(input.AddCircles)
+	removeCircles := cleanCircles(input.RemoveCircles)
+	changes := len(addCircles) + len(removeCircles)
+	if input.Archived != nil {
+		changes++
+	}
+	for _, f := range fields {
+		if f.value == nil {
+			continue
+		}
+		if strings.TrimSpace(*f.value) == "" {
+			apperrors.AbortWithError(c, apperrors.ErrInvalidInput(f.name, "must not be blank"))
+			return
+		}
+		changes++
+	}
+	if changes == 0 {
+		apperrors.AbortWithError(c, apperrors.ErrInvalidInput("request", "no change given"))
+		return
+	}
+	for _, circle := range addCircles {
+		if slices.Contains(removeCircles, circle) {
+			apperrors.AbortWithError(c, apperrors.ErrInvalidInput("circles", "a circle can't be both added and removed"))
+			return
+		}
+	}
+
+	ids := slices.Clone(input.ContactIDs)
+	slices.Sort(ids)
+	ids = slices.Compact(ids)
+
+	var contacts []models.Contact
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("user_id = ? AND id IN ?", userID, ids).Find(&contacts).Error; err != nil {
+			return apperrors.ErrDatabase("Failed to load contacts").WithError(err)
+		}
+		if len(contacts) != len(ids) {
+			// One of them is gone or someone else's: change none rather than some.
+			return apperrors.ErrNotFound("Contact")
+		}
+		for i := range contacts {
+			contact := &contacts[i]
+			contact.Circles = applyCircleChanges(contact.Circles, addCircles, removeCircles)
+			for _, f := range fields {
+				if f.value != nil {
+					f.set(contact, strings.TrimSpace(*f.value))
+				}
+			}
+			if input.Archived != nil {
+				if *input.Archived && !contact.Archived {
+					// Archiving a single contact also drops its reminders.
+					if err := tx.Where("contact_id = ? AND user_id = ?", contact.ID, userID).Delete(&models.Reminder{}).Error; err != nil {
+						return apperrors.ErrDatabase("Failed to archive contacts").WithError(err)
+					}
+				}
+				contact.Archived = *input.Archived
+			}
+			if err := tx.Save(contact).Error; err != nil {
+				return apperrors.ErrDatabase("Failed to update contacts").WithError(err)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		if ae, ok := err.(*apperrors.AppError); ok {
+			apperrors.AbortWithError(c, ae)
+		} else {
+			apperrors.AbortWithError(c, apperrors.ErrDatabase("Failed to update contacts").WithError(err))
+		}
+		return
+	}
+
+	cfg, clk := currentConfig(c), middleware.RequestClock(c)
+	go func() {
+		for _, contact := range contacts {
+			services.TriggerWebhooks(db, cfg, userID, "contact.updated", contact, clk)
+		}
+	}()
+
+	c.JSON(http.StatusOK, gin.H{"updated": len(contacts)})
+}
+
+// cleanCircles trims the names and drops blanks and repeats.
+func cleanCircles(circles []string) []string {
+	out := make([]string, 0, len(circles))
+	for _, circle := range circles {
+		circle = strings.TrimSpace(circle)
+		if circle != "" && !slices.Contains(out, circle) {
+			out = append(out, circle)
+		}
+	}
+	return out
+}
+
+// applyCircleChanges keeps the contact's circles in their order, drops the removed
+// ones and appends the added ones it doesn't have yet.
+func applyCircleChanges(circles, add, remove []string) []string {
+	out := make([]string, 0, len(circles)+len(add))
+	for _, circle := range circles {
+		if !slices.Contains(remove, circle) && !slices.Contains(out, circle) {
+			out = append(out, circle)
+		}
+	}
+	for _, circle := range add {
+		if !slices.Contains(out, circle) {
+			out = append(out, circle)
+		}
+	}
+	return out
+}
+
+// setPrimaryCity sets the city of the contact's first address, adding a home
+// address with the city when it has none. A legacy one-line address with no
+// structured entry is kept as that address's street rather than overwritten.
+func setPrimaryCity(contact *models.Contact, city string) {
+	if len(contact.Addresses) == 0 {
+		contact.Addresses = []models.ContactAddress{{Type: "home", Street: contact.Address, City: city}}
+		return
+	}
+	addresses := slices.Clone(contact.Addresses)
+	addresses[0].City = city
+	contact.Addresses = addresses
+}

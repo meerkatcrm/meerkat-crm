@@ -288,6 +288,37 @@
       "notDeceased": "Non décédé",
       "active": "Actif",
       "archivedRemovesReminders": "Archivé (ses rappels sont supprimés)"
+    },
+    "select": {
+      "button": "Sélectionner",
+      "done": "Terminé",
+      "page": "Tout sélectionner sur cette page",
+      "count_one": "{{count}} sélectionné",
+      "count_other": "{{count}} sélectionnés",
+      "all_one": "Sélectionner les {{count}}",
+      "all_other": "Sélectionner les {{count}}",
+      "clear": "Effacer la sélection",
+      "edit": "Modifier la sélection"
+    },
+    "bulkEdit": {
+      "title_one": "Modifier {{count}} contact",
+      "title_other": "Modifier {{count}} contacts",
+      "description": "Seuls les champs remplis sont modifiés. Les champs vides conservent la valeur de chaque contact.",
+      "addCircles": "Ajouter aux cercles",
+      "addCirclesHelp": "Choisissez un cercle ou saisissez-en un nouveau",
+      "removeCircles": "Retirer des cercles",
+      "circleConflict": "Un cercle ne peut pas être ajouté et retiré à la fois : {{circles}}",
+      "setFields": "Définir pour chaque contact",
+      "cityHelp": "Enregistrée dans l'adresse principale de chaque contact ; une adresse est ajoutée s'il n'en a pas",
+      "archiveLabel": "Archive",
+      "noChange": "Aucun changement",
+      "archive": "Archiver",
+      "unarchive": "Désarchiver",
+      "archiveWarning": "L'archivage supprime aussi les rappels de ces contacts.",
+      "apply_one": "Appliquer à {{count}} contact",
+      "apply_other": "Appliquer à {{count}} contacts",
+      "success_one": "{{count}} contact mis à jour",
+      "success_other": "{{count}} contacts mis à jour"
     }
   },
   "timeline": {
@@ -352,7 +383,14 @@
     "exportVcardError": "Échec de l'exportation du contact en vCard. Veuillez réessayer.",
     "showAllFields": "Afficher tous les champs",
     "hideEmptyFields": "Masquer les champs vides",
-    "noFilledFields": "Aucune information renseignée pour l'instant."
+    "noFilledFields": "Aucune information renseignée pour l'instant.",
+    "listNav": {
+      "label": "Liste des contacts",
+      "previous": "Précédent",
+      "next": "Suivant",
+      "position": "{{position}} sur {{total}}",
+      "gone": "Ce contact n'est plus dans la liste"
+    }
   },
   "noteDialog": {
     "title": "Ajouter une note",

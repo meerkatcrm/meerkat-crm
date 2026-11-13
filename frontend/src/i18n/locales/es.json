@@ -288,6 +288,37 @@
       "notDeceased": "No fallecido",
       "active": "Activo",
       "archivedRemovesReminders": "Archivado (se eliminan sus recordatorios)"
+    },
+    "select": {
+      "button": "Seleccionar",
+      "done": "Listo",
+      "page": "Seleccionar todos en esta página",
+      "count_one": "{{count}} seleccionado",
+      "count_other": "{{count}} seleccionados",
+      "all_one": "Seleccionar los {{count}}",
+      "all_other": "Seleccionar los {{count}}",
+      "clear": "Borrar selección",
+      "edit": "Editar selección"
+    },
+    "bulkEdit": {
+      "title_one": "Editar {{count}} contacto",
+      "title_other": "Editar {{count}} contactos",
+      "description": "Solo se cambia lo que rellenes. Los campos vacíos conservan el valor de cada contacto.",
+      "addCircles": "Añadir a círculos",
+      "addCirclesHelp": "Elige un círculo o escribe uno nuevo",
+      "removeCircles": "Quitar de círculos",
+      "circleConflict": "Un círculo no puede añadirse y quitarse a la vez: {{circles}}",
+      "setFields": "Establecer para cada contacto",
+      "cityHelp": "Se guarda en la dirección principal de cada contacto; se añade una si no tiene",
+      "archiveLabel": "Archivo",
+      "noChange": "Sin cambios",
+      "archive": "Archivar",
+      "unarchive": "Desarchivar",
+      "archiveWarning": "Archivar también elimina los recordatorios de estos contactos.",
+      "apply_one": "Aplicar a {{count}} contacto",
+      "apply_other": "Aplicar a {{count}} contactos",
+      "success_one": "{{count}} contacto actualizado",
+      "success_other": "{{count}} contactos actualizados"
     }
   },
   "timeline": {
@@ -352,7 +383,14 @@
     "exportVcardError": "No se pudo exportar el contacto como vCard. Inténtalo de nuevo.",
     "showAllFields": "Mostrar todos los campos",
     "hideEmptyFields": "Ocultar campos vacíos",
-    "noFilledFields": "Todavía no hay datos rellenados."
+    "noFilledFields": "Todavía no hay datos rellenados.",
+    "listNav": {
+      "label": "Lista de contactos",
+      "previous": "Anterior",
+      "next": "Siguiente",
+      "position": "{{position}} de {{total}}",
+      "gone": "Ese contacto ya no está en la lista"
+    }
   },
   "noteDialog": {
     "title": "Agregar Nota",

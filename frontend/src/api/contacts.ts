@@ -335,3 +335,31 @@ export async function mergeContacts(
     body: JSON.stringify({ source_id: sourceId, resolutions }),
   });
 }
+
+// Fields bulk edit can set. City goes to each contact's primary address.
+export type BulkContactField =
+  | 'how_we_met'
+  | 'food_preference'
+  | 'work_information'
+  | 'organization'
+  | 'department'
+  | 'job_title'
+  | 'role'
+  | 'city';
+
+export type BulkUpdateContactsInput = {
+  contact_ids: number[];
+  add_circles?: string[];
+  remove_circles?: string[];
+  archived?: boolean;
+} & Partial<Record<BulkContactField, string>>;
+
+// Applies one change to many contacts at once; all of them or none are changed.
+export async function bulkUpdateContacts(
+  input: BulkUpdateContactsInput
+): Promise<{ updated: number }> {
+  return apiJson('/contacts/bulk-update', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}

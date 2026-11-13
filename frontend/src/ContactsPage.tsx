@@ -2,11 +2,15 @@ import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useContacts } from './hooks/useContacts';
-import { getCircles } from './api/contacts';
+import { getCircles, getContacts } from './api/contacts';
 import { getCurrentUser } from './api/admin';
 import { resolveEnabledFields, ContactFieldKey } from './contactFields';
 import AddContactDialog from './components/AddContactDialog';
 import ImportContactsDialog from './components/ImportContactsDialog';
+import BulkEditContactsDialog from './components/BulkEditContactsDialog';
+import { ContactListNav, isNavigableSort } from './contactListNav';
+import { useSnackbar } from './context/SnackbarContext';
+import { getErrorMessage } from './utils/errorHandler';
 import {
   Box,
   Card,
@@ -21,14 +25,20 @@ import {
   Pagination,
   Button,
   FormControlLabel,
-  Switch
+  Switch,
+  Checkbox
 } from '@mui/material';
+import ChecklistIcon from '@mui/icons-material/Checklist';
+import EditIcon from '@mui/icons-material/Edit';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import CallMergeIcon from '@mui/icons-material/CallMerge';
 import { ContactListSkeleton } from './components/LoadingSkeletons';
 import { contactDisplayName } from './utils/contactName';
 import { thumbnailSrc } from './utils/thumbnail';
+
+// Mirrors models.MaxBulkContacts on the server
+const MAX_BULK_CONTACTS = 1000;
 
 export default function ContactsPage() {
   const { t } = useTranslation();
@@ -46,6 +56,11 @@ export default function ContactsPage() {
   const [customFieldNames, setCustomFieldNames] = useState<string[]>([]);
   const [enabledFields, setEnabledFields] = useState<Set<ContactFieldKey>>(() => resolveEnabledFields(null));
   const [showArchived, setShowArchived] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
+  const [selectingAll, setSelectingAll] = useState(false);
+  const [bulkEditOpen, setBulkEditOpen] = useState(false);
+  const { showError, showSuccess } = useSnackbar();
   const pageSize = 10;
 
   // While searching, the default order is the best match first (the server ranks when no
@@ -90,6 +105,13 @@ export default function ContactsPage() {
     includeArchived: showArchived,
   }), [page, searchQuery, selectedCircle, sortField, sortOrder, showArchived]);
 
+  // The list's filters and order without paging: what "select all" and the detail
+  // page's previous / next step through.
+  const listParams = useMemo(() => {
+    const { page: _page, limit: _limit, ...rest } = contactParams;
+    return rest;
+  }, [contactParams]);
+
   // Use custom hook for fetching contacts
   const { contacts, total: totalContacts, loading, refetch } = useContacts(contactParams);
 
@@ -122,6 +144,8 @@ export default function ContactsPage() {
       prev.showArchived !== showArchived
     ) {
       setPage(1);
+      // A selection is made within one list: other filters would hide what it holds
+      setSelectedIds(new Set());
       prevFiltersRef.current = { searchQuery, selectedCircle, activeSort, showArchived };
     }
   }, [searchQuery, selectedCircle, activeSort, showArchived, setPage]);
@@ -134,9 +158,7 @@ export default function ContactsPage() {
     navigate(`/contacts/${contactId}`);
   };
 
-  const handleImportComplete = async () => {
-    await refetch();
-    // Also refresh circles
+  const refreshCircles = async () => {
     try {
       const data = await getCircles();
       setCircles(Array.isArray(data) ? data : []);
@@ -144,6 +166,74 @@ export default function ContactsPage() {
       console.error('Error fetching circles:', err);
     }
   };
+
+  const handleImportComplete = async () => {
+    await refetch();
+    await refreshCircles();
+  };
+
+  const toggleSelected = (id: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const pageIds = filteredContacts.map(c => c.ID);
+  const pageAllSelected = pageIds.length > 0 && pageIds.every(id => selectedIds.has(id));
+  const pageSomeSelected = pageIds.some(id => selectedIds.has(id));
+
+  const togglePage = () => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      pageIds.forEach(id => (pageAllSelected ? next.delete(id) : next.add(id)));
+      return next;
+    });
+  };
+
+  // Collects the IDs of every contact matching the current filters, a page of the
+  // largest size the server allows at a time.
+  const selectAllMatching = async () => {
+    setSelectingAll(true);
+    try {
+      const ids = new Set<number>();
+      const limit = 100;
+      for (let p = 1; ids.size < MAX_BULK_CONTACTS; p++) {
+        const result = await getContacts({ ...listParams, page: p, limit });
+        result.contacts.forEach(c => ids.add(c.ID));
+        if (result.contacts.length < limit || p * limit >= result.total) break;
+      }
+      setSelectedIds(ids);
+    } catch (err) {
+      showError(getErrorMessage(err));
+    } finally {
+      setSelectingAll(false);
+    }
+  };
+
+  const exitSelectMode = () => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  };
+
+  const handleBulkEditComplete = async (updated: number) => {
+    setBulkEditOpen(false);
+    setSelectedIds(new Set());
+    showSuccess(t('contacts.bulkEdit.success', { count: updated }));
+    await refetch();
+    await refreshCircles();
+  };
+
+  // Previous / next on the detail page need a stable order; a random one isn't.
+  const listNavFor = (index: number): ContactListNav | undefined =>
+    isNavigableSort(listParams.sort)
+      ? { params: listParams, index: (page - 1) * pageSize + index, total: totalContacts }
+      : undefined;
   
   return (
     <Box sx={{ maxWidth: 1200, mx: 'auto', mt: 2, p: 2 }}>
@@ -207,6 +297,14 @@ export default function ContactsPage() {
           sx={{ alignItems: 'center', flexWrap: 'wrap' }}
         >
           <Button
+            variant={selectMode ? 'contained' : 'outlined'}
+            startIcon={<ChecklistIcon />}
+            onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
+            sx={{ whiteSpace: 'nowrap' }}
+          >
+            {selectMode ? t('contacts.select.done') : t('contacts.select.button')}
+          </Button>
+          <Button
             variant="outlined"
             startIcon={<CallMergeIcon />}
             onClick={() => navigate('/contacts/duplicates')}
@@ -260,16 +358,78 @@ export default function ContactsPage() {
           )}
         </Box>
       )}
+      {selectMode && (
+        <Box
+          sx={{
+            mb: 2,
+            p: 1,
+            border: 1,
+            borderColor: 'primary.main',
+            borderRadius: 1,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            flexWrap: 'wrap',
+          }}
+        >
+          <Checkbox
+            checked={pageAllSelected}
+            indeterminate={!pageAllSelected && pageSomeSelected}
+            onChange={togglePage}
+            disabled={pageIds.length === 0}
+            slotProps={{ input: { 'aria-label': t('contacts.select.page') } }}
+          />
+          <Typography variant="body2" sx={{ flexGrow: 1 }}>
+            {t('contacts.select.count', { count: selectedIds.size })}
+          </Typography>
+          {totalContacts > selectedIds.size && totalContacts <= MAX_BULK_CONTACTS && (
+            <Button size="small" onClick={selectAllMatching} disabled={selectingAll}>
+              {t('contacts.select.all', { count: totalContacts })}
+            </Button>
+          )}
+          {selectedIds.size > 0 && (
+            <Button size="small" onClick={() => setSelectedIds(new Set())}>
+              {t('contacts.select.clear')}
+            </Button>
+          )}
+          <Button
+            size="small"
+            variant="contained"
+            startIcon={<EditIcon />}
+            disabled={selectedIds.size === 0 || selectedIds.size > MAX_BULK_CONTACTS}
+            onClick={() => setBulkEditOpen(true)}
+          >
+            {t('contacts.select.edit')}
+          </Button>
+        </Box>
+      )}
       {loading ? (
         <ContactListSkeleton count={10} />
       ) : (
         <>
           <Stack spacing={2}>
-            {filteredContacts.map(contact => (
+            {filteredContacts.map((contact, index) => (
               <Card
                 key={contact.ID}
-                component={Link}
-                to={`/contacts/${contact.ID}`}
+                {...(selectMode
+                  ? {
+                      component: 'div' as const,
+                      role: 'checkbox',
+                      'aria-checked': selectedIds.has(contact.ID),
+                      tabIndex: 0,
+                      onClick: () => toggleSelected(contact.ID),
+                      onKeyDown: (e: React.KeyboardEvent) => {
+                        if (e.key === ' ' || e.key === 'Enter') {
+                          e.preventDefault();
+                          toggleSelected(contact.ID);
+                        }
+                      },
+                    }
+                  : {
+                      component: Link,
+                      to: `/contacts/${contact.ID}`,
+                      state: { listNav: listNavFor(index) },
+                    })}
                 sx={{
                   display: 'flex',
                   alignItems: 'center',
@@ -283,6 +443,14 @@ export default function ContactsPage() {
                   }
                 }}
               >
+                {selectMode && (
+                  <Checkbox
+                    checked={selectedIds.has(contact.ID)}
+                    tabIndex={-1}
+                    sx={{ mr: 0.5, pointerEvents: 'none' }}
+                    slotProps={{ input: { 'aria-hidden': true } }}
+                  />
+                )}
                 <Avatar src={thumbnailSrc(contact.photo_thumbnail)} sx={{ width: 48, height: 48, mr: 1.5, bgcolor: 'primary.main' }}>
                   {contact.firstname.charAt(0)}
                 </Avatar>
@@ -314,8 +482,8 @@ export default function ContactsPage() {
                         label={circle}
                         size="small"
                         variant="outlined"
-                        clickable
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedCircle(circle); setPage(1); }}
+                        clickable={!selectMode}
+                        onClick={selectMode ? undefined : (e) => { e.preventDefault(); e.stopPropagation(); setSelectedCircle(circle); setPage(1); }}
                         sx={{ height: 20, fontSize: '0.75rem' }}
                       />
                     ))}
@@ -344,6 +512,14 @@ export default function ContactsPage() {
         availableCircles={circles}
         customFieldNames={customFieldNames}
         enabledFields={enabledFields}
+      />
+      <BulkEditContactsDialog
+        open={bulkEditOpen}
+        contactIds={[...selectedIds]}
+        availableCircles={circles}
+        enabledFields={enabledFields}
+        onClose={() => setBulkEditOpen(false)}
+        onComplete={handleBulkEditComplete}
       />
       <ImportContactsDialog
         open={importDialogOpen}

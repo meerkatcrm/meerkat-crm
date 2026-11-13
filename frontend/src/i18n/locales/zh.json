@@ -288,6 +288,37 @@
       "notDeceased": "未故",
       "active": "活跃",
       "archivedRemovesReminders": "已归档（其提醒将被删除）"
+    },
+    "select": {
+      "button": "选择",
+      "done": "完成",
+      "page": "全选本页",
+      "count_one": "已选择 {{count}} 个",
+      "count_other": "已选择 {{count}} 个",
+      "all_one": "全选 {{count}} 个",
+      "all_other": "全选 {{count}} 个",
+      "clear": "清除选择",
+      "edit": "编辑所选"
+    },
+    "bulkEdit": {
+      "title_one": "编辑 {{count}} 个联系人",
+      "title_other": "编辑 {{count}} 个联系人",
+      "description": "只修改你填写的内容。留空的字段保留每个联系人原有的值。",
+      "addCircles": "添加到圈子",
+      "addCirclesHelp": "选择一个圈子或输入新圈子",
+      "removeCircles": "从圈子中移除",
+      "circleConflict": "同一圈子不能同时添加和移除：{{circles}}",
+      "setFields": "为每个联系人设置",
+      "cityHelp": "写入每个联系人的主要地址；没有地址时会新建一个",
+      "archiveLabel": "归档",
+      "noChange": "不更改",
+      "archive": "归档",
+      "unarchive": "取消归档",
+      "archiveWarning": "归档时也会删除这些联系人的提醒。",
+      "apply_one": "应用到 {{count}} 个联系人",
+      "apply_other": "应用到 {{count}} 个联系人",
+      "success_one": "已更新 {{count}} 个联系人",
+      "success_other": "已更新 {{count}} 个联系人"
     }
   },
   "timeline": {
@@ -352,7 +383,14 @@
     "exportVcardError": "将联系人导出为 vCard 失败。请重试。",
     "showAllFields": "显示所有字段",
     "hideEmptyFields": "隐藏空字段",
-    "noFilledFields": "尚未填写任何信息。"
+    "noFilledFields": "尚未填写任何信息。",
+    "listNav": {
+      "label": "联系人列表",
+      "previous": "上一个",
+      "next": "下一个",
+      "position": "第 {{position}} 个，共 {{total}} 个",
+      "gone": "该联系人已不在列表中"
+    }
   },
   "noteDialog": {
     "title": "添加笔记",

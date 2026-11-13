@@ -378,3 +378,28 @@ type WebhookDeliveryResponse struct {
 	Status      string     `json:"status"` // pending, delivered or dead
 	CreatedAt   time.Time  `json:"created_at"`
 }
+
+// MaxBulkContacts caps how many contacts one bulk update may touch.
+const MaxBulkContacts = 1000
+
+// ContactBulkUpdateInput is the DTO for applying one change to many contacts at once.
+// A nil field leaves that value alone; a set one replaces it on every contact. Values
+// can only be set, not cleared: blank is rejected so an empty box can't wipe data.
+// City is written to each contact's primary (first) address, which is created when
+// the contact has none. Archived archives (deleting reminders) or restores.
+type ContactBulkUpdateInput struct {
+	ContactIDs    []uint   `json:"contact_ids" validate:"required,min=1,max=1000,dive,gt=0"`
+	AddCircles    []string `json:"add_circles" validate:"omitempty,max=50,dive,min=1,max=100"`
+	RemoveCircles []string `json:"remove_circles" validate:"omitempty,max=50,dive,min=1,max=100"`
+
+	HowWeMet        *string `json:"how_we_met" validate:"omitempty,max=1000"`
+	FoodPreference  *string `json:"food_preference" validate:"omitempty,max=500"`
+	WorkInformation *string `json:"work_information" validate:"omitempty,max=1000"`
+	Organization    *string `json:"organization" validate:"omitempty,max=200"`
+	Department      *string `json:"department" validate:"omitempty,max=200"`
+	JobTitle        *string `json:"job_title" validate:"omitempty,max=200"`
+	Role            *string `json:"role" validate:"omitempty,max=200"`
+	City            *string `json:"city" validate:"omitempty,max=200"`
+
+	Archived *bool `json:"archived"`
+}
