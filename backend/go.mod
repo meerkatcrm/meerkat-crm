@@ -29,6 +29,7 @@ require (
 require (
 	github.com/dustin/go-humanize v1.1.0 // indirect
 	github.com/ebitengine/purego v0.11.2 // indirect
+	github.com/gin-contrib/gzip v1.2.10 // indirect
 	github.com/glebarez/go-sqlite v1.23.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.8 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect

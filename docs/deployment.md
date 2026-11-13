@@ -10,7 +10,9 @@ For initial setup see [Getting Started](getting-started.html). This page covers 
 
 ## How the Docker Setup Works
 
-Meerkat CRM runs as a single all-in-one container. Inside it, nginx serves the React SPA and proxies all `/api/`, `/carddav/`, and `/.well-known/carddav` requests to the Go backend on `127.0.0.1:8080`; the backend is never exposed to the host directly. Only the nginx port is published (default `7300`). This same-origin proxy is built in, so nothing extra is required.
+Meerkat CRM runs as a single all-in-one container running one process: a Go binary that serves the React SPA and answers `/api/`, `/carddav/`, `/.well-known/carddav` and `/health` itself. There is no nginx and no process manager in the image, and the container runs as an unprivileged user (UID/GID 1001). Only that one port is published (default `7300`), so the API was never reachable on its own. This same-origin setup is built in, so nothing extra is required.
+
+The web app is read from the directory `FRONTEND_DIR` names (`/app/frontend`, built into the image): `/static` serves its content-hashed output with `Cache-Control: public, max-age=31536000, immutable`, and every other path is served from that directory with `Cache-Control: no-cache`, falling back to `index.html` so the SPA can own any URL. Leave `FRONTEND_DIR` empty to serve the API alone and host the bundle yourself.
 
 You only need an external reverse proxy for TLS termination. Point it at the published port (default `7300`):
 
@@ -98,8 +100,8 @@ the policy stricter, a second `Strict-Transport-Security` or `X-Frame-Options` i
 
 | Response | Headers |
 |---|---|
-| The web app (HTML, JS, CSS, images), sent by nginx | `Content-Security-Policy` (below), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (no camera, microphone, geolocation, payment, USB), `Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Resource-Policy: same-origin` |
-| The API (`/api/`, `/carddav/`, downloads, photos), sent by the backend | the same, but `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'` and `Cross-Origin-Resource-Policy: same-site` |
+| The web app (HTML, JS, CSS, images), sent by the bundle routes | `Content-Security-Policy` (below), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (no camera, microphone, geolocation, payment, USB), `Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Resource-Policy: same-origin` |
+| The API (`/api/`, `/carddav/`, downloads, photos) | the same, but `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'` and `Cross-Origin-Resource-Policy: same-site` |
 
 The web app policy is enforced, and the E2E suite fails on any violation:
 
@@ -109,27 +111,27 @@ font-src 'self' data:; connect-src 'self'; manifest-src 'self'; worker-src 'self
 base-uri 'self'; form-action 'self'; frame-ancestors 'none'
 ```
 
-It lives in one file, `frontend/security-headers.conf`, which the all-in-one image and the separate
-frontend image both include in every location that serves files (never in the proxied ones, where the
-backend's headers pass through). `frontend/src/securityHeaders.test.ts` fails when a config drifts.
+Both policies live in `backend/middleware/security_headers.go`, one constant each, and
+`backend/middleware/security_headers_test.go` fails when either drifts. The API policy is set by
+middleware on every response, and the bundle's routes replace it for the files they serve.
 
-**HSTS** is sent only when the browser is on HTTPS: nginx looks at `X-Forwarded-Proto` (set it to
-`https` in your TLS proxy; only `http` and `https` are accepted) and sends
-`Strict-Transport-Security: max-age=31536000`. The backend sends the same when the request came over
-TLS or with `X-Forwarded-Proto: https`, and adds `includeSubDomains` only when you declared HTTPS
-yourself with `COOKIE_SECURE=true`. Plain-HTTP access never gets it.
+**HSTS** is sent only when the browser is on HTTPS: the server looks at `X-Forwarded-Proto` (set it
+to `https` in your TLS proxy; only `http` and `https` are accepted) or at a TLS connection it
+terminated itself, and sends `Strict-Transport-Security: max-age=31536000`. It adds
+`includeSubDomains` only when you declared HTTPS yourself with `COOKIE_SECURE=true`. Plain-HTTP
+access never gets it. Both response kinds follow the same rule.
 
 **API on another origin.** Set `FRONTEND_URL` to the web app's origin as before (CORS and the
 cookie keep working). Serve the API on the same site as the web app, for example
 `app.example.com` and `api.example.com`: the backend sends `Cross-Origin-Resource-Policy: same-site`,
 and the session cookie is `SameSite=Lax`, so photos from another site would not load anyway. Then
 add the API origin to the web app's policy, for example `connect-src 'self' https://api.example.com`
-and `img-src 'self' data: blob: https://api.example.com`, by editing `frontend/security-headers.conf`
-and rebuilding, or by mounting your own copy over `/etc/nginx/security-headers.conf`. Never add
+and `img-src 'self' data: blob: https://api.example.com`, by editing the `spaCSP` constant in
+`backend/middleware/security_headers.go` and rebuilding the image. Never add
 `'unsafe-inline'` or `'unsafe-eval'` to `script-src`.
 
-**Gap:** responses that nginx generates itself (its error pages while the backend is down, the
-`/.well-known/carddav` redirect) carry no security headers. They contain no application data.
+**No headerless responses.** Since the server itself is the only thing that answers, every response,
+including the `/.well-known/carddav` redirect and the 404s, goes through the header middleware.
 
 ## Outgoing requests
 
@@ -193,11 +195,14 @@ Meerkat can expose metrics in the Prometheus text format. It is **off by default
 | `METRICS_TOKEN` | If set, scrapers must send `Authorization: Bearer <token>` (compared in constant time) |
 | `METRICS_ADDR` | If set (for example `127.0.0.1:9090` or `:9090` on a private Docker network), `/metrics` is served only on this extra listener and not on the main port |
 
-**Where the endpoint is.** The nginx in the images proxies only `/api/`, `/health` and `/carddav/`; every other path, `/metrics` included, is answered with the web app (`index.html`), so the browser port never serves metrics. How to reach them depends on the layout:
+**Where the endpoint is.** There is one process and one port, so unlike the old split there is no
+proxy in front of the app to keep `/metrics` off the browser port. How to reach them:
 
-- *Single container* (`docker-compose.yml`, service `meerkat`): nginx listens on 8080 and the backend on `PORT=8081` inside the container. Scrape `meerkat:8081/metrics` from a container on the same Docker network (port 8081 is not published to the host, which is what you want), or set `METRICS_ADDR=:9090` and scrape `meerkat:9090/metrics`.
-- *Legacy split* (`docker-compose.legacy.yml`: `backend` and `frontend` containers): the backend listens on 8080, scrape `backend:8080/metrics`.
+- *Single container* (`docker-compose.yml`, service `meerkat`): with `METRICS_ADDR=:9090`, `/metrics` is served only on that extra listener; scrape `meerkat:9090/metrics` from a container on the same Docker network (9090 is not published to the host, which is what you want). Set `METRICS_TOKEN` too if anything else shares that network.
+- *Without `METRICS_ADDR`*: `/metrics` is on the published port (`PORT`, default 8080, host `7300`), so set `METRICS_TOKEN` or block `/metrics` at your reverse proxy.
 - *Without Docker*: `/metrics` is on the backend `PORT`.
+- With `METRICS_ENABLED` unset there is no `/metrics` route at all, and the path answers with
+  the web app as any unknown path does.
 
 If your own reverse proxy forwards everything to the backend, set a token or use `METRICS_ADDR`, or block `/metrics` there. Without a token or `METRICS_ADDR`, Meerkat logs a warning at startup. If `METRICS_ADDR` cannot be bound, Meerkat does not start. The metrics contain no user data (routes are patterns such as `/api/v1/contacts/:id`, never URLs), but they reveal traffic and failure patterns.
 
@@ -225,8 +230,8 @@ scrape_configs:
       type: Bearer
       credentials_file: /etc/prometheus/meerkat-token
     static_configs:
-      # single container: meerkat:8081 (or the METRICS_ADDR host and port); legacy split: backend:8080
-      - targets: ["meerkat:8081"]
+      # the METRICS_ADDR host and port; without METRICS_ADDR this is meerkat:8080
+      - targets: ["meerkat:9090"]
 ```
 
 Alert ideas (adapt the thresholds):
