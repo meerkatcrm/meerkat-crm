@@ -3,6 +3,7 @@ package controllers
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"image"
 	"image/color"
@@ -289,6 +290,67 @@ func TestRemovePhoto_ClearsThePhotoAndDeletesTheFiles(t *testing.T) {
 	assert.Empty(t, f.files(t), "the photo and its thumbnail must be deleted from disk")
 	assert.Equal(t, http.StatusNotFound, doRequest(f.router, http.MethodGet, path, nil, "").Code)
 	assert.Equal(t, http.StatusNotFound, doRequest(f.router, http.MethodGet, path+"?thumbnail=true", nil, "").Code)
+}
+
+// editDuringWrite renames the contact right before the handler's write, after it read
+// the contact, the way an edit in another tab or a CardDAV sync can land in between.
+// It runs on the write's own connection: the test database has only one.
+func editDuringWrite(t *testing.T, db *gorm.DB, contactID uint) {
+	t.Helper()
+	done := false
+	require.NoError(t, db.Callback().Update().Before("gorm:update").Register("test:concurrent_edit", func(tx *gorm.DB) {
+		if done || tx.Statement.Table != "contacts" {
+			return
+		}
+		done = true
+		require.NoError(t, tx.Session(&gorm.Session{NewDB: true, SkipHooks: true}).Exec(
+			"UPDATE contacts SET firstname = ? WHERE id = ?", "Edited elsewhere", contactID).Error)
+	}))
+	t.Cleanup(func() { _ = db.Callback().Update().Remove("test:concurrent_edit") })
+}
+
+func TestRemovePhoto_RespondsWithTheClearedPhoto(t *testing.T) {
+	f := setupPhotoFixture(t)
+	path := f.picturePath(f.contact.ID)
+	require.Equal(t, http.StatusOK, doUpload(t, f.router, path, "photo", "a.png", encodePNG(t, sidesAndCenterImage(50, 50))).Code)
+
+	w := doRequest(f.router, http.MethodDelete, path, nil, "")
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
+	assert.Equal(t, "", body["photo"])
+}
+
+func TestRemovePhoto_KeepsAnEditMadeInTheMeantime(t *testing.T) {
+	f := setupPhotoFixture(t)
+	require.NoError(t, f.db.Model(&models.Contact{}).Where("id = ?", f.contact.ID).Update("photo", "old.jpg").Error)
+	editDuringWrite(t, f.db, f.contact.ID)
+
+	w := doRequest(f.router, http.MethodDelete, f.picturePath(f.contact.ID), nil, "")
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	after := f.reload(t)
+	assert.Empty(t, after.Photo)
+	assert.Equal(t, "Edited elsewhere", after.Firstname, "removing the photo must not write back other fields")
+}
+
+func TestAddPhoto_KeepsAnEditMadeInTheMeantime(t *testing.T) {
+	f := setupPhotoFixture(t)
+	before := f.reload(t)
+	editDuringWrite(t, f.db, f.contact.ID)
+
+	w := doUpload(t, f.router, f.picturePath(f.contact.ID), "photo", "a.png", encodePNG(t, sidesAndCenterImage(50, 50)))
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	after := f.reload(t)
+	assert.NotEmpty(t, after.Photo)
+	assert.NotEmpty(t, after.PhotoThumbnailFile)
+	assert.NotEqual(t, before.ETag, after.ETag, "CardDAV clients must see the new photo")
+	assert.Equal(t, "Edited elsewhere", after.Firstname, "uploading a photo must not write back other fields")
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
+	assert.Equal(t, after.Photo, body["photo"])
 }
 
 func TestRemovePhoto_ClearsALegacyThumbnail(t *testing.T) {
