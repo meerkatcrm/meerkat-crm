@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	apperrors "meerkat/errors"
+	"meerkat/middleware"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/gin-gonic/gin"
@@ -172,5 +173,14 @@ func TestNoSpecOrDocsRoutesAreServed(t *testing.T) {
 		if w.Code != http.StatusNotFound {
 			t.Errorf("GET %s: got %d, want 404", path, w.Code)
 		}
+	}
+}
+
+func TestABodyOverTheLimitIsInvalidInputWith400(t *testing.T) {
+	big := `{"full_name":"ok","extra":"` + strings.Repeat("x", middleware.DefaultMaxBodySize) + `"}`
+	status, body := put(t, newTestRouter(t), "/api/v1/things/1", big)
+	code, details := errorOf(t, body)
+	if status != http.StatusBadRequest || code != apperrors.ErrCodeInvalidInput || details["reason"] == "" {
+		t.Fatalf("got %d %v", status, body)
 	}
 }
