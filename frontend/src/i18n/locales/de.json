@@ -458,6 +458,7 @@
     "title": "Profilbild hochladen",
     "selectImage": "Bild auswählen",
     "dragOrClick": "Klicken zum Durchsuchen oder per Drag & Drop",
+    "pasteHint": "Sie können auch ein Bild oder einen Screenshot einfügen (Strg+V / ⌘V)",
     "changeImage": "Bild ändern",
     "zoom": "Zoom",
     "uploading": "Hochladen...",

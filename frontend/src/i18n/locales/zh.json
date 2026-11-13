@@ -458,6 +458,7 @@
     "title": "上传头像",
     "selectImage": "选择图片",
     "dragOrClick": "点击浏览或拖放文件",
+    "pasteHint": "也可以粘贴图片或截图（Ctrl+V / ⌘V）",
     "changeImage": "更换图片",
     "zoom": "缩放",
     "uploading": "正在上传...",

@@ -458,6 +458,7 @@
     "title": "Carica Foto Profilo",
     "selectImage": "Seleziona un'immagine",
     "dragOrClick": "Clicca per sfogliare o trascina e rilascia",
+    "pasteHint": "Puoi anche incollare un'immagine o uno screenshot (Ctrl+V / ⌘V)",
     "changeImage": "Cambia immagine",
     "zoom": "Zoom",
     "uploading": "Caricamento in corso...",
