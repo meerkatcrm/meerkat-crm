@@ -100,7 +100,7 @@ func newIsolationEnv(t *testing.T) *isolationEnv {
 	e.b = models.User{Username: "b", Email: "b@example.com", Password: string(hash)}
 	require.NoError(t, db.Create(&e.a).Error)
 	require.NoError(t, db.Create(&e.b).Error)
-	e.token, err = middleware.GenerateToken(e.a, cfg)
+	e.token, err = middleware.GenerateToken(e.a, cfg, time.Now())
 	require.NoError(t, err)
 	e.seed(t)
 	return e
