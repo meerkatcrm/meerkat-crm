@@ -54,3 +54,11 @@ func ClearSelfContact(tx *gorm.DB, userID, contactID uint) error {
 		Where("id = ? AND self_contact_id = ?", userID, contactID).
 		Update("self_contact_id", nil).Error
 }
+
+// ExcludeSelfContact is a query scope on contacts that leaves out the one the user marked as
+// themself, for lists that prompt the user about other people (birthdays, "stay in touch").
+func ExcludeSelfContact(userID uint) func(*gorm.DB) *gorm.DB {
+	return func(db *gorm.DB) *gorm.DB {
+		return db.Where("contacts.id NOT IN (SELECT self_contact_id FROM users WHERE id = ? AND self_contact_id IS NOT NULL)", userID)
+	}
+}

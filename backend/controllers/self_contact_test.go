@@ -88,3 +88,34 @@ func TestSelfContactRoundTrip(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code)
 	assert.Nil(t, self())
 }
+
+// TestContactsRandomExcludesSelfContact verifies the dashboard's "stay in touch" suggestions
+// never suggest the contact marked as the user themself.
+func TestContactsRandomExcludesSelfContact(t *testing.T) {
+	db, router := setupRouter()
+	router.GET("/contacts/random", GetContactsRandom)
+
+	var user models.User
+	require.NoError(t, db.First(&user).Error)
+	me := models.Contact{UserID: user.ID, Firstname: "Me"}
+	friend := models.Contact{UserID: user.ID, Firstname: "Friend"}
+	require.NoError(t, db.Create(&me).Error)
+	require.NoError(t, db.Create(&friend).Error)
+	require.NoError(t, db.Model(&user).Update("self_contact_id", me.ID).Error)
+
+	// Fewer contacts than the limit, so every eligible one comes back.
+	req, _ := http.NewRequest(http.MethodGet, "/contacts/random", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var body struct {
+		Contacts []map[string]any `json:"contacts"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
+	names := []any{}
+	for _, c := range body.Contacts {
+		names = append(names, c["firstname"])
+	}
+	assert.Equal(t, []any{"Friend"}, names)
+}

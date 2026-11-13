@@ -866,7 +866,7 @@ function ContactDetail() {
           onDeleteRelationship={handleDeleteRelationship}
           customFieldNames={customFieldNames}
           reminders={reminders}
-          onToggleBirthdayReminder={handleToggleBirthdayReminder}
+          onToggleBirthdayReminder={isSelf ? undefined : handleToggleBirthdayReminder}
           employmentHistory={employmentHistory}
           onAddEmploymentHistory={handleAddEmploymentHistory}
           onEditEmploymentHistory={handleEditEmploymentHistory}
