@@ -31,7 +31,7 @@ func InitDB(dbPath string) (*gorm.DB, error) {
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 	// Databases written while foreign keys were off may hold orphan rows.
-	warnForeignKeyViolations(sqlDB)
+	warnForeignKeyViolations(sqlDB, dbPath)
 
 	// Open GORM connection
 	db, err := gorm.Open(sqlite.Open(appDSN(dbPath)), &gorm.Config{})
@@ -102,7 +102,7 @@ func foreignKeyViolations(db *sql.DB) (map[string]int, error) {
 	return counts, rows.Err()
 }
 
-func warnForeignKeyViolations(db *sql.DB) {
+func warnForeignKeyViolations(db *sql.DB, dbPath string) {
 	counts, err := foreignKeyViolations(db)
 	if err != nil {
 		logger.Warn().Err(err).Msg("Could not run the foreign key check")
@@ -111,9 +111,9 @@ func warnForeignKeyViolations(db *sql.DB) {
 	// The check runs on every start (it takes milliseconds on a CRM-sized database),
 	// so the warning repeats until the rows are cleaned up.
 	for relation, n := range counts {
-		logger.Warn().Str("relation", relation).Int("rows", n).
-			Msg(`Rows reference a parent that no longer exists; changing them can fail now that foreign keys are enforced. ` +
-				`List them with: sqlite3 <db> "PRAGMA foreign_key_check", then delete them or point them at an existing parent`)
+		logger.Warn().Str("relation", relation).Str("db", dbPath).Int("rows", n).
+			Msgf(`Rows reference a parent that no longer exists; changing them can fail now that foreign keys are enforced. `+
+				`List them with: sqlite3 %q "PRAGMA foreign_key_check", then delete them or point them at an existing parent`, dbPath)
 	}
 }
 
