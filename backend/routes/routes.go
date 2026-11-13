@@ -133,6 +133,9 @@ func RegisterRoutes(router *gin.Engine, cfg *config.Config, db *gorm.DB, oidcPro
 			protected.GET("/contacts/:id/profile_picture", func(c *gin.Context) {
 				controllers.GetProfilePicture(c, cfg)
 			})
+			protected.DELETE("/contacts/:id/profile_picture", func(c *gin.Context) {
+				controllers.RemovePhotoFromContact(c, cfg)
+			})
 
 			// Image proxy route (for fetching images from external URLs)
 			protected.GET("/proxy/image", middleware.ImageProxyRateLimitMiddleware(), controllers.ProxyImage)

@@ -468,7 +468,10 @@
     "urlPlaceholder": "Incolla URL immagine...",
     "fetch": "Recupera",
     "urlFetchError": "Impossibile recuperare l'immagine dall'URL",
-    "urlRateLimited": "Troppe immagini recuperate da URL. Attendi un minuto e riprova."
+    "urlRateLimited": "Troppe immagini recuperate da URL. Attendi un minuto e riprova.",
+    "remove": "Rimuovi foto",
+    "confirmRemove": "Rimuovere l'immagine del profilo di questo contatto?",
+    "removeError": "Impossibile rimuovere l'immagine del profilo"
   },
   "itemImage": {
     "alt": "Immagine allegata",

@@ -468,7 +468,10 @@
     "urlPlaceholder": "Bild-URL einfügen...",
     "fetch": "Abrufen",
     "urlFetchError": "Bild konnte nicht von URL abgerufen werden",
-    "urlRateLimited": "Zu viele Bilder von URLs abgerufen. Bitte eine Minute warten und erneut versuchen."
+    "urlRateLimited": "Zu viele Bilder von URLs abgerufen. Bitte eine Minute warten und erneut versuchen.",
+    "remove": "Foto entfernen",
+    "confirmRemove": "Profilbild dieses Kontakts entfernen?",
+    "removeError": "Profilbild konnte nicht entfernt werden"
   },
   "itemImage": {
     "alt": "Angehängtes Bild",

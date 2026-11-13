@@ -204,6 +204,13 @@ export async function uploadProfilePicture(
   });
 }
 
+// Remove contact profile picture
+export async function removeProfilePicture(id: string | number): Promise<void> {
+  await apiJson(`/contacts/${id}/profile_picture`, {
+    method: 'DELETE',
+  });
+}
+
 // Get all circles
 export async function getCircles(): Promise<string[]> {
   const data = await apiJson<unknown>('/contacts/circles');

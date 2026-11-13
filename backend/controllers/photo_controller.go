@@ -176,6 +176,56 @@ func AddPhotoToContact(c *gin.Context, cfg *config.Config) {
 	c.JSON(http.StatusOK, contact)
 }
 
+// RemovePhotoFromContact deletes a contact's profile picture without touching the
+// rest of the contact. The files are removed only after the database no longer points
+// at them, so a failed update leaves the photo intact.
+func RemovePhotoFromContact(c *gin.Context, cfg *config.Config) {
+	// Photo changes are disabled in demo mode, like uploads.
+	if cfg.DemoMode {
+		apperrors.AbortWithError(c, apperrors.ErrForbidden("Photo changes are disabled in demo mode"))
+		return
+	}
+
+	contactID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		apperrors.AbortWithError(c, apperrors.ErrValidation("Invalid contact ID"))
+		return
+	}
+	db := c.MustGet("db").(*gorm.DB)
+
+	userID, ok := currentUserID(c)
+	if !ok {
+		return
+	}
+
+	var contact models.Contact
+	if err := db.Where("user_id = ?", userID).First(&contact, "id = ?", contactID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			apperrors.AbortWithError(c, apperrors.ErrNotFound("Contact"))
+			return
+		}
+		apperrors.AbortWithError(c, apperrors.ErrDatabase("find").WithError(err))
+		return
+	}
+
+	if contact.Photo == "" && contact.PhotoThumbnailFile == "" && contact.LegacyThumbnail == "" {
+		c.JSON(http.StatusOK, contact)
+		return
+	}
+
+	old := contact
+	contact.Photo, contact.PhotoThumbnailFile, contact.LegacyThumbnail = "", "", ""
+	// Save (not Updates) so empty strings are written and the CardDAV ETag changes.
+	if err := db.Save(&contact).Error; err != nil {
+		apperrors.AbortWithError(c, apperrors.ErrDatabase("update").WithError(err))
+		return
+	}
+
+	carddav.RemoveContactPhotoFiles(cfg.ProfilePhotoDir, old)
+
+	c.JSON(http.StatusOK, contact)
+}
+
 // serveThumbnail sends the thumbnail file with an ETag and a long private cache: the URL
 // carries the file's unique name (see models.ThumbnailURL), so a new picture is a new URL.
 // A contact whose thumbnail was not exported yet still gets the legacy database copy.

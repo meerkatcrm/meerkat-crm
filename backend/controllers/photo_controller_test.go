@@ -49,6 +49,7 @@ func setupPhotoFixture(t *testing.T) photoFixture {
 	router := routerAs(db, user.ID, *cfg)
 	router.POST("/contacts/:id/profile_picture", func(c *gin.Context) { AddPhotoToContact(c, cfg) })
 	router.GET("/contacts/:id/profile_picture", func(c *gin.Context) { GetProfilePicture(c, cfg) })
+	router.DELETE("/contacts/:id/profile_picture", func(c *gin.Context) { RemovePhotoFromContact(c, cfg) })
 
 	return photoFixture{
 		db: db, router: router, dir: dir, user: user,
@@ -266,6 +267,75 @@ func TestAddPhoto_WithoutAFileLeavesThePhotoAlone(t *testing.T) {
 
 	doRequest(f.router, http.MethodPost, f.picturePath(f.contact.ID), nil, "")
 
+	assert.Equal(t, "kept.jpg", f.reload(t).Photo)
+}
+
+func TestRemovePhoto_ClearsThePhotoAndDeletesTheFiles(t *testing.T) {
+	f := setupPhotoFixture(t)
+	path := f.picturePath(f.contact.ID)
+	require.Equal(t, http.StatusOK, doUpload(t, f.router, path, "photo", "a.png", encodePNG(t, sidesAndCenterImage(50, 50))).Code)
+	before := f.reload(t)
+	require.NotEmpty(t, before.Photo)
+	require.Len(t, f.files(t), 2)
+
+	w := doRequest(f.router, http.MethodDelete, path, nil, "")
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	after := f.reload(t)
+	assert.Empty(t, after.Photo)
+	assert.Empty(t, after.PhotoThumbnailFile)
+	assert.Equal(t, before.Firstname, after.Firstname, "the rest of the contact stays")
+	assert.NotEqual(t, before.ETag, after.ETag, "CardDAV clients must see the change")
+	assert.Empty(t, f.files(t), "the photo and its thumbnail must be deleted from disk")
+	assert.Equal(t, http.StatusNotFound, doRequest(f.router, http.MethodGet, path, nil, "").Code)
+	assert.Equal(t, http.StatusNotFound, doRequest(f.router, http.MethodGet, path+"?thumbnail=true", nil, "").Code)
+}
+
+func TestRemovePhoto_ClearsALegacyThumbnail(t *testing.T) {
+	f := setupPhotoFixture(t)
+	require.NoError(t, f.db.Model(&models.Contact{}).Where("id = ?", f.contact.ID).
+		Update("photo_thumbnail", "data:image/jpeg;base64,AAAA").Error)
+
+	w := doRequest(f.router, http.MethodDelete, f.picturePath(f.contact.ID), nil, "")
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.Empty(t, f.reload(t).LegacyThumbnail)
+}
+
+func TestRemovePhoto_WithoutAPhotoSucceeds(t *testing.T) {
+	f := setupPhotoFixture(t)
+	w := doRequest(f.router, http.MethodDelete, f.picturePath(f.contact.ID), nil, "")
+	assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
+}
+
+func TestRemovePhoto_AnotherUsersContactIsNotFound(t *testing.T) {
+	f := setupPhotoFixture(t)
+	require.NoError(t, os.WriteFile(filepath.Join(f.dir, "theirs.jpg"), []byte("jpeg-bytes"), 0o600))
+	require.NoError(t, f.db.Model(&models.Contact{}).Where("id = ?", f.other.ID).Update("photo", "theirs.jpg").Error)
+
+	w := doRequest(f.router, http.MethodDelete, f.picturePath(f.other.ID), nil, "")
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	var other models.Contact
+	require.NoError(t, f.db.First(&other, f.other.ID).Error)
+	assert.Equal(t, "theirs.jpg", other.Photo)
+	assert.Equal(t, []string{"theirs.jpg"}, f.files(t))
+}
+
+func TestRemovePhoto_InvalidContactID(t *testing.T) {
+	f := setupPhotoFixture(t)
+	w := doRequest(f.router, http.MethodDelete, "/contacts/abc/profile_picture", nil, "")
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestRemovePhoto_DisabledInDemoMode(t *testing.T) {
+	t.Setenv("DEMO_MODE", "true")
+	f := setupPhotoFixture(t)
+	require.NoError(t, f.db.Model(&models.Contact{}).Where("id = ?", f.contact.ID).Update("photo", "kept.jpg").Error)
+
+	w := doRequest(f.router, http.MethodDelete, f.picturePath(f.contact.ID), nil, "")
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
 	assert.Equal(t, "kept.jpg", f.reload(t).Photo)
 }
 
