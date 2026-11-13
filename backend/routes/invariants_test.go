@@ -69,6 +69,10 @@ var sessionKeyed = map[string]proof{
 	"DELETE /api/v1/contacts/import/monica/session": {"controllers/monica_import_controller_test.go", "TestMonicaSessionOwnershipEnforced"},
 }
 
+// sessionNotFound is how both import session stores answer the walk's made-up session id; a
+// mutating route that answers with it must be in sessionKeyed.
+const sessionNotFound = "Import session expired or not found"
+
 const isolationPassword = "Correct-horse-1!"
 
 type isolationEnv struct {
@@ -97,7 +101,7 @@ func newIsolationEnv(t *testing.T) *isolationEnv {
 	hash, err := bcrypt.GenerateFromPassword([]byte(isolationPassword), bcrypt.MinCost)
 	require.NoError(t, err)
 	e.a = models.User{Username: "a", Email: "a@example.com", Password: string(hash)}
-	e.b = models.User{Username: "b", Email: "b@example.com", Password: string(hash)}
+	e.b = models.User{Username: "b", Email: "bsecret-user@example.com", Password: string(hash)}
 	require.NoError(t, db.Create(&e.a).Error)
 	require.NoError(t, db.Create(&e.b).Error)
 	e.token, err = middleware.GenerateToken(e.a, cfg, time.Now())
@@ -108,6 +112,12 @@ func newIsolationEnv(t *testing.T) *isolationEnv {
 
 // secret is in every text field of B's seeded rows; no response to A may contain it.
 const secret = "BSecret"
+
+// showsSecret reports whether s holds the marker, in any case: some fields (emails) come
+// back lowercased.
+func showsSecret(s string) bool {
+	return strings.Contains(strings.ToLower(s), strings.ToLower(secret))
+}
 
 // seed gives B a row in every table with a user_id that the routes reach.
 func (e *isolationEnv) seed(t *testing.T) {
@@ -341,7 +351,7 @@ func (e *isolationEnv) body() []byte {
 		"contact_a_id": c1, "contact_b_id": c2, "url": "https://127.0.0.1:1/x", "base_url": "https://127.0.0.1:1/",
 		"address_book_path": "/ab/", "events": []string{"contact.created"}, "language": "de",
 		"date_format": "iso", "mode": "all", "circles": []string{"x"}, "hide_empty_contact_fields": true,
-		"names": []string{"x"}, "fields": []string{"email"}, "session_id": "b-session", "api_token": "t",
+		"names": []string{"x"}, "fields": []string{"email"}, "session_id": "b-session", "api_token": "t", "mappings": []any{}, "actions": []any{},
 	}) // No password fields, and the circle filter mode "all": either would hide CardDAV from A
 	// for the rest of the walk.
 
@@ -365,7 +375,8 @@ func cardDAVBody(method string) (body, contentType string) {
 
 func (e *isolationEnv) send(method, path string) *httptest.ResponseRecorder {
 	if !strings.HasPrefix(path, "/carddav/") {
-		path += "?source_id=" + strconv.Itoa(int(e.contact2)) // query fields, B's id as in body()
+		// query fields, with B's ids as in body()
+		path += "?source_id=" + strconv.Itoa(int(e.contact2)) + "&session_id=b-session"
 	}
 	return request(e.router, method, path, func(r *http.Request) {
 		if strings.HasPrefix(path, "/carddav/") {
@@ -388,7 +399,10 @@ func TestInvariants_NoMutatingRouteChangesAnotherUsersRows(t *testing.T) {
 	before := e.snapshot(t)
 
 	walked := e.walk(t, func(m string) bool { return mutating[m] }, func(method string, tg target, w *httptest.ResponseRecorder) {
-		assert.NotContains(t, w.Body.String(), secret, "%s %s shows B's data to A", method, tg.path)
+		assert.False(t, showsSecret(w.Body.String()), "%s %s shows B's data to A", method, tg.path)
+		if _, listed := sessionKeyed[method+" "+tg.path]; !listed && strings.Contains(w.Body.String(), sessionNotFound) {
+			t.Errorf("%s %s looks up an import session: add it to sessionKeyed with the test that proves its isolation", method, tg.path)
+		}
 		if after := e.snapshot(t); !assert.Equal(t, before, after, "%s %s changed B's rows", method, tg.path) {
 			before = after // report each route once
 		}
@@ -396,12 +410,12 @@ func TestInvariants_NoMutatingRouteChangesAnotherUsersRows(t *testing.T) {
 	assert.Greater(t, walked, 60, "the walk must see the real route table")
 
 	// The snapshot sees B's rows; a copy of B's data into anyone else's row is caught here.
-	assert.Empty(t, e.rowsOutsideBWith(t, secret), "rows outside B's carry B's data")
+	assert.Empty(t, e.rowsOutsideBWithSecret(t), "rows outside B's carry B's data")
 }
 
-// rowsOutsideBWith returns "table: row" for every row, outside the ones the snapshot holds,
-// that has marker in any column.
-func (e *isolationEnv) rowsOutsideBWith(t *testing.T, marker string) []string {
+// rowsOutsideBWithSecret returns "table: row" for every row, outside the ones the snapshot
+// holds, that has the marker in any column.
+func (e *isolationEnv) rowsOutsideBWithSecret(t *testing.T) []string {
 	t.Helper()
 	var tables []string
 	require.NoError(t, e.db.Raw("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name != 'schema_migrations' ORDER BY name").Scan(&tables).Error)
@@ -419,7 +433,7 @@ func (e *isolationEnv) rowsOutsideBWith(t *testing.T, marker string) []string {
 		for _, row := range rows {
 			data, err := json.Marshal(row)
 			require.NoError(t, err)
-			if strings.Contains(strings.ToLower(string(data)), strings.ToLower(marker)) {
+			if showsSecret(string(data)) {
 				found = append(found, table+": "+string(data))
 			}
 		}
@@ -431,7 +445,7 @@ func TestInvariants_NoReadRouteShowsAnotherUsersRows(t *testing.T) {
 	e := newIsolationEnv(t)
 
 	walked := e.walk(t, func(m string) bool { return reads[m] }, func(method string, tg target, w *httptest.ResponseRecorder) {
-		assert.NotContains(t, w.Body.String(), secret, "%s %s shows B's data to A", method, tg.path)
+		assert.False(t, showsSecret(w.Body.String()), "%s %s shows B's data to A", method, tg.path)
 	})
 	assert.Greater(t, walked, 30, "the walk must see the real route table")
 }
