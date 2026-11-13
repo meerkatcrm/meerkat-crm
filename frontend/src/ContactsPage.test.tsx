@@ -52,7 +52,16 @@ test('a new search starts at Best match again', () => {
   render(
     <MemoryRouter initialEntries={['/contacts?search=zoe']}>
       <Routes>
-        <Route path="/contacts" element={<><ContactsPage /><Link to="/contacts?search=ann">next</Link></>} />
+        <Route
+          path="/contacts"
+          element={
+            <>
+              <ContactsPage />
+              <Link to="/contacts?search=ann">next</Link>
+              <Link to="/contacts?search=zoe">back</Link>
+            </>
+          }
+        />
       </Routes>
     </MemoryRouter>,
   );
@@ -63,4 +72,7 @@ test('a new search starts at Best match again', () => {
   fireEvent.click(screen.getByText('next'));
   expect(lastParams()).toMatchObject({ search: 'ann', sort: undefined, order: undefined });
   expect(screen.getByRole('combobox', { name: 'Sort by' })).toHaveTextContent('Best match');
+
+  fireEvent.click(screen.getByText('back'));
+  expect(lastParams()).toMatchObject({ search: 'zoe', sort: undefined, order: undefined });
 });

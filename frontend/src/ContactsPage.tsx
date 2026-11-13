@@ -50,9 +50,14 @@ export default function ContactsPage() {
 
   // While searching, the default order is the best match first (the server ranks when no
   // sort is sent). Another order can be picked; it holds for that search only.
-  const searching = searchQuery.trim() !== '';
-  const [searchSort, setSearchSort] = useState({ query: '', option: 'relevance' });
-  const searchSortOption = searchSort.query === searchQuery ? searchSort.option : 'relevance';
+  const trimmedQuery = searchQuery.trim();
+  const searching = trimmedQuery !== '';
+  const [searchSort, setSearchSort] = useState({ query: trimmedQuery, option: 'relevance' });
+  // Any change of the search, even back to an earlier term, starts at Best match again
+  if (searchSort.query !== trimmedQuery) {
+    setSearchSort({ query: trimmedQuery, option: 'relevance' });
+  }
+  const searchSortOption = searchSort.query === trimmedQuery ? searchSort.option : 'relevance';
   const activeSort = searching ? searchSortOption : sortOption;
   const [sortField, sortOrder] = activeSort.split('-');
 
@@ -174,7 +179,7 @@ export default function ContactsPage() {
             labelId="sort-select-label"
             value={activeSort}
             label={t('contacts.sortBy')}
-            onChange={e => (searching ? setSearchSort({ query: searchQuery, option: e.target.value }) : setSortOption(e.target.value))}
+            onChange={e => (searching ? setSearchSort({ query: trimmedQuery, option: e.target.value }) : setSortOption(e.target.value))}
           >
             {searching && <MenuItem value="relevance">{t('contacts.sort.relevance')}</MenuItem>}
             <MenuItem value="id-desc">{t('contacts.sort.recentlyAdded')}</MenuItem>
