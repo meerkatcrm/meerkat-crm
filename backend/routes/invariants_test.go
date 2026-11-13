@@ -41,6 +41,12 @@ var mutating = map[string]bool{
 	"PROPPATCH": true, "MKCOL": true, "COPY": true, "MOVE": true,
 }
 
+// reads are the methods the read walk sends. Every registered method must be in mutating or
+// reads; TestInvariants_EveryRouteMethodIsWalked fails on any other.
+var reads = map[string]bool{
+	"GET": true, "HEAD": true, "OPTIONS": true, "PROPFIND": true, "REPORT": true, "CONNECT": true, "TRACE": true,
+}
+
 // unseeded lists the tables with a user_id that no route reads or writes per user, so the
 // walk has nothing to protect in them. Every entry needs a reason.
 var unseeded = map[string]string{
@@ -149,39 +155,66 @@ func (e *isolationEnv) seed(t *testing.T) {
 	}
 }
 
+// pointer is a column that holds the id of a row in another table.
+type pointer struct{ col, target string }
+
 // columns returns every table with a user_id column, and per table the columns that point at
-// a contact.
-func (e *isolationEnv) columns(t *testing.T) (withUser []string, contactCols map[string][]string) {
+// a row of a table with a user_id: the declared foreign keys, plus the columns named
+// *contact*_id, since some contact references (carddav_contact_links.contact_id, the
+// duplicate-dismissal pair) declare no foreign key.
+func (e *isolationEnv) columns(t *testing.T) (withUser []string, pointers map[string][]pointer) {
 	t.Helper()
 	var tables []string
 	require.NoError(t, e.db.Raw("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name != 'schema_migrations' ORDER BY name").Scan(&tables).Error)
-	contactCols = map[string][]string{}
+	owned := map[string]bool{}
+	named := map[string][]string{}
 	for _, table := range tables {
 		cols, err := e.db.Migrator().ColumnTypes(table)
 		require.NoError(t, err)
 		for _, c := range cols {
 			if name := c.Name(); name == "user_id" {
 				withUser = append(withUser, table)
+				owned[table] = true
 			} else if strings.Contains(name, "contact") && strings.HasSuffix(name, "_id") {
-				contactCols[table] = append(contactCols[table], name)
+				named[table] = append(named[table], name)
 			}
 		}
 	}
-	return withUser, contactCols
+	pointers = map[string][]pointer{}
+	for _, table := range tables {
+		seen := map[string]bool{}
+		var fks []struct {
+			Table string
+			From  string
+		}
+		require.NoError(t, e.db.Raw(fmt.Sprintf("PRAGMA foreign_key_list(%q)", table)).Scan(&fks).Error)
+		for _, fk := range fks {
+			if owned[fk.Table] && !seen[fk.From] {
+				seen[fk.From] = true
+				pointers[table] = append(pointers[table], pointer{fk.From, fk.Table})
+			}
+		}
+		for _, col := range named[table] {
+			if !seen[col] {
+				pointers[table] = append(pointers[table], pointer{col, "contacts"})
+			}
+		}
+	}
+	return withUser, pointers
 }
 
 // snapshot renders B's user row, every row B owns, and every row, of anyone, that points at
-// one of B's contacts.
+// one of B's rows through a column columns() reports.
 func (e *isolationEnv) snapshot(t *testing.T) string {
 	t.Helper()
-	withUser, contactCols := e.columns(t)
+	withUser, pointers := e.columns(t)
 	conds := map[string][]string{"users": {"id = @b"}}
 	for _, table := range withUser {
 		conds[table] = append(conds[table], "user_id = @b")
 	}
-	for table, cols := range contactCols {
-		for _, col := range cols {
-			conds[table] = append(conds[table], col+" IN (SELECT id FROM contacts WHERE user_id = @b)")
+	for table, ps := range pointers {
+		for _, p := range ps {
+			conds[table] = append(conds[table], fmt.Sprintf("%q IN (SELECT id FROM %q WHERE user_id = @b)", p.col, p.target))
 		}
 	}
 	tables := make([]string, 0, len(conds))
@@ -202,8 +235,7 @@ func (e *isolationEnv) snapshot(t *testing.T) string {
 	return out.String()
 }
 
-// target is one request of the walk. aimed is set when the path names one of B's rows or
-// B's CardDAV address book.
+// target is one request of the walk. aimed is set when a path parameter names one of B's rows.
 type target struct {
 	path  string
 	aimed bool
@@ -213,14 +245,19 @@ type target struct {
 // parameter follows a segment the walk does not know.
 func (e *isolationEnv) targets(route string) (out []target, ok bool) {
 	if strings.HasPrefix(route, "/carddav/") {
-		// One wildcard route serves every CardDAV path, so the walk picks them: B's contact
-		// reached through A's address book by UID and by id, and B's address book itself.
+		// One wildcard route serves every CardDAV path, so the walk picks them: A's own address
+		// book (where an unscoped listing would show B's contacts), B's contact reached through
+		// it by UID and by id, and B's address book itself. None is aimed: the backend resolves
+		// every path to the caller's own contacts, so a PUT under B's path that writes A's own
+		// contact rightly succeeds. The snapshot, the copy check and the read walk's body check
+		// are what guard CardDAV.
 		id := strconv.Itoa(int(e.ids["contacts"]))
 		return []target{
+			{"/carddav/addressbooks/a/contacts/", false},
 			{"/carddav/addressbooks/a/contacts/b-uid.vcf", false},
 			{"/carddav/addressbooks/a/contacts/" + id + ".vcf", false},
-			{"/carddav/addressbooks/b/contacts/b-uid.vcf", true},
-			{"/carddav/addressbooks/b/contacts/", true},
+			{"/carddav/addressbooks/b/contacts/b-uid.vcf", false},
+			{"/carddav/addressbooks/b/contacts/", false},
 		}, true
 	}
 	segments := strings.Split(route, "/")
@@ -237,15 +274,6 @@ func (e *isolationEnv) targets(route string) (out []target, ok bool) {
 		aimed = true
 	}
 	return []target{{strings.Join(segments, "/"), aimed}}, true
-}
-
-// refuses checks the answer to a request aimed at B's rows. The JSON API answers 403 or 404;
-// go-webdav answers CardDAV with several codes, so there any non-2xx will do.
-func refuses(path string, code int) bool {
-	if strings.HasPrefix(path, "/carddav/") {
-		return code < 200 || code >= 300
-	}
-	return code == http.StatusForbidden || code == http.StatusNotFound
 }
 
 // walk sends every route of the given methods as A and calls check with each answer. It fails
@@ -268,7 +296,8 @@ func (e *isolationEnv) walk(t *testing.T, methods func(string) bool, check func(
 			assert.NotContains(t, []int{http.StatusUnauthorized, http.StatusTooManyRequests}, w.Code,
 				"%s %s: A's credentials did not get through, so the request proves nothing", route.Method, tg.path)
 			if tg.aimed {
-				assert.True(t, refuses(tg.path, w.Code), "%s %s aims at B's data and answered %d: %.300s", route.Method, tg.path, w.Code, w.Body.String())
+				assert.Contains(t, []int{http.StatusForbidden, http.StatusNotFound}, w.Code,
+					"%s %s aims at B's data and answered %d: %.300s", route.Method, tg.path, w.Code, w.Body.String())
 			}
 			check(route.Method, tg, w)
 		}
@@ -287,14 +316,30 @@ func (e *isolationEnv) body() []byte {
 		"contact_id": c1, "contact_ids": []uint{c1, c2}, "related_contact_id": c2, "source_id": c2,
 		"contact_a_id": c1, "contact_b_id": c2, "url": "https://127.0.0.1:1/x", "base_url": "https://127.0.0.1:1/",
 		"address_book_path": "/ab/", "events": []string{"contact.created"}, "language": "de",
-		"date_format": "iso", "mode": "include", "circles": []string{"x"}, "hide_empty_contact_fields": true,
+		"date_format": "iso", "mode": "all", "circles": []string{"x"}, "hide_empty_contact_fields": true,
 		"names": []string{"x"}, "fields": []string{"email"}, "session_id": "b-session", "api_token": "t",
-	}) // no password fields: changing A's password would lock the walk out of CardDAV
+	}) // No password fields, and the circle filter mode "all": either would hide CardDAV from A
+	// for the rest of the walk.
 
 	return data
 }
 
-const isolationVCard = "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:b-uid\r\nFN:Hacked\r\nN:Hacked;;;;\r\nEND:VCARD\r\n"
+// cardDAVBody returns a well-formed body for method, so a CardDAV request is refused for the
+// data it aims at and not as malformed.
+func cardDAVBody(method string) (body, contentType string) {
+	const xml = `<?xml version="1.0" encoding="utf-8"?>`
+	switch method {
+	case "PROPFIND":
+		return xml + `<D:propfind xmlns:D="DAV:"><D:allprop/></D:propfind>`, "application/xml"
+	case "REPORT":
+		return xml + `<C:addressbook-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:carddav"><D:prop><D:getetag/><C:address-data/></D:prop></C:addressbook-query>`, "application/xml"
+	case "PROPPATCH":
+		return xml + `<D:propertyupdate xmlns:D="DAV:"><D:set><D:prop><D:displayname>Mine</D:displayname></D:prop></D:set></D:propertyupdate>`, "application/xml"
+	case "MKCOL":
+		return "", ""
+	}
+	return "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:b-uid\r\nFN:Hacked\r\nN:Hacked;;;;\r\nEND:VCARD\r\n", "text/vcard"
+}
 
 func (e *isolationEnv) send(method, path string) *httptest.ResponseRecorder {
 	if !strings.HasPrefix(path, "/carddav/") {
@@ -302,8 +347,10 @@ func (e *isolationEnv) send(method, path string) *httptest.ResponseRecorder {
 	}
 	return request(e.router, method, path, func(r *http.Request) {
 		if strings.HasPrefix(path, "/carddav/") {
-			r.Body = io.NopCloser(strings.NewReader(isolationVCard))
-			r.Header.Set("Content-Type", "text/vcard")
+			body, contentType := cardDAVBody(method)
+			r.Body = io.NopCloser(strings.NewReader(body))
+			r.Header.Set("Content-Type", contentType)
+			r.Header.Set("Depth", "1")
 			r.Header.Set("Destination", "/carddav/addressbooks/a/contacts/moved.vcf")
 			r.SetBasicAuth("a", isolationPassword)
 			return
@@ -333,12 +380,19 @@ func TestInvariants_NoMutatingRouteChangesAnotherUsersRows(t *testing.T) {
 
 func TestInvariants_NoReadRouteShowsAnotherUsersRows(t *testing.T) {
 	e := newIsolationEnv(t)
-	reads := map[string]bool{"GET": true, "PROPFIND": true, "REPORT": true}
 
 	walked := e.walk(t, func(m string) bool { return reads[m] }, func(method string, tg target, w *httptest.ResponseRecorder) {
 		assert.NotContains(t, w.Body.String(), secret, "%s %s shows B's data to A", method, tg.path)
 	})
 	assert.Greater(t, walked, 30, "the walk must see the real route table")
+}
+
+func TestInvariants_EveryRouteMethodIsWalked(t *testing.T) {
+	router, _ := newRouter(t, testConfig(), nil)
+	for _, route := range router.Routes() {
+		assert.True(t, mutating[route.Method] || reads[route.Method],
+			"%s is in neither walk: add %s to mutating or reads", routeKey(route), route.Method)
+	}
 }
 
 func TestInvariants_EveryUserTableIsSeededForTheWalk(t *testing.T) {
