@@ -4,6 +4,7 @@ go 1.26.10
 
 require (
 	github.com/coreos/go-oidc/v3 v3.21.0
+	github.com/danielgtaylor/huma/v2 v2.40.0
 	github.com/emersion/go-ical v0.0.0-20250609112844-439c63cef608
 	github.com/gen2brain/heic v0.7.2
 	github.com/gin-contrib/cors v1.7.10

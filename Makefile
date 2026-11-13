@@ -1,4 +1,4 @@
-.PHONY: help install format format-check lint typecheck test precommit build
+.PHONY: help install format format-check lint typecheck test precommit build openapi
 
 YARN ?= corepack yarn
 # Base for format-check: only files changed since it are checked, so legacy
@@ -31,6 +31,10 @@ typecheck: ## TypeScript type check
 test: ## Backend and frontend unit tests
 	cd backend && go test ./...
 	cd frontend && $(YARN) test
+
+openapi: ## Regenerate docs/openapi.json and the frontend's API types from the huma operations
+	cd backend && go run ./cmd/openapi ../docs/openapi.json
+	cd frontend && $(YARN) openapi
 
 precommit: format-check lint typecheck test ## All checks except E2E
 

@@ -19,7 +19,7 @@ const expected: [DateFormat, string][] = [
 ];
 const allFormatted = expected.map(([, text]) => text);
 
-const note: Note = { ID: 1, content: 'Coffee', date, CreatedAt: '', UpdatedAt: '' };
+const note: Note = { ID: 1, content: 'Coffee', date, CreatedAt: '', UpdatedAt: '', contact_id: null, image: '' };
 const reminder: Reminder = {
   ID: 2,
   message: 'Call',

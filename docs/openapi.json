@@ -1,0 +1,556 @@
+{
+  "components": {
+    "schemas": {
+      "ContactNotes": {
+        "additionalProperties": false,
+        "properties": {
+          "notes": {
+            "items": {
+              "$ref": "#/components/schemas/Note"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "notes"
+        ],
+        "type": "object"
+      },
+      "Error": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorDetail"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error",
+          "timestamp"
+        ],
+        "type": "object"
+      },
+      "ErrorDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "details": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "type": "object"
+      },
+      "MessageBody": {
+        "additionalProperties": false,
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "type": "object"
+      },
+      "Note": {
+        "additionalProperties": false,
+        "properties": {
+          "CreatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "ID": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "UpdatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "contact_id": {
+            "format": "int64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "content": {
+            "type": "string"
+          },
+          "date": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "image": {
+            "description": "File name of the note's image, empty when it has none. Served by GET /notes/{id}/image.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ID",
+          "CreatedAt",
+          "UpdatedAt",
+          "content",
+          "date",
+          "contact_id",
+          "image"
+        ],
+        "type": "object"
+      },
+      "NoteBody": {
+        "additionalProperties": true,
+        "properties": {
+          "contact_id": {
+            "description": "The contact the note is about. Ignored under /contacts/{id}/notes. On update, null or left out detaches the note.",
+            "format": "int64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "content": {
+            "maxLength": 5000,
+            "type": "string"
+          },
+          "date": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "content",
+          "date"
+        ],
+        "type": "object"
+      },
+      "NotePage": {
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "notes": {
+            "items": {
+              "$ref": "#/components/schemas/Note"
+            },
+            "type": "array"
+          },
+          "page": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "notes",
+          "total",
+          "page",
+          "limit"
+        ],
+        "type": "object"
+      },
+      "NoteSaved": {
+        "additionalProperties": false,
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "note": {
+            "$ref": "#/components/schemas/Note"
+          }
+        },
+        "required": [
+          "message",
+          "note"
+        ],
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Errors use the AppError format: {\"error\": {\"code\", \"message\", \"details\"}, \"request_id\", \"timestamp\"}.",
+    "title": "Meerkat CRM API",
+    "version": "1"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/contacts/{id}/notes": {
+      "get": {
+        "operationId": "list-contact-notes",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactNotes"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List the notes about a contact",
+        "tags": [
+          "notes"
+        ]
+      },
+      "post": {
+        "operationId": "create-contact-note",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteSaved"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Add a note about a contact",
+        "tags": [
+          "notes"
+        ]
+      }
+    },
+    "/notes": {
+      "get": {
+        "operationId": "list-unassigned-notes",
+        "parameters": [
+          {
+            "description": "Page number, from 1 (default 1)",
+            "explode": false,
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "description": "Page number, from 1 (default 1)",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Page size, 1 to 100 (default 25)",
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "description": "Page size, 1 to 100 (default 25)",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Text the content contains, case-insensitive",
+            "explode": false,
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "description": "Text the content contains, case-insensitive",
+              "type": "string"
+            }
+          },
+          {
+            "description": "First day, YYYY-MM-DD; ignored when not a date",
+            "explode": false,
+            "in": "query",
+            "name": "fromDate",
+            "schema": {
+              "description": "First day, YYYY-MM-DD; ignored when not a date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Last day, inclusive, YYYY-MM-DD; ignored when not a date",
+            "explode": false,
+            "in": "query",
+            "name": "toDate",
+            "schema": {
+              "description": "Last day, inclusive, YYYY-MM-DD; ignored when not a date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotePage"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List the notes without a contact, with search, date range and paging",
+        "tags": [
+          "notes"
+        ]
+      },
+      "post": {
+        "operationId": "create-note",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteSaved"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Add a note, about a contact or without one",
+        "tags": [
+          "notes"
+        ]
+      }
+    },
+    "/notes/{id}": {
+      "delete": {
+        "operationId": "delete-note",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Delete a note",
+        "tags": [
+          "notes"
+        ]
+      },
+      "get": {
+        "operationId": "get-note",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Note"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get a note",
+        "tags": [
+          "notes"
+        ]
+      },
+      "put": {
+        "operationId": "update-note",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteSaved"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Replace a note's content, date and contact",
+        "tags": [
+          "notes"
+        ]
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "/api/v1"
+    }
+  ]
+}

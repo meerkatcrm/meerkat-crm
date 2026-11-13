@@ -60,6 +60,11 @@
 - `TestContactSyncTokenModeIsUsed` asserts which strategy each server gets, so a regression that silently drops every server onto the fallback fails loudly instead of passing.
 - Fixtures and assertions speak CardDAV over HTTP rather than touching a backing store, so covering another server means adding a `davRemote` constructor, not new scenarios.
 
+**API contract (OpenAPI)**
+- Converted endpoints (notes so far) are [huma](https://huma.rocks) operations mounted on the existing Gin groups, so auth, rate limits and the AppError format stay. Their Go input and output types are the contract.
+- `make openapi` writes [docs/openapi.json](docs/openapi.json) (via `backend/cmd/openapi`, no database needed) and generates `frontend/src/types/generated/api.ts` from it with openapi-typescript. Both files are committed; `routes.TestOpenAPISpecIsCurrent` and `src/types/generated/api.test.ts` fail when either is stale.
+- Conventions for writing an operation are in the package comment of [backend/api/api.go](backend/api/api.go).
+
 **Data & Integrations**
 - SQLite lives at `SQLITE_DB_PATH` (default meerkat.db); migrations in [backend/database/migrations](backend/database/migrations) are embedded into the binary and auto-run on startup. The database runs in WAL mode with foreign keys enforced ([backend/database/migrate.go](backend/database/migrate.go)): the `-wal` and `-shm` files next to it are part of the database, so mount and back up the whole directory, or copy a running database with `sqlite3 meerkat.db ".backup copy.db"`. WAL needs shared memory between processes on one host, so keep `SQLITE_DB_PATH` on a local disk or Docker volume, not on an NFS or SMB mount.
 - JWT expiry, HTTP timeouts, trusted proxies, and Resend email settings are declared in [backend/config/config.go](backend/config/config.go) and loaded based on environment variables; use Config.Validate to catch misconfigurations.

@@ -10,7 +10,7 @@ import type { Activity } from '../api/activities';
 import type { ReminderCompletion } from '../api/reminders';
 
 const date = '2026-03-04T00:00:00Z';
-const note: Note = { ID: 1, content: 'Met for coffee', date, CreatedAt: '', UpdatedAt: '' };
+const note: Note = { ID: 1, content: 'Met for coffee', date, CreatedAt: '', UpdatedAt: '', contact_id: null, image: '' };
 const activity: Activity = {
   ID: 2,
   title: 'Lunch',

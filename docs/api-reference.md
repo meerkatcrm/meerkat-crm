@@ -6,6 +6,10 @@ has_children: false
 
 # API Reference
 
+A machine-readable OpenAPI 3.1 document of the endpoints converted so far is in
+[openapi.json](openapi.json). It is generated from the code, so it is always current; the
+rest of this page is written by hand.
+
 ## Base URL
 
 ```
