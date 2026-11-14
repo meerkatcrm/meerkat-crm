@@ -256,6 +256,7 @@ export default function ContactHeader({
                       className="edit-icon"
                       size="small"
                       onClick={onStartEditProfile}
+                      aria-label={t('common.edit')}
                       sx={{
                         ml: 1,
                         opacity: 0,
@@ -351,6 +352,7 @@ export default function ContactHeader({
                   className="edit-icon"
                   size="small"
                   onClick={onToggleEditCircles}
+                  aria-label={t('common.edit')}
                   sx={{
                     ml: 'auto',
                     opacity: 0,
@@ -416,7 +418,7 @@ export default function ContactHeader({
                       placeholder={t('contactDetail.newCircle')}
                       value={newCircleName}
                       onChange={(e) => onNewCircleNameChange(e.target.value)}
-                      onKeyPress={(e) => {
+                      onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                           onAddCircle();
                         }
@@ -427,6 +429,7 @@ export default function ContactHeader({
                       size="small"
                       color="primary"
                       onClick={() => onAddCircle()}
+                      aria-label={t('common.add')}
                       disabled={!newCircleName.trim()}
                     >
                       <AddIcon />

@@ -866,7 +866,7 @@ export default function MonicaImportDialog({
       <DialogTitle>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           {t('settings.monicaImport.title', 'Import from Monica')}
-          <IconButton onClick={handleClose} size="small">
+          <IconButton onClick={handleClose} size="small" aria-label={t('common.close')}>
             <CloseIcon />
           </IconButton>
         </Box>

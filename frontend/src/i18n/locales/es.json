@@ -2,7 +2,8 @@
   "app": {
     "title": "Meerkat CRM",
     "logout": "Cerrar sesión",
-    "loading": "Cargando..."
+    "loading": "Cargando...",
+    "skipToContent": "Saltar al contenido principal"
   },
   "nav": {
     "dashboard": "Panel",
@@ -393,7 +394,9 @@
       "next": "Siguiente",
       "position": "{{position}} de {{total}}",
       "gone": "Ese contacto ya no está en la lista"
-    }
+    },
+    "timelineTabsLabel": "Pestañas de cronología y recordatorios",
+    "infoTabsLabel": "Pestañas de información del contacto"
   },
   "noteDialog": {
     "title": "Agregar Nota",
@@ -493,7 +496,10 @@
     "close": "Cerrar",
     "back": "Atrás",
     "continue": "Continuar",
-    "add": "Agregar"
+    "add": "Agregar",
+    "info": "Información",
+    "clear": "Borrar",
+    "menu": "Menú"
   },
   "profilePicture": {
     "title": "Subir Foto de Perfil",

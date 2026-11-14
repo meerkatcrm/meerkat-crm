@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
+import { contactDisplayName } from './utils/contactName';
 import {
   Box,
   Typography,
@@ -9,6 +10,7 @@ import {
   Avatar,
   Stack,
   Chip,
+  Link as MuiLink,
   Alert,
   IconButton,
   Tooltip,
@@ -162,8 +164,8 @@ function DashboardPage() {
   };
 
   const getContactName = (contact: Contact) => {
-    if (contact.nickname) return `${contact.nickname} ${contact.lastname}`;
-    return `${contact.firstname} ${contact.lastname}`;
+    // A nickname stands in for the first name here.
+    return contactDisplayName({ firstname: contact.nickname || contact.firstname, lastname: contact.lastname });
   };
 
 
@@ -222,6 +224,7 @@ function DashboardPage() {
             </Typography>
             <IconButton
               size="small"
+              aria-label={t('common.info')}
               onClick={(e) => setBirthdaysInfoAnchor(e.currentTarget)}
             >
               <InfoOutlinedIcon fontSize="small" />
@@ -329,6 +332,7 @@ function DashboardPage() {
             </Typography>
             <IconButton
               size="small"
+              aria-label={t('common.info')}
               onClick={(e) => setRemindersInfoAnchor(e.currentTarget)}
             >
               <InfoOutlinedIcon fontSize="small" />
@@ -380,7 +384,16 @@ function DashboardPage() {
                       <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
                         <Box sx={{ flexGrow: 1 }}>
                           <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                            {reminder.message}
+                            {/* Keyboard path to the contact; the card's onClick serves the mouse. */}
+                            <MuiLink
+                              component={Link}
+                              to={`/contacts/${reminder.contact_id}`}
+                              color="inherit"
+                              underline="hover"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {reminder.message}
+                            </MuiLink>
                           </Typography>
                           {contact && (
                             <Typography variant="caption" sx={{
@@ -476,6 +489,7 @@ function DashboardPage() {
             </Typography>
             <IconButton
               size="small"
+              aria-label={t('common.info')}
               onClick={(e) => setStayInTouchInfoAnchor(e.currentTarget)}
             >
               <InfoOutlinedIcon fontSize="small" />

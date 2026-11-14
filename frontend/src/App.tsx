@@ -331,6 +331,20 @@ function AppContent({ token, setToken }: { token: string | null; setToken: (toke
 
   return (
     <>
+      <Button
+        href="#main-content"
+        variant="contained"
+        sx={{
+          position: 'fixed',
+          top: 8,
+          left: 8,
+          zIndex: (theme) => theme.zIndex.tooltip + 1,
+          transform: 'translateY(-200%)',
+          '&:focus': { transform: 'none' }
+        }}
+      >
+        {t('app.skipToContent')}
+      </Button>
       <AppBar
         position="fixed"
         sx={{
@@ -348,7 +362,7 @@ function AppContent({ token, setToken }: { token: string | null; setToken: (toke
             <IconButton 
               edge="start" 
               color="inherit" 
-              aria-label="menu" 
+              aria-label={t('common.menu')} 
               onClick={handleDrawerToggle} 
               sx={{ mr: { xs: 1, sm: 2 } }}
             >
@@ -438,6 +452,7 @@ function AppContent({ token, setToken }: { token: string | null; setToken: (toke
                         <IconButton
                           size="small"
                           onClick={handleSearchSubmit}
+                          aria-label={t('contacts.search')}
                           sx={{ color: 'rgba(255, 255, 255, 0.7)', p: 0.5 }}
                         >
                           <SearchIcon />
@@ -456,6 +471,7 @@ function AppContent({ token, setToken }: { token: string | null; setToken: (toke
                               navigate('/contacts');
                             }
                           }}
+                          aria-label={t('common.clear')}
                           sx={{ color: 'rgba(255, 255, 255, 0.7)', p: 0.5 }}
                         >
                           <ClearIcon fontSize="small" />
@@ -547,7 +563,10 @@ function AppContent({ token, setToken }: { token: string | null; setToken: (toke
 
       <Box
         component="main"
+        id="main-content"
+        tabIndex={-1}
         sx={{
+          outline: 'none',
           flexGrow: 1,
           // A flex item won't shrink below its content by default, which would let
           // one wide table or canvas stretch the whole page past the viewport.

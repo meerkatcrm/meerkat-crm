@@ -22,6 +22,7 @@ import {
   TimelineOppositeContent,
 } from '@mui/lab';
 import EventIcon from '@mui/icons-material/Event';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
 import EditIcon from '@mui/icons-material/Edit';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { useActivities } from './hooks/useActivities';
@@ -234,6 +235,7 @@ const ActivitiesPage: React.FC = () => {
           <IconButton
             size="small"
             aria-describedby={infoPopoverId}
+            aria-label={t('common.info')}
             onClick={handleInfoClick}
           >
             <InfoOutlinedIcon fontSize="small" />
@@ -361,7 +363,7 @@ const ActivitiesPage: React.FC = () => {
                               mt: 1,
                               display: 'block'
                             }}>
-                            📍 {activity.location}
+                            <LocationOnIcon fontSize="inherit" aria-hidden sx={{ verticalAlign: 'text-bottom', mr: 0.5 }} />{activity.location}
                           </Typography>
                         )}
                         <ItemImage type="activities" id={activity.ID} image={activity.image} />

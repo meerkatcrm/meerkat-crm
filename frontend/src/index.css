@@ -11,3 +11,20 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+/* Controls that fade in on hover: also show them on keyboard focus and on
+   touch screens, where there is no hover. */
+.edit-icon:focus-visible,
+.action-icon:focus-visible,
+.camera-badge:focus-visible,
+.edit-actions:focus-within {
+  opacity: 1 !important;
+}
+@media (hover: none) {
+  .edit-icon,
+  .action-icon,
+  .camera-badge,
+  .edit-actions {
+    opacity: 1 !important;
+  }
+}

@@ -92,6 +92,7 @@ export default function RegisterPage() {
                 label={t('register.username')}
                 value={username}
                 onChange={e => setUsername(e.target.value)}
+                autoComplete="username"
                 required
                 fullWidth
               />
@@ -100,6 +101,7 @@ export default function RegisterPage() {
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
+                autoComplete="email"
                 required
                 fullWidth
               />
@@ -108,6 +110,7 @@ export default function RegisterPage() {
                 type="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
+                autoComplete="new-password"
                 required
                 fullWidth
               />

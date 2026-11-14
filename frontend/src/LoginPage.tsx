@@ -84,6 +84,8 @@ export default function LoginPage({ setToken }: LoginPageProps) {
                   type="text"
                   value={identifier}
                   onChange={e => setIdentifier(e.target.value)}
+                  autoComplete="username"
+                  autoFocus
                   required
                   fullWidth
                 />
@@ -92,6 +94,7 @@ export default function LoginPage({ setToken }: LoginPageProps) {
                   type="password"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
+                  autoComplete="current-password"
                   required
                   fullWidth
                 />
