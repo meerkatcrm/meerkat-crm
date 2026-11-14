@@ -13,6 +13,8 @@ export default defineConfig({
     // Node >= 22 ships its own experimental localStorage global, which is
     // undefined without --localstorage-file and shadows jsdom's working one
     pool: 'forks',
+    // Each fork boots a jsdom env (~7s); unbounded forks starve tests into 5s timeouts
+    maxWorkers: 6,
     execArgv: ['--no-experimental-webstorage'],
     coverage: {
       provider: 'v8',
