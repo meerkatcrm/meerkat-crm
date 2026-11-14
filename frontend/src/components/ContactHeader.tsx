@@ -256,7 +256,7 @@ export default function ContactHeader({
                       className="edit-icon"
                       size="small"
                       onClick={onStartEditProfile}
-                      aria-label={t('common.edit')}
+                      aria-label={t('contactDetail.editName')}
                       sx={{
                         ml: 1,
                         opacity: 0,
@@ -352,7 +352,7 @@ export default function ContactHeader({
                   className="edit-icon"
                   size="small"
                   onClick={onToggleEditCircles}
-                  aria-label={t('common.edit')}
+                  aria-label={t('contactDetail.editCircles')}
                   sx={{
                     ml: 'auto',
                     opacity: 0,
@@ -429,7 +429,7 @@ export default function ContactHeader({
                       size="small"
                       color="primary"
                       onClick={() => onAddCircle()}
-                      aria-label={t('common.add')}
+                      aria-label={t('contactDetail.addCircle')}
                       disabled={!newCircleName.trim()}
                     >
                       <AddIcon />

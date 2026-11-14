@@ -396,7 +396,9 @@
       "gone": "Ese contacto ya no está en la lista"
     },
     "timelineTabsLabel": "Pestañas de cronología y recordatorios",
-    "infoTabsLabel": "Pestañas de información del contacto"
+    "infoTabsLabel": "Pestañas de información del contacto",
+    "editName": "Editar nombre",
+    "editCircles": "Editar círculos"
   },
   "noteDialog": {
     "title": "Agregar Nota",

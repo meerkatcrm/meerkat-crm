@@ -396,7 +396,9 @@
       "gone": "That contact is no longer in the list"
     },
     "timelineTabsLabel": "Timeline and reminders tabs",
-    "infoTabsLabel": "Contact information tabs"
+    "infoTabsLabel": "Contact information tabs",
+    "editName": "Edit name",
+    "editCircles": "Edit circles"
   },
   "noteDialog": {
     "title": "Add Note",

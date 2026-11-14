@@ -396,7 +396,9 @@
       "gone": "该联系人已不在列表中"
     },
     "timelineTabsLabel": "时间线和提醒标签页",
-    "infoTabsLabel": "联系人信息标签页"
+    "infoTabsLabel": "联系人信息标签页",
+    "editName": "编辑姓名",
+    "editCircles": "编辑圈子"
   },
   "noteDialog": {
     "title": "添加笔记",
