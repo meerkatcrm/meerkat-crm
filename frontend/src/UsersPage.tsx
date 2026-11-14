@@ -269,6 +269,7 @@ export default function UsersPage() {
                     size="small"
                     onClick={() => handleEditClick(user)}
                     title={t('common.edit')}
+                    aria-label={t('common.edit')}
                   >
                     <EditIcon fontSize="small" />
                   </IconButton>
@@ -276,6 +277,7 @@ export default function UsersPage() {
                     size="small"
                     onClick={() => handleDeleteClick(user)}
                     title={t('common.delete')}
+                    aria-label={t('common.delete')}
                   >
                     <DeleteIcon fontSize="small" />
                   </IconButton>

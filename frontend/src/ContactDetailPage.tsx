@@ -856,7 +856,7 @@ function ContactDetail() {
             <Tabs
               value={activeTab}
               onChange={(_, newValue) => setActiveTab(newValue)}
-              aria-label="timeline and reminders tabs"
+              aria-label={t('contactDetail.timelineTabsLabel')}
               variant="scrollable"
               scrollButtons="auto"
               allowScrollButtonsMobile

@@ -600,7 +600,7 @@ export default function ContactInformation({
         <Tabs
           value={activeTab}
           onChange={(_, newValue) => setActiveTab(newValue)}
-          aria-label="contact information tabs"
+          aria-label={t('contactDetail.infoTabsLabel')}
           variant="scrollable"
           scrollButtons="auto"
           allowScrollButtonsMobile

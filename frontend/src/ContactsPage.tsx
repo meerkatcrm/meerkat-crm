@@ -335,7 +335,7 @@ export default function ContactsPage() {
             onClick={() => setImportDialogOpen(true)}
             sx={{ whiteSpace: 'nowrap' }}
           >
-            {t('contacts.import.button', 'Import')}
+            {t('contacts.import.button')}
           </Button>
           <Button
             variant="outlined"

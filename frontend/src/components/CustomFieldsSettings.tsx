@@ -212,7 +212,7 @@ export default function CustomFieldsSettings() {
                     onKeyDown={handleKeyDown}
                     disabled={saving}
                     sx={{ flexGrow: 1, minWidth: 0 }}
-                    slotProps={{ htmlInput: { maxLength: 100 } }}
+                    slotProps={{ htmlInput: { maxLength: 100, 'aria-label': t('settings.customFields.newFieldPlaceholder') } }}
                   />
                   <Button
                     variant="outlined"

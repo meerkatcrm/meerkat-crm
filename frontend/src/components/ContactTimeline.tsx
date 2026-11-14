@@ -18,6 +18,7 @@ import {
   TimelineOppositeContent
 } from '@mui/lab';
 import NoteIcon from '@mui/icons-material/Note';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
 import EventIcon from '@mui/icons-material/Event';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -115,7 +116,7 @@ export default function ContactTimeline({ timelineItems, onEditItem, onDeleteCom
                       mt: 1,
                       display: 'block'
                     }}>
-                    📍 {(item.data as Activity).location}
+                    <LocationOnIcon fontSize="inherit" aria-hidden sx={{ verticalAlign: 'text-bottom', mr: 0.5 }} />{(item.data as Activity).location}
                   </Typography>
                 )}
                 {item.type === 'activity' && (item.data as Activity).contacts && (item.data as Activity).contacts!.length > 0 && (

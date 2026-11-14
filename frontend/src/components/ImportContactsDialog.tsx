@@ -747,7 +747,7 @@ export default function ImportContactsDialog({
       <DialogTitle>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           {t('contacts.import.title', 'Import Contacts')}
-          <IconButton onClick={handleClose} size="small">
+          <IconButton onClick={handleClose} size="small" aria-label={t('common.close')}>
             <CloseIcon />
           </IconButton>
         </Box>

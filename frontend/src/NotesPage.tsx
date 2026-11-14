@@ -24,6 +24,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { ListSkeleton } from './components/LoadingSkeletons';
 import { useNotes } from './hooks/useNotes';
+import { responsiveTimelineSx } from './components/timelineLayout';
 import { useDebouncedValue } from './hooks/useDebounce';
 import { createUnassignedNote, updateNote, deleteNote, Note } from './api/notes';
 import { applyImageChange, uploadItemImage } from './api/itemImages';
@@ -200,6 +201,7 @@ const NotesPage: React.FC = () => {
           <IconButton
             size="small"
             aria-describedby={infoPopoverId}
+            aria-label={t('common.info')}
             onClick={handleInfoClick}
           >
             <InfoOutlinedIcon fontSize="small" />
@@ -268,7 +270,7 @@ const NotesPage: React.FC = () => {
           </Typography>
         </Paper>
       ) : (
-        <Timeline position="right">
+        <Timeline position="right" sx={responsiveTimelineSx}>
           {notes.map((note, index) => (
             <TimelineItem key={note.ID}>
               <TimelineOppositeContent
@@ -286,7 +288,7 @@ const NotesPage: React.FC = () => {
                 </TimelineDot>
                 {index < notes.length - 1 && <TimelineConnector />}
               </TimelineSeparator>
-              <TimelineContent sx={{ flex: 0.8 }}>
+              <TimelineContent sx={{ flex: 0.8, minWidth: 0, overflowWrap: 'anywhere' }}>
                 <Paper
                   elevation={2}
                   sx={{

@@ -310,7 +310,7 @@ export default function ProfilePictureUploadDialog({
                 borderRadius: 2,
                 p: 4,
                 cursor: 'pointer',
-                '&:hover': {
+                '&:hover, &:focus-within': {
                   borderColor: 'primary.main',
                   bgcolor: 'action.hover'
                 }
@@ -323,7 +323,8 @@ export default function ProfilePictureUploadDialog({
                 type="file"
                 accept="image/*"
                 onChange={handleFileSelect}
-                style={{ display: 'none' }}
+                // Visually hidden, not display:none, so the keyboard can reach it
+                style={{ position: 'absolute', width: 1, height: 1, opacity: 0, overflow: 'hidden' }}
               />
               <CloudUploadIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
               <Typography variant="h6" sx={{
