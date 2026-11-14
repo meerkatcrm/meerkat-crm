@@ -156,7 +156,10 @@ func TestStaticServesTheHashedBundle(t *testing.T) {
 }
 
 // A missing bundle file is a 404 and not index.html: a page under a .js URL is how a broken
-// release turns into a confusing one. router.Static would have handed these to NoRoute.
+// release turns into a confusing one. And it is a 404 nobody may keep: the immutable pin
+// belongs on the file, so a stale index.html pointing at a renamed bundle recovers as soon as
+// the release that supplies it lands, rather than after whatever its cache decided to remember
+// the miss for.
 func TestMissingAssetIsNotFoundAndNotTheApp(t *testing.T) {
 	r := staticRouter(t, writeBundle(t))
 
@@ -164,6 +167,8 @@ func TestMissingAssetIsNotFoundAndNotTheApp(t *testing.T) {
 		w := request(r, http.MethodGet, path, nil)
 		assert.Equal(t, http.StatusNotFound, w.Code, path)
 		assert.NotEqual(t, indexBody, w.Body.String(), path)
+		assert.NotContains(t, w.Header().Get("Cache-Control"), "immutable", path)
+		assert.Equal(t, "no-store", w.Header().Get("Cache-Control"), path)
 	}
 }
 

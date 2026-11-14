@@ -12,7 +12,7 @@ For initial setup see [Getting Started](getting-started.html). This page covers 
 
 Meerkat CRM runs as a single all-in-one container running one process: a Go binary that serves the React SPA and answers `/api/`, `/carddav/`, `/.well-known/carddav` and `/health` itself. There is no nginx and no process manager in the image, and the container runs as an unprivileged user (UID/GID 1001). Only that one port is published (default `7300`), so the API was never reachable on its own. This same-origin setup is built in, so nothing extra is required.
 
-The web app is read from the directory `FRONTEND_DIR` names (`/app/frontend`, built into the image): `/static` serves its content-hashed output with `Cache-Control: public, max-age=31536000, immutable`, and every other path is served from that directory with `Cache-Control: no-cache`, falling back to `index.html` so the SPA can own any URL. Leave `FRONTEND_DIR` empty to serve the API alone and host the bundle yourself.
+The web app is read from the directory `FRONTEND_DIR` names (`/app/frontend`, built into the image): `/static` serves its content-hashed output with `Cache-Control: public, max-age=31536000, immutable`, and every other path is served from that directory with `Cache-Control: no-cache`, falling back to `index.html` so the SPA can own any URL. A `/static` path with no file behind it is a plain 404 with `Cache-Control: no-store` and not the app — the immutable pin applies to files that exist, so a release that supplies a missing asset takes effect without waiting out a cached miss. Leave `FRONTEND_DIR` empty to serve the API alone and host the bundle yourself.
 
 You only need an external reverse proxy for TLS termination. Point it at the published port (default `7300`):
 

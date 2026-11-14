@@ -20,6 +20,18 @@ const staticPath = "/static"
 
 const textPlain = "text/plain; charset=utf-8"
 
+// The two cache policies of the bundle. They are arguments to serveBundleFile rather than
+// headers the routes set, so that they can only land on a response that has a file behind it.
+const (
+	// Files with a content hash in the name: the URL changes whenever the bytes do, so the
+	// browser may keep them for a year.
+	immutableCache = "public, max-age=31536000, immutable"
+	// index.html names the hashed bundles, so nothing under the root is servable from cache
+	// without revalidating: a stored copy would keep an updated instance loading the previous
+	// release's assets.
+	noCache = "no-cache"
+)
+
 // notFoundBody is gin's own 404 body, sent so a path the API owns reads the same whether or
 // not a bundle is mounted. Context.NotFound is not usable here: it re-enters these handlers.
 var notFoundBody = []byte("404 page not found\n")
@@ -80,13 +92,11 @@ func RegisterStaticRoutes(router *gin.Engine, cfg *config.Config) error {
 	}
 	claimed := apiNamespaces(router)
 
-	// Files with a content hash in the name: the URL changes whenever the bytes do, so the
-	// browser may keep them for a year. Served here rather than with router.Static, which
-	// hands a missing file to NoRoute and would answer a missing .js with the app and a 200.
+	// Served here rather than with router.Static, which hands a missing file to NoRoute and
+	// would answer a missing .js with the app and a 200.
 	hashed := router.Group(staticPath, middleware.SPAHeadersMiddleware(cfg.CookieSecure), bundleGzip())
 	asset := func(c *gin.Context) {
-		c.Header("Cache-Control", "public, max-age=31536000, immutable")
-		serveBundleFile(c, filepath.Join(cfg.FrontendDir, strings.TrimPrefix(staticPath, "/")), c.Param("filepath"), false)
+		serveBundleFile(c, filepath.Join(cfg.FrontendDir, strings.TrimPrefix(staticPath, "/")), c.Param("filepath"), false, immutableCache)
 	}
 	hashed.GET("/*filepath", asset)
 	hashed.HEAD("/*filepath", asset)
@@ -103,26 +113,31 @@ func RegisterStaticRoutes(router *gin.Engine, cfg *config.Config) error {
 			notFound(c)
 			return
 		}
-		// index.html names the hashed bundles, so nothing under the root is servable from
-		// cache without revalidating: a stored copy would keep an updated instance loading
-		// the previous release's assets.
-		c.Header("Cache-Control", "no-cache")
 		middleware.SPAHeaders(c, cfg.CookieSecure)
-		serveBundleFile(c, cfg.FrontendDir, c.Request.URL.Path, true)
+		serveBundleFile(c, cfg.FrontendDir, c.Request.URL.Path, true, noCache)
 	})
 
 	return nil
 }
 
 func notFound(c *gin.Context) {
+	// no-store rather than nothing: RFC 9111 4.2.2 lets a cache invent a freshness lifetime
+	// for a 404, and one that outlives the next release keeps a missing asset broken after
+	// the release that supplies it has been deployed.
+	c.Header("Cache-Control", "no-store")
 	c.Data(http.StatusNotFound, textPlain, notFoundBody)
 }
 
-// serveBundleFile serves rel from dir. Without a file behind the request, fallback decides
-// between index.html and a plain 404: the root of the app falls back, which is what lets the
-// SPA route every path that is neither a file nor the API's, and /static does not, because a
-// page under a .js URL turns a broken release into a confusing one.
-func serveBundleFile(c *gin.Context, dir, rel string, fallback bool) {
+// serveBundleFile serves rel from dir with the given Cache-Control. Without a file behind the
+// request, fallback decides between index.html and a plain 404: the root of the app falls
+// back, which is what lets the SPA route every path that is neither a file nor the API's, and
+// /static does not, because a page under a .js URL turns a broken release into a confusing
+// one.
+//
+// The header is set here and not by the caller because a header set before the stat rides
+// along on the 404 too: a missing asset pinned for a year stays broken in every browser and
+// shared cache between the broken release and the one that fixes it.
+func serveBundleFile(c *gin.Context, dir, rel string, fallback bool, cacheControl string) {
 	// The "/" prefix makes Clean discard any .. that would climb out of the bundle.
 	name := filepath.Join(dir, filepath.Clean("/"+rel))
 	if st, err := os.Stat(name); err != nil || st.IsDir() {
@@ -132,5 +147,6 @@ func serveBundleFile(c *gin.Context, dir, rel string, fallback bool) {
 		}
 		name = filepath.Join(dir, "index.html")
 	}
+	c.Header("Cache-Control", cacheControl)
 	http.ServeFile(c.Writer, c.Request, name)
 }
