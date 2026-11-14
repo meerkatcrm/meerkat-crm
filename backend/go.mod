@@ -8,6 +8,7 @@ require (
 	github.com/emersion/go-ical v0.0.0-20250609112844-439c63cef608
 	github.com/gen2brain/heic v0.7.2
 	github.com/gin-contrib/cors v1.7.10
+	github.com/gin-contrib/gzip v1.2.10
 	github.com/gin-gonic/gin v1.12.0
 	github.com/glebarez/sqlite v1.11.0
 	github.com/go-co-op/gocron v1.37.0
@@ -29,7 +30,6 @@ require (
 require (
 	github.com/dustin/go-humanize v1.1.0 // indirect
 	github.com/ebitengine/purego v0.11.2 // indirect
-	github.com/gin-contrib/gzip v1.2.10 // indirect
 	github.com/glebarez/go-sqlite v1.23.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.8 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect
