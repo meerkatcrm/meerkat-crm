@@ -410,6 +410,9 @@ func TestGetProfilePicture_ServesTheFullPhoto(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, "jpeg-bytes", w.Body.String())
+	// The URL names the contact, not the picture, so a new photo arrives at the same URL and
+	// nothing here may be reused without revalidating.
+	assert.Equal(t, "private, no-cache", w.Header().Get("Cache-Control"))
 }
 
 func TestGetProfilePicture_RefusesPathsOutsideThePhotoDir(t *testing.T) {

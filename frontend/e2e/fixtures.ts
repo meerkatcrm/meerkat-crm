@@ -4,7 +4,7 @@ import { TEST_USER, API_BASE_URL, E2E_CONTACT_PREFIX } from './global-setup';
 /**
  * `test` with a guard on every page: a Content-Security-Policy violation (a blocked script,
  * style, image, connection, ...) anywhere in a test fails it. The SPA is served with the
- * enforcing policy from frontend/security-headers.conf, so a blocked resource is a real bug.
+ * enforcing policy from backend/middleware/security_headers.go, so a blocked resource is a real bug.
  */
 export const test = base.extend({
   page: async ({ page }, use) => {

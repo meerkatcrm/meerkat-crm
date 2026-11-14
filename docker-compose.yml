@@ -1,6 +1,7 @@
 # Meerkat CRM Docker Compose - All-in-one image
 #
-# Single-container with bundled frontend and backend (+ nginx)
+# One container, one process: the Go binary serves the web app and its own /api, /carddav
+# and /health. No nginx, no supervisord.
 #
 # USAGE:
 #   cp .env.example .env && edit .env, then:
@@ -17,13 +18,16 @@ services:
     restart: unless-stopped
     env_file:
       - .env
-    environment:
-      - PUID=${PUID:-1001}
-      - PGID=${PGID:-1001}
+    # Nothing in the container runs as root, so whatever uid this runs as has to own the
+    # two directories below. Unlike a named volume, a bind mount keeps the host's ownership:
+    #   chown -R 1001:1001 data photos
+    # Run `id` on the host to use your own uid instead of the default.
+    user: "${PUID:-1001}:${PGID:-1001}"
     volumes:
       - ${DATA_PATH:-./data}:/app/data
       - ${PHOTOS_PATH:-./photos}:/app/static/photos
     ports:
+      # The web app and the same-origin API share this one port
       - "${FRONTEND_PORT:-7300}:8080"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/health"]

@@ -58,7 +58,13 @@ SSO is disabled unless all three of `OIDC_PROVIDER_URL`, `OIDC_CLIENT_ID`, and `
 
 Other variables are found in the [sample env file](https://github.com/meerkatcrm/meerkat-crm/blob/main/.env.example).
 
-The backend process runs as a non-root user (default UID/GID 1001), and a startup script chowns the data and photo directories to that user. Run `id` on your host to find your UID and GID and set them as `PUID`/`PGID` in your `.env` file if you prefer folders to be owned by your host user (optional).
+The container runs as a non-root user (UID/GID 1001), and nothing inside it runs as root: there is no startup script to `chown` anything. Whatever user the container runs as must own the mounted data and photo directories, so create them owned first:
+
+```bash
+mkdir -p data photos && chown -R 1001:1001 data photos
+```
+
+Run `id` on your host to find your own UID and GID and set them as `PUID`/`PGID` in your `.env` file to have the folders owned by your host user instead (optional).
 
 ## Post-Installation Setup
 

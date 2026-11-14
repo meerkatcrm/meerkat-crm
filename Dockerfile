@@ -1,12 +1,13 @@
 # Meerkat CRM - All-in-one image
 #
-# Bundles React frontend and the Go backend into a single container, served by nginx
+# One Go binary serves the React bundle, the API, CardDAV and /health. No nginx, no
+# supervisord: the process the image starts is the application.
 #
 # Build context is the repository root:
 #   docker build -t meerkat-crm .
 
 # =============================================================================
-# Stage 1: Build Go backend (cross-compiled, CGO disabled - pure-Go SQLite)
+# Stage 1: Build the Go backend (cross-compiled, CGO disabled - pure-Go SQLite)
 # =============================================================================
 FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS backend-builder
 
@@ -26,7 +27,7 @@ COPY backend/ .
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o meerkat .
 
 # =============================================================================
-# Stage 2: Build React frontend (same-origin API, served by nginx)
+# Stage 2: Build the React frontend (same-origin API, served by the Go binary)
 # =============================================================================
 FROM --platform=$BUILDPLATFORM node:22-alpine AS frontend-builder
 
@@ -43,65 +44,52 @@ RUN if [ -f yarn.lock ]; then yarn install --frozen-lockfile; \
 # Copy frontend source code
 COPY frontend/ .
 
-# API is served from the same origin; nginx proxies /api to the backend.
-# Must stay empty so the bundle uses relative URLs
+# The API is same-origin: the binary below answers /api/ itself. Must stay empty so the
+# bundle uses relative URLs.
 ENV REACT_APP_API_URL=""
 
 RUN if [ -f yarn.lock ]; then yarn build; else npm run build; fi
 
 # =============================================================================
-# Stage 3: Runtime - nginx + Go backend under supervisord
+# Stage 3: Runtime - one unprivileged process, listening on PORT
 # =============================================================================
-FROM alpine:3.20
+FROM alpine:3.24
 
-# Runtime dependencies. shadow provides usermod/groupmod for PUID/PGID remap.
 # No sqlite package needed - the backend uses a pure-Go SQLite driver.
 RUN apk add --no-cache \
     ca-certificates \
-    tzdata \
-    nginx \
-    supervisor \
-    shadow \
-    libc6-compat
+    tzdata
 
 WORKDIR /app
 
-# Non-root user the backend process runs as
+# Nothing in the image runs as root, so there is no entrypoint to remap a uid or chown a
+# volume: run the container as whoever owns the mounted directories.
 RUN addgroup -g 1001 -S appgroup && adduser -u 1001 -S appuser -G appgroup
 
-# Runtime directories
-RUN mkdir -p /app/data /app/static/photos /var/log/supervisor /run/nginx && \
-    chown -R appuser:appgroup /app/data /app/static/photos
+# Both data directories exist in the image, owned by the run-as uid, so that Docker seeds
+# that ownership into a fresh named volume. A bind mount gets the host's ownership instead
+# and has to be chowned on the host.
+RUN mkdir -p /app/data /app/static/photos && \
+    chown -R appuser:appgroup /app/data /app/static
 
-# Copy Go binary and static assets from the backend builder
+# The binary and the bundle it serves
 COPY --from=backend-builder /app/meerkat /app/meerkat
-COPY --from=backend-builder /app/static/styles.css /app/static/
-
-# Copy frontend build to nginx html directory
-COPY --from=frontend-builder /app/build /usr/share/nginx/html
-
-# Configuration files
-COPY docker/nginx.conf /etc/nginx/http.d/default.conf
-COPY frontend/security-headers.conf /etc/nginx/security-headers.conf
-COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-COPY docker/entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+COPY --from=frontend-builder /app/build /app/frontend
 
 # Default environment
-# PORT is the backend's internal bind port - nginx listens on 8080 (below) and
-# proxies to it, so it must not collide with nginx's own port.
-ENV PORT=8081
+ENV PORT=8080
 ENV SQLITE_DB_PATH=/app/data/meerkat.db
 ENV PROFILE_PHOTO_DIR=/app/static/photos
+ENV FRONTEND_DIR=/app/frontend
 ENV GIN_MODE=release
 
-# nginx listens on 8080 (no root needed to bind)
+# The bundle is read, never written; root-owned 0644 is enough.
+USER 1001:1001
+
 EXPOSE 8080
 
-# Health check hits nginx, which proxies /health to the backend
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:8080/health || exit 1
 
-# Entrypoint remaps PUID/PGID + chowns data dirs, then launches supervisord
-ENTRYPOINT ["/app/entrypoint.sh"]
-CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+# CMD rather than ENTRYPOINT, so `docker run --entrypoint sh` can open the container.
+CMD ["/app/meerkat"]
