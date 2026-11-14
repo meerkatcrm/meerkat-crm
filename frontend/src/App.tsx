@@ -1,4 +1,5 @@
 import { useSnackbar } from './context/SnackbarContext';
+import { takeReturnTo } from './api/client';
 import { lazy, useState, useEffect, Suspense, useMemo, MouseEvent as ReactMouseEvent, ReactNode } from 'react';
 import LoginPage from './LoginPage';
 import RegisterPage from './RegisterPage';
@@ -93,6 +94,13 @@ function ScrollToTop() {
 }
 
 // Inner component that can use useLocation (must be inside Router)
+// Where /login leads once signed in: the page a session expiry interrupted, else the
+// dashboard. LoginPage doesn't navigate itself, so nothing else races this redirect.
+function PostLoginRedirect() {
+  const [to] = useState(() => takeReturnTo() ?? '/');
+  return <Navigate to={to} replace />;
+}
+
 // An unknown URL goes to the dashboard, and says so rather than looking like a navigation bug
 function NotFoundRedirect() {
   const { t } = useTranslation();
@@ -582,7 +590,7 @@ function AppContent({ token, setToken }: { token: string | null; setToken: (toke
           <Route path="/users" element={<LazyPage><UsersPage /></LazyPage>} />
           <Route path="/api-tokens" element={<LazyPage><ApiTokensPage /></LazyPage>} />
           <Route path="/" element={<LazyPage><DashboardPage /></LazyPage>} />
-          <Route path="/login" element={<Navigate to="/" replace />} />
+          <Route path="/login" element={<PostLoginRedirect />} />
           <Route path="/register" element={<Navigate to="/" replace />} />
           <Route path="*" element={<NotFoundRedirect />} />
         </Routes>
