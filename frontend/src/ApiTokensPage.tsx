@@ -222,7 +222,7 @@ export default function ApiTokensPage() {
             label={t('apiTokens.createDialog.nameLabel')}
             value={newTokenName}
             onChange={(e) => setNewTokenName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); }}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing && e.keyCode !== 229) handleCreate(); }}
             fullWidth
             margin="normal"
             slotProps={{

@@ -393,7 +393,7 @@ function AppContent({ token, setToken }: { token: string | null; setToken: (toke
               }
             }}
             onKeyDown={(event) => {
-              if (event.key === 'Enter') {
+              if (event.key === 'Enter' && !event.nativeEvent.isComposing && event.keyCode !== 229) {
                 handleSearchSubmit();
               }
             }}

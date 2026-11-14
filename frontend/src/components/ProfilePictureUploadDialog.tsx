@@ -361,7 +361,7 @@ export default function ProfilePictureUploadDialog({
                 onChange={(e) => setImageUrl(e.target.value)}
                 disabled={fetchingUrl}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
+                  if (e.key === 'Enter' && !e.nativeEvent.isComposing && e.keyCode !== 229) {
                     e.preventDefault();
                     handleFetchFromUrl();
                   }
