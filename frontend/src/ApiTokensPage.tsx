@@ -241,7 +241,9 @@ export default function ApiTokensPage() {
       </AppDialog>
 
       {/* Token created dialog */}
-      <Dialog open={!!createdToken} onClose={() => setCreatedToken(null)} maxWidth="sm" fullWidth>
+      {/* The token is shown only once: busy ignores Esc and a backdrop click only shakes
+          the dialog, so closing takes the Done button. */}
+      <AppDialog open={!!createdToken} busy maxWidth="sm" fullWidth>
         <DialogTitle>{t('apiTokens.createdDialog.title')}</DialogTitle>
         <DialogContent>
           <Alert severity="warning" sx={{ mb: 2 }}>
@@ -270,7 +272,7 @@ export default function ApiTokensPage() {
             {t('apiTokens.createdDialog.done')}
           </Button>
         </DialogActions>
-      </Dialog>
+      </AppDialog>
 
       {/* Revoke confirmation dialog */}
       <Dialog open={revokeDialogOpen} onClose={() => setRevokeDialogOpen(false)}>

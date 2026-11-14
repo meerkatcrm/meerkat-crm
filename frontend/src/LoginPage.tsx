@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { loginUser, isAuthenticated, API_BASE_URL } from './auth';
+import { takeReturnTo } from './api/client';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { applyUserPreferences } from './utils/userPreferences';
@@ -52,7 +53,7 @@ export default function LoginPage({ setToken }: LoginPageProps) {
       // Sync language and date format preferences from backend
       applyUserPreferences(preferences);
 
-      navigate('/');
+      navigate(takeReturnTo() ?? '/');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : t('login.loginFailed');
       setError(errorMessage);

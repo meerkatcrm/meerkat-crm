@@ -2,7 +2,8 @@
   "app": {
     "title": "Meerkat CRM",
     "logout": "Déconnexion",
-    "loading": "Chargement..."
+    "loading": "Chargement...",
+    "notFound": "Cette page n'existe pas, vous avez été redirigé vers le tableau de bord."
   },
   "nav": {
     "dashboard": "Tableau de bord",

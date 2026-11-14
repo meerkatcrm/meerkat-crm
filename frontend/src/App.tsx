@@ -1,3 +1,4 @@
+import { useSnackbar } from './context/SnackbarContext';
 import { lazy, useState, useEffect, Suspense, useMemo, MouseEvent as ReactMouseEvent, ReactNode } from 'react';
 import LoginPage from './LoginPage';
 import RegisterPage from './RegisterPage';
@@ -92,6 +93,14 @@ function ScrollToTop() {
 }
 
 // Inner component that can use useLocation (must be inside Router)
+// An unknown URL goes to the dashboard, and says so rather than looking like a navigation bug
+function NotFoundRedirect() {
+  const { t } = useTranslation();
+  const { showInfo } = useSnackbar();
+  useEffect(() => { showInfo(t('app.notFound')); }, [showInfo, t]);
+  return <Navigate to="/" replace />;
+}
+
 function AppContent({ token, setToken }: { token: string | null; setToken: (token: string | null) => void }) {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -575,7 +584,7 @@ function AppContent({ token, setToken }: { token: string | null; setToken: (toke
           <Route path="/" element={<LazyPage><DashboardPage /></LazyPage>} />
           <Route path="/login" element={<Navigate to="/" replace />} />
           <Route path="/register" element={<Navigate to="/" replace />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<NotFoundRedirect />} />
         </Routes>
       </Box>
     </>

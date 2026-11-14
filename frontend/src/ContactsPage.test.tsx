@@ -145,7 +145,7 @@ function ShowState() {
 }
 
 test('opening a contact carries its place in the list for previous / next', () => {
-  mockList([contact(1, 'Ann'), contact(2, 'Bob')], 12);
+  mockList([contact(1, 'Ann'), contact(2, 'Bob')], 30);
   render(
     <SnackbarProvider>
       <MemoryRouter initialEntries={['/contacts?page=2']}>
@@ -158,7 +158,7 @@ test('opening a contact carries its place in the list for previous / next', () =
   );
   fireEvent.click(screen.getByRole('link', { name: /Bob/ }));
   const state = JSON.parse(screen.getByTestId('state').textContent!);
-  expect(state.listNav).toMatchObject({ index: 11, total: 12, params: { sort: 'firstname', order: 'asc' } });
+  expect(state.listNav).toMatchObject({ index: 26, total: 30, params: { sort: 'firstname', order: 'asc' } });
   expect(state.listNav.params).not.toHaveProperty('page');
 });
 
@@ -208,16 +208,16 @@ test('after a bulk edit the message says how many contacts changed, or that none
 });
 
 test('select all still applies when the page is turned while it collects', async () => {
-  mockList([contact(1, 'Ann')], 15);
+  mockList([contact(1, 'Ann')], 30);
   let resolve!: (v: unknown) => void;
   vi.mocked(getContacts).mockReturnValue(new Promise((r) => { resolve = r; }) as never);
   renderAt('/contacts');
 
   fireEvent.click(screen.getByRole('button', { name: 'Select' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Select all 15' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Select all 30' }));
   fireEvent.click(screen.getByRole('button', { name: 'Go to page 2' }));
-  await act(async () => resolve({ contacts: Array.from({ length: 15 }, (_, i) => contact(i + 1, 'X')), total: 15, page: 1, limit: 100 }));
-  expect(screen.getByText('15 selected')).toBeInTheDocument();
+  await act(async () => resolve({ contacts: Array.from({ length: 30 }, (_, i) => contact(i + 1, 'X')), total: 30, page: 1, limit: 100 }));
+  expect(screen.getByText('30 selected')).toBeInTheDocument();
 });
 
 test('select all applies nothing when select mode is left while it collects', async () => {
@@ -235,7 +235,7 @@ test('select all applies nothing when select mode is left while it collects', as
 });
 
 test('a page past the end of a shrunken list moves to the last page there is', async () => {
-  mockList([], 12);
+  mockList([], 30);
   render(
     <SnackbarProvider>
       <MemoryRouter initialEntries={['/contacts?page=3']}>
@@ -249,7 +249,13 @@ test('a page past the end of a shrunken list moves to the last page there is', a
 });
 
 test('a valid page with contacts is left alone', () => {
-  mockList([contact(11, 'Kim')], 12);
+  mockList([contact(26, 'Kim')], 30);
   renderAt('/contacts?page=2');
   expect(lastParams()).toMatchObject({ page: 2 });
+});
+
+test('the circle filter and the archived switch come from the URL, so Back restores them', () => {
+  mockList([contact(1, 'Ann')], 1);
+  renderAt('/contacts?circle=Family&archived=1');
+  expect(lastParams()).toMatchObject({ circle: 'Family', includeArchived: true });
 });

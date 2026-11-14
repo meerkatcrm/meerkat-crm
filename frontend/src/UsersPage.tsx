@@ -2,6 +2,7 @@ import { useState, useEffect, FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDateFormat } from './DateFormatProvider';
 import { useNavigate } from 'react-router-dom';
+import { decodeToken } from './auth';
 import {
   Box,
   Typography,
@@ -47,6 +48,8 @@ export default function UsersPage() {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [total, setTotal] = useState(0);
+  // The server refuses to delete your own account, so the button is off for that row
+  const currentUserId = decodeToken()?.user_id;
   const [triggerLoading, setTriggerLoading] = useState(false);
 
   // Edit dialog state
@@ -196,8 +199,13 @@ export default function UsersPage() {
 
     try {
       await deleteUser(deletingUser.id);
-      setUsers(users.filter(u => u.id !== deletingUser.id));
       setTotal(total - 1);
+      if (users.length === 1 && page > 0) {
+        // That was the last row here: go back a page, which refetches
+        setPage(page - 1);
+      } else {
+        setUsers(users.filter(u => u.id !== deletingUser.id));
+      }
       handleDeleteClose();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : t('users.deleteError');
@@ -275,6 +283,7 @@ export default function UsersPage() {
                   <IconButton
                     size="small"
                     onClick={() => handleDeleteClick(user)}
+                    disabled={user.id === currentUserId}
                     title={t('common.delete')}
                   >
                     <DeleteIcon fontSize="small" />

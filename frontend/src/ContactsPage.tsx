@@ -46,7 +46,9 @@ export default function ContactsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const searchQuery = searchParams.get('search') || '';
   const page = parseInt(searchParams.get('page') || '1', 10);
-  const [selectedCircle, setSelectedCircle] = useState('');
+  // Circle and archived live in the URL beside search and page, so Back from a contact restores them
+  const selectedCircle = searchParams.get('circle') || '';
+  const showArchived = searchParams.get('archived') === '1';
   const [circles, setCircles] = useState<string[]>([]);
   const [sortOption, setSortOption] = useState(() => {
     return localStorage.getItem('contacts-sort-option') || 'id-desc';
@@ -55,13 +57,12 @@ export default function ContactsPage() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [customFieldNames, setCustomFieldNames] = useState<string[]>([]);
   const [enabledFields, setEnabledFields] = useState<Set<ContactFieldKey>>(() => resolveEnabledFields(null));
-  const [showArchived, setShowArchived] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
   const [selectingAll, setSelectingAll] = useState(false);
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const { showError, showSuccess, showInfo } = useSnackbar();
-  const pageSize = 10;
+  const pageSize = 25;
 
   // While searching, the default order is the best match first (the server ranks when no
   // sort is sent). Another order can be picked; it holds for that search only.
@@ -80,6 +81,16 @@ export default function ContactsPage() {
   useEffect(() => {
     localStorage.setItem('contacts-sort-option', sortOption);
   }, [sortOption]);
+
+  const setUrlParam = useCallback((key: string, value: string) => {
+    setSearchParams(prev => {
+      const params = new URLSearchParams(prev);
+      if (value) params.set(key, value); else params.delete(key);
+      return params;
+    }, { replace: true });
+  }, [setSearchParams]);
+  const setSelectedCircle = useCallback((circle: string) => setUrlParam('circle', circle), [setUrlParam]);
+  const setShowArchived = useCallback((on: boolean) => setUrlParam('archived', on ? '1' : ''), [setUrlParam]);
 
   // Helper to update page in URL
   const setPage = useCallback((newPage: number) => {

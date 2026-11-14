@@ -2,7 +2,8 @@
   "app": {
     "title": "Meerkat CRM",
     "logout": "Logout",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "notFound": "That page does not exist, so you were taken to the dashboard."
   },
   "nav": {
     "dashboard": "Dashboard",

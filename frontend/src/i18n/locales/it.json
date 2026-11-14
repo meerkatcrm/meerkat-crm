@@ -2,7 +2,8 @@
   "app": {
     "title": "Meerkat CRM",
     "logout": "Esci",
-    "loading": "Caricamento in corso..."
+    "loading": "Caricamento in corso...",
+    "notFound": "Questa pagina non esiste, quindi sei stato portato alla dashboard."
   },
   "nav": {
     "dashboard": "Cruscotto",

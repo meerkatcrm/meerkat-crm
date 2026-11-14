@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ApiError, apiFetch, apiJson, parseErrorResponse } from './client';
+import { ApiError, apiFetch, apiJson, parseErrorResponse, takeReturnTo } from './client';
 
 describe('ApiError.getDisplayMessage', () => {
   test('returns the message when there are no details', () => {
@@ -127,7 +127,7 @@ describe('parseErrorResponse with an errorMessage', () => {
 
 describe('apiFetch / apiJson', () => {
   const fetchMock = vi.fn();
-  const location = { href: '/contacts' };
+  const location = { href: '/contacts', pathname: '/contacts', search: '?page=2' };
 
   beforeEach(() => {
     fetchMock.mockReset();
@@ -187,6 +187,19 @@ describe('apiFetch / apiJson', () => {
     await expect(apiFetch('/api/v1/contacts')).rejects.toThrow('Session expired');
     expect(location.href).toBe('/login');
     expect(localStorage.getItem('user_info')).toBeNull();
+  });
+
+  test('a 401 remembers the page so login can return to it', async () => {
+    sessionStorage.clear();
+    fetchMock.mockResolvedValue(new Response('', { status: 401 }));
+    await expect(apiFetch('/api/v1/contacts')).rejects.toThrow('Session expired');
+    expect(takeReturnTo()).toBe('/contacts?page=2');
+    expect(takeReturnTo()).toBeNull();
+  });
+
+  test('takeReturnTo rejects a value that is not a same-origin path', () => {
+    sessionStorage.setItem('return_to', '//evil.example/x');
+    expect(takeReturnTo()).toBeNull();
   });
 
   test('skipAuthRedirect hands a 401 back to the caller', async () => {

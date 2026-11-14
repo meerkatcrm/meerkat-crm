@@ -20,6 +20,20 @@ interface BackendErrorResponse {
 }
 
 // Custom API error class with detailed information
+const RETURN_TO_KEY = 'return_to';
+
+/** The page to open after logging back in, once; null when none was saved. */
+export function takeReturnTo(): string | null {
+  try {
+    const path = sessionStorage.getItem(RETURN_TO_KEY);
+    sessionStorage.removeItem(RETURN_TO_KEY);
+    // Same-origin paths only, so a planted value can't redirect elsewhere
+    return path && /^\/(?![/\\])/.test(path) ? path : null;
+  } catch {
+    return null;
+  }
+}
+
 export class ApiError extends Error {
   code: string;
   status: number;
@@ -162,6 +176,10 @@ export async function apiFetch(
     if (response.status === 401 && !skipAuthRedirect) {
       // Session is invalid or expired - logout and redirect
       localStorage.removeItem('user_info');
+      try {
+        const { pathname = '', search = '' } = window.location;
+        if (pathname && !pathname.startsWith('/login')) sessionStorage.setItem(RETURN_TO_KEY, pathname + search);
+      } catch { /* storage unavailable: the user lands on the dashboard after login */ }
       window.location.href = '/login';
       throw new Error('Session expired. Please login again.');
     }
