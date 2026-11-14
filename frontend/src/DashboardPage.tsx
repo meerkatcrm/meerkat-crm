@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -9,7 +9,6 @@ import {
   Avatar,
   Stack,
   Chip,
-  Alert,
   IconButton,
   Tooltip,
   Popover
@@ -30,6 +29,7 @@ import { handleFetchError, handleError } from './utils/errorHandler';
 import { useDateFormat } from './DateFormatProvider';
 import { isReminderOverdue } from './utils/reminderDue';
 import { useSnackbar } from './context/SnackbarContext';
+import LoadError from './components/LoadError';
 import { useConfirm } from './components/ConfirmDialog';
 import { thumbnailSrc } from './utils/thumbnail';
 import { now } from './utils/now';
@@ -98,7 +98,12 @@ function DashboardPage() {
     loadDashboardData();
   }, [loadDashboardData]);
 
+  // Reminders with a request in flight: a double-click must not send a second one
+  const busyReminders = useRef(new Set<number>());
+
   const handleCompleteReminder = async (reminderId: number) => {
+    if (busyReminders.current.has(reminderId)) return;
+    busyReminders.current.add(reminderId);
     try {
       await completeReminder(reminderId);
       // Reload reminders after completion
@@ -106,6 +111,8 @@ function DashboardPage() {
       setUpcomingReminders(reminders);
     } catch (err) {
       handleError(err, { operation: 'completing reminder' }, { showError });
+    } finally {
+      busyReminders.current.delete(reminderId);
     }
   };
 
@@ -113,6 +120,8 @@ function DashboardPage() {
     if (!(await confirm({ message: t('reminders.skipConfirm'), confirmLabel: t('reminders.skip') }))) {
       return;
     }
+    if (busyReminders.current.has(reminderId)) return;
+    busyReminders.current.add(reminderId);
     try {
       await skipReminder(reminderId);
       // Reload reminders after skipping
@@ -120,6 +129,8 @@ function DashboardPage() {
       setUpcomingReminders(reminders);
     } catch (err) {
       handleError(err, { operation: 'skipping reminder' }, { showError });
+    } finally {
+      busyReminders.current.delete(reminderId);
     }
   };
 
@@ -195,7 +206,7 @@ function DashboardPage() {
   if (error) {
     return (
       <Box sx={{ maxWidth: 1400, mx: 'auto', mt: 2, p: 2 }}>
-        <Alert severity="error">{error}</Alert>
+        <LoadError message={error} onRetry={loadDashboardData} />
       </Box>
     );
   }

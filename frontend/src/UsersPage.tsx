@@ -34,6 +34,7 @@ import SendIcon from '@mui/icons-material/Send';
 import { getUsers, updateUser, deleteUser, triggerReminders } from './api/admin';
 import { isAdmin } from './auth';
 import { useSnackbar } from './context/SnackbarContext';
+import { useConfirm } from './components/ConfirmDialog';
 import type { User, UserUpdateInput } from './types';
 
 export default function UsersPage() {
@@ -41,6 +42,7 @@ export default function UsersPage() {
   const { formatInstantDate } = useDateFormat();
   const navigate = useNavigate();
   const { showSuccess, showError } = useSnackbar();
+  const { confirm, confirmDialog } = useConfirm();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -163,6 +165,8 @@ export default function UsersPage() {
 
   // Trigger reminders handler
   const handleTriggerReminders = async () => {
+    // It emails every user, so ask first
+    if (!(await confirm({ message: t('users.triggerRemindersConfirm'), confirmLabel: t('users.triggerReminders') }))) return;
     setTriggerLoading(true);
     try {
       await triggerReminders();
@@ -382,6 +386,7 @@ export default function UsersPage() {
           </Button>
         </DialogActions>
       </Dialog>
+      {confirmDialog}
     </Box>
   );
 }

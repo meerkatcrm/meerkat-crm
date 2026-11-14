@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   DialogTitle,
@@ -38,7 +39,7 @@ export interface TimelineItemValues {
 interface EditTimelineItemDialogProps {
   open: boolean;
   onClose: () => void;
-  onSave: () => void;
+  onSave: () => void | Promise<void>;
   onDelete: () => void;
   type: 'note' | 'activity';
   values: TimelineItemValues;
@@ -67,8 +68,23 @@ export default function EditTimelineItemDialog({
     ...participantSearch.options.filter((option) => !selectedContacts.some((c) => c.ID === option.ID)),
   ];
 
-  const handleSave = () => {
-    onSave();
+  // A save in flight can't be repeated or dismissed; an empty required field says so
+  const [saving, setSaving] = useState(false);
+  const [attempted, setAttempted] = useState(false);
+  useEffect(() => { if (!open) setAttempted(false); }, [open]);
+  const missing = type === 'note' ? !values.noteContent?.trim() : !values.activityTitle?.trim();
+  const showMissing = attempted && missing;
+  const requiredText = type === 'note' ? t('noteDialog.required') : t('activityDialog.required');
+
+  const handleSave = async () => {
+    setAttempted(true);
+    if (missing) return;
+    setSaving(true);
+    try {
+      await onSave();
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = async () => {
@@ -78,7 +94,7 @@ export default function EditTimelineItemDialog({
   };
 
   return (
-    <AppDialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+    <AppDialog open={open} onClose={onClose} busy={saving} maxWidth="md" fullWidth>
       <DialogTitle>
         {type === 'note' ? t('contactDetail.editNote') : t('contactDetail.editActivity')}
       </DialogTitle>
@@ -94,6 +110,8 @@ export default function EditTimelineItemDialog({
               onChange={(e) => onChange({ ...values, noteContent: e.target.value })}
               label={t('noteDialog.content')}
               placeholder={t('noteDialog.contentPlaceholder')}
+              error={showMissing}
+              helperText={showMissing ? requiredText : undefined}
               autoFocus
             />
             <TextField
@@ -121,6 +139,8 @@ export default function EditTimelineItemDialog({
               value={values.activityTitle || ''}
               onChange={(e) => onChange({ ...values, activityTitle: e.target.value })}
               label={t('activityDialog.activityTitle')}
+              error={showMissing}
+              helperText={showMissing ? requiredText : undefined}
               autoFocus
             />
             <TextField
@@ -189,7 +209,9 @@ export default function EditTimelineItemDialog({
         <IconButton 
           color="error"
           onClick={handleDelete}
+          disabled={saving}
           title={t('contactDetail.delete')}
+          aria-label={t('contactDetail.delete')}
         >
           <DeleteIcon />
         </IconButton>
@@ -197,7 +219,7 @@ export default function EditTimelineItemDialog({
           <Button onClick={onClose} sx={{ mr: 1 }}>
             {t('contactDetail.cancel')}
           </Button>
-          <Button onClick={handleSave} variant="contained">
+          <Button onClick={handleSave} variant="contained" disabled={saving}>
             {t('contactDetail.save')}
           </Button>
         </Box>

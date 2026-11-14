@@ -69,6 +69,7 @@ export default function DuplicatesPage() {
   const handleDismiss = async (pair: DuplicatePair) => {
     try {
       await dismissDuplicate(pair.contacts[0].ID, pair.contacts[1].ID);
+      showSnackbar(t('contacts.duplicates.dismissed'), 'success');
       await refetch();
     } catch (err) {
       showError(getErrorMessage(err));

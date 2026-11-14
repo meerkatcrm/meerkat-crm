@@ -10,6 +10,7 @@ import {
   Chip,
   Box,
   Typography,
+  Alert,
   Stack,
   FormControlLabel,
   Switch
@@ -244,9 +245,9 @@ export default function AddContactDialog({
       <DialogTitle>{t('contacts.add.title')}</DialogTitle>
       <DialogContent>
         {error && (
-          <Typography color="error" sx={{ mb: 2 }}>
+          <Alert severity="error" sx={{ mb: 2 }}>
             {error}
-          </Typography>
+          </Alert>
         )}
         <Stack spacing={2} sx={{ mt: 1 }}>
           {(isOn('prefix') || isOn('suffix')) && (

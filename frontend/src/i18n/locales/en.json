@@ -258,7 +258,8 @@
         "name": "Same name",
         "email": "Same email",
         "phone": "Same phone"
-      }
+      },
+      "dismissed": "Marked as different people"
     },
     "merge": {
       "button": "Merge",
@@ -393,7 +394,8 @@
       "next": "Next",
       "position": "{{position}} of {{total}}",
       "gone": "That contact is no longer in the list"
-    }
+    },
+    "confirmRemoveCircle": "Remove \"{{circle}}\" from this contact?"
   },
   "noteDialog": {
     "title": "Add Note",
@@ -493,7 +495,8 @@
     "close": "Close",
     "back": "Back",
     "continue": "Continue",
-    "add": "Add"
+    "add": "Add",
+    "retry": "Retry"
   },
   "profilePicture": {
     "title": "Upload Profile Picture",
@@ -891,7 +894,8 @@
     },
     "data": {
       "title": "Data"
-    }
+    },
+    "preferenceSyncError": "Saved on this device only; the server couldn't be updated, so it may revert on your next login."
   },
   "pages": {
     "notes": "Notes Page",
@@ -1079,7 +1083,8 @@
     "deleteError": "Failed to delete user",
     "triggerReminders": "Send Reminder Emails",
     "triggerRemindersSuccess": "Reminder emails sent successfully",
-    "triggerRemindersError": "Failed to send reminder emails"
+    "triggerRemindersError": "Failed to send reminder emails",
+    "triggerRemindersConfirm": "Send reminder emails to all users now?"
   },
   "errorBoundary": {
     "title": "Oops! Something went wrong",

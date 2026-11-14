@@ -258,7 +258,8 @@
         "name": "Mismo nombre",
         "email": "Mismo correo",
         "phone": "Mismo teléfono"
-      }
+      },
+      "dismissed": "Marcados como personas distintas"
     },
     "merge": {
       "button": "Fusionar",
@@ -393,7 +394,8 @@
       "next": "Siguiente",
       "position": "{{position}} de {{total}}",
       "gone": "Ese contacto ya no está en la lista"
-    }
+    },
+    "confirmRemoveCircle": "¿Quitar «{{circle}}» de este contacto?"
   },
   "noteDialog": {
     "title": "Agregar Nota",
@@ -493,7 +495,8 @@
     "close": "Cerrar",
     "back": "Atrás",
     "continue": "Continuar",
-    "add": "Agregar"
+    "add": "Agregar",
+    "retry": "Reintentar"
   },
   "profilePicture": {
     "title": "Subir Foto de Perfil",
@@ -891,7 +894,8 @@
     },
     "data": {
       "title": "Datos"
-    }
+    },
+    "preferenceSyncError": "Guardado solo en este dispositivo; no se pudo actualizar el servidor, así que puede revertirse en tu próximo inicio de sesión."
   },
   "pages": {
     "notes": "Página de Notas",
@@ -1079,7 +1083,8 @@
     "deleteError": "Error al eliminar el usuario",
     "triggerReminders": "Enviar Emails de Recordatorio",
     "triggerRemindersSuccess": "Emails de recordatorio enviados exitosamente",
-    "triggerRemindersError": "Error al enviar los emails de recordatorio"
+    "triggerRemindersError": "Error al enviar los emails de recordatorio",
+    "triggerRemindersConfirm": "¿Enviar ahora los correos de recordatorio a todos los usuarios?"
   },
   "errorBoundary": {
     "title": "¡Vaya! Algo salió mal",

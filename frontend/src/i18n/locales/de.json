@@ -258,7 +258,8 @@
         "name": "Gleicher Name",
         "email": "Gleiche E-Mail",
         "phone": "Gleiche Telefonnummer"
-      }
+      },
+      "dismissed": "Als verschiedene Personen markiert"
     },
     "merge": {
       "button": "Zusammenführen",
@@ -393,7 +394,8 @@
       "next": "Weiter",
       "position": "{{position}} von {{total}}",
       "gone": "Dieser Kontakt ist nicht mehr in der Liste"
-    }
+    },
+    "confirmRemoveCircle": "„{{circle}}“ von diesem Kontakt entfernen?"
   },
   "noteDialog": {
     "title": "Notiz hinzufügen",
@@ -493,7 +495,8 @@
     "close": "Schließen",
     "back": "Zurück",
     "continue": "Weiter",
-    "add": "Hinzufügen"
+    "add": "Hinzufügen",
+    "retry": "Erneut versuchen"
   },
   "profilePicture": {
     "title": "Profilbild hochladen",
@@ -891,7 +894,8 @@
     },
     "data": {
       "title": "Daten"
-    }
+    },
+    "preferenceSyncError": "Nur auf diesem Gerät gespeichert; der Server konnte nicht aktualisiert werden, daher kann es sich beim nächsten Login zurücksetzen."
   },
   "pages": {
     "notes": "Notizen Seite",
@@ -1079,7 +1083,8 @@
     "deleteError": "Benutzer konnte nicht gelöscht werden",
     "triggerReminders": "Erinnerungs-E-Mails senden",
     "triggerRemindersSuccess": "Erinnerungs-E-Mails erfolgreich gesendet",
-    "triggerRemindersError": "Fehler beim Senden der Erinnerungs-E-Mails"
+    "triggerRemindersError": "Fehler beim Senden der Erinnerungs-E-Mails",
+    "triggerRemindersConfirm": "Erinnerungs-E-Mails jetzt an alle Benutzer senden?"
   },
   "errorBoundary": {
     "title": "Hoppla! Etwas ist schiefgelaufen",

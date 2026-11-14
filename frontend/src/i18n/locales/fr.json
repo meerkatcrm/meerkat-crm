@@ -258,7 +258,8 @@
         "name": "Même nom",
         "email": "Même e-mail",
         "phone": "Même téléphone"
-      }
+      },
+      "dismissed": "Marqués comme personnes différentes"
     },
     "merge": {
       "button": "Fusionner",
@@ -393,7 +394,8 @@
       "next": "Suivant",
       "position": "{{position}} sur {{total}}",
       "gone": "Ce contact n'est plus dans la liste"
-    }
+    },
+    "confirmRemoveCircle": "Retirer « {{circle}} » de ce contact ?"
   },
   "noteDialog": {
     "title": "Ajouter une note",
@@ -493,7 +495,8 @@
     "close": "Fermer",
     "back": "Retour",
     "continue": "Continuer",
-    "add": "Ajouter"
+    "add": "Ajouter",
+    "retry": "Réessayer"
   },
   "profilePicture": {
     "title": "Télécharger une photo de profil",
@@ -891,7 +894,8 @@
     },
     "data": {
       "title": "Données"
-    }
+    },
+    "preferenceSyncError": "Enregistré sur cet appareil uniquement ; le serveur n'a pas pu être mis à jour, il peut donc revenir en arrière à votre prochaine connexion."
   },
   "pages": {
     "notes": "Page des notes",
@@ -1079,7 +1083,8 @@
     "deleteError": "Échec de la suppression de l'utilisateur",
     "triggerReminders": "Envoyer les e-mails de rappel",
     "triggerRemindersSuccess": "E-mails de rappel envoyés avec succès",
-    "triggerRemindersError": "Échec de l'envoi des e-mails de rappel"
+    "triggerRemindersError": "Échec de l'envoi des e-mails de rappel",
+    "triggerRemindersConfirm": "Envoyer maintenant les e-mails de rappel à tous les utilisateurs ?"
   },
   "errorBoundary": {
     "title": "Oups ! Une erreur s'est produite",

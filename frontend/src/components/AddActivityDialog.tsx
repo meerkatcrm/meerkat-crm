@@ -47,6 +47,7 @@ export default function AddActivityDialog({
   const [selectedContacts, setSelectedContacts] = useState<Contact[]>([]);
   const [image, setImage] = useState<File | null>();
   const [error, setError] = useState('');
+  const [dateError, setDateError] = useState('');
   const [saving, setSaving] = useState(false);
   // Saving before the preselected contact arrives would store the activity without it.
   const [loadingPreselected, setLoadingPreselected] = useState(false);
@@ -95,7 +96,7 @@ export default function AddActivityDialog({
 
     const parsedDate = parseDateInput(date);
     if (!parsedDate) {
-      setError(t('activityDialog.dateError'));
+      setDateError(t('activityDialog.dateError'));
       return;
     }
 
@@ -125,6 +126,7 @@ export default function AddActivityDialog({
     setSearchInput('');
     setImage(undefined);
     setError('');
+    setDateError('');
     onClose();
   };
 
@@ -172,7 +174,9 @@ export default function AddActivityDialog({
             label={t('activityDialog.date')}
             placeholder={getDatePlaceholder()}
             value={date}
-            onChange={(e) => setDate(autoFormatDateInput(e.target.value, date))}
+            onChange={(e) => { setDate(autoFormatDateInput(e.target.value, date)); setDateError(''); }}
+            error={!!dateError}
+            helperText={dateError}
             fullWidth
             required
           />

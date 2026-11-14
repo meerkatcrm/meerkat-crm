@@ -258,7 +258,8 @@
         "name": "Stesso nome",
         "email": "Stessa email",
         "phone": "Stesso telefono"
-      }
+      },
+      "dismissed": "Segnati come persone diverse"
     },
     "merge": {
       "button": "Unisci",
@@ -393,7 +394,8 @@
       "next": "Successivo",
       "position": "{{position}} di {{total}}",
       "gone": "Quel contatto non è più nell'elenco"
-    }
+    },
+    "confirmRemoveCircle": "Rimuovere «{{circle}}» da questo contatto?"
   },
   "noteDialog": {
     "title": "Aggiungi Nota",
@@ -493,7 +495,8 @@
     "close": "Chiudi",
     "back": "Indietro",
     "continue": "Continua",
-    "add": "Aggiungi"
+    "add": "Aggiungi",
+    "retry": "Riprova"
   },
   "profilePicture": {
     "title": "Carica Foto Profilo",
@@ -891,7 +894,8 @@
     },
     "data": {
       "title": "Dati"
-    }
+    },
+    "preferenceSyncError": "Salvato solo su questo dispositivo; il server non è stato aggiornato, quindi potrebbe tornare indietro al prossimo accesso."
   },
   "pages": {
     "notes": "Pagina Note",
@@ -1079,7 +1083,8 @@
     "deleteError": "Impossibile eliminare l'utente",
     "triggerReminders": "Invia Email Promemoria",
     "triggerRemindersSuccess": "Email di promemoria inviate con successo",
-    "triggerRemindersError": "Invio email di promemoria fallito"
+    "triggerRemindersError": "Invio email di promemoria fallito",
+    "triggerRemindersConfirm": "Inviare ora le email di promemoria a tutti gli utenti?"
   },
   "errorBoundary": {
     "title": "Ops! Qualcosa è andato storto",

@@ -64,3 +64,21 @@ test('delete asks for confirmation first', async () => {
   fireEvent.click(within(confirm).getByRole('button', { name: 'Delete' }));
   await waitFor(() => expect(h.onDelete).toHaveBeenCalledTimes(1));
 });
+
+test('saving with empty content says it is required and does not save', () => {
+  const { onSave } = renderDialog({ type: 'note' }, { noteContent: '  ' });
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  expect(screen.getByText('Content is required')).toBeInTheDocument();
+  expect(onSave).not.toHaveBeenCalled();
+});
+
+test('Save is disabled while the save is in flight, so it cannot be repeated', async () => {
+  let finish!: () => void;
+  const onSave = vi.fn(() => new Promise<void>((r) => { finish = r; }));
+  renderDialog({ type: 'note', onSave }, { noteContent: 'Lunch' });
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled());
+  expect(onSave).toHaveBeenCalledTimes(1);
+  finish();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
+});

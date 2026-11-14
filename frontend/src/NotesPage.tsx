@@ -23,6 +23,7 @@ import NoteIcon from '@mui/icons-material/Note';
 import EditIcon from '@mui/icons-material/Edit';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { ListSkeleton } from './components/LoadingSkeletons';
+import LoadError from './components/LoadError';
 import { useNotes } from './hooks/useNotes';
 import { useDebouncedValue } from './hooks/useDebounce';
 import { createUnassignedNote, updateNote, deleteNote, Note } from './api/notes';
@@ -66,6 +67,7 @@ const NotesPage: React.FC = () => {
     page: serverPage,
     limit,
     loading,
+    error: loadError,
     refetch,
   } = useNotes(undefined, notesParams);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -257,7 +259,9 @@ const NotesPage: React.FC = () => {
         </Box>
       </Paper>
 
-      {isInitialLoading ? (
+      {loadError ? (
+        <LoadError message={loadError} onRetry={refetch} />
+      ) : isInitialLoading ? (
         <ListSkeleton count={8} />
       ) : notes.length === 0 ? (
         <Paper sx={{ p: 3, textAlign: 'center' }}>

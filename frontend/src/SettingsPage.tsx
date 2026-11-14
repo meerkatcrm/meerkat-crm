@@ -1,3 +1,4 @@
+import { useSnackbar } from './context/SnackbarContext';
 import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -31,6 +32,7 @@ import { DateFormat, useDateFormat } from './DateFormatProvider';
 
 export default function SettingsPage() {
   const { t, i18n } = useTranslation();
+  const { showError } = useSnackbar();
   const { preference: themePreference, setPreference: setThemePreference } = useThemePreference();
   const { dateFormat, setDateFormat } = useDateFormat();
   const [currentPassword, setCurrentPassword] = useState('');
@@ -52,6 +54,7 @@ export default function SettingsPage() {
       // Silently fail - the frontend language is still updated
       // Backend sync failure doesn't affect UI language
       console.error('Failed to sync language to backend:', error);
+      showError(t('settings.preferenceSyncError'));
     }
   };
 
@@ -71,6 +74,7 @@ export default function SettingsPage() {
       // Silently fail - the frontend date format is still updated
       // Backend sync failure doesn't affect UI date format
       console.error('Failed to sync date format to backend:', error);
+      showError(t('settings.preferenceSyncError'));
     }
   };
 

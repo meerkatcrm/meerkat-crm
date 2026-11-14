@@ -258,7 +258,8 @@
         "name": "姓名相同",
         "email": "电子邮件相同",
         "phone": "电话相同"
-      }
+      },
+      "dismissed": "已标记为不同的人"
     },
     "merge": {
       "button": "合并",
@@ -393,7 +394,8 @@
       "next": "下一个",
       "position": "第 {{position}} 个，共 {{total}} 个",
       "gone": "该联系人已不在列表中"
-    }
+    },
+    "confirmRemoveCircle": "从此联系人中移除“{{circle}}”？"
   },
   "noteDialog": {
     "title": "添加笔记",
@@ -493,7 +495,8 @@
     "close": "关闭",
     "back": "返回",
     "continue": "继续",
-    "add": "添加"
+    "add": "添加",
+    "retry": "重试"
   },
   "profilePicture": {
     "title": "上传头像",
@@ -891,7 +894,8 @@
     },
     "data": {
       "title": "数据"
-    }
+    },
+    "preferenceSyncError": "仅保存在此设备；服务器未能更新，下次登录时可能会恢复。"
   },
   "pages": {
     "notes": "笔记页面",
@@ -1079,7 +1083,8 @@
     "deleteError": "删除用户失败",
     "triggerReminders": "发送提醒邮件",
     "triggerRemindersSuccess": "提醒邮件发送成功",
-    "triggerRemindersError": "发送提醒邮件失败"
+    "triggerRemindersError": "发送提醒邮件失败",
+    "triggerRemindersConfirm": "现在向所有用户发送提醒邮件吗？"
   },
   "errorBoundary": {
     "title": "哎呀！出了点问题",

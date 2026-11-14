@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import LoadError from './components/LoadError';
 import { useContacts } from './hooks/useContacts';
 import { getCircles, getContacts } from './api/contacts';
 import { getCurrentUser } from './api/admin';
@@ -420,7 +421,9 @@ export default function ContactsPage() {
           </Button>
         </Box>
       )}
-      {loading ? (
+      {error ? (
+        <LoadError message={error} onRetry={refetch} />
+      ) : loading ? (
         <ContactListSkeleton count={10} />
       ) : (
         <>

@@ -24,6 +24,7 @@ import {
 import EventIcon from '@mui/icons-material/Event';
 import EditIcon from '@mui/icons-material/Edit';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import LoadError from './components/LoadError';
 import { useActivities } from './hooks/useActivities';
 import { useDebouncedValue } from './hooks/useDebounce';
 import { createActivity, updateActivity, deleteActivity, Activity } from './api/activities';
@@ -73,6 +74,7 @@ const ActivitiesPage: React.FC = () => {
     page: serverPage,
     limit,
     loading,
+    error: loadError,
     refetch,
   } = useActivities(activityParams);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -292,7 +294,9 @@ const ActivitiesPage: React.FC = () => {
         </Box>
       </Paper>
 
-      {isInitialLoading ? (
+      {loadError ? (
+        <LoadError message={loadError} onRetry={refetch} />
+      ) : isInitialLoading ? (
         <ListSkeleton count={8} />
       ) : activities.length === 0 ? (
         <Paper sx={{ p: 4, textAlign: 'center' }}>

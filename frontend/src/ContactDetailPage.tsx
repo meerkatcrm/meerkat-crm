@@ -554,6 +554,7 @@ function ContactDetail() {
 
   const handleDeleteCircle = async (circleToDelete: string) => {
     if (!contact) return;
+    if (!(await confirm({ message: t('contactDetail.confirmRemoveCircle', { circle: circleToDelete }), confirmLabel: t('common.delete') }))) return;
 
     const updatedCircles = (contact.circles || []).filter(circle => circle !== circleToDelete);
 
