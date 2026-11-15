@@ -15,7 +15,6 @@ import {
 } from './api/contacts';
 import { exportContactAsVcf } from './api/export';
 import { getCurrentUser } from './api/admin';
-import { setSelfContact } from './api/users';
 import { resolveEnabledFields, ContactFieldKey } from './contactFields';
 import { 
   getContactNotes, 
@@ -154,8 +153,8 @@ function ContactDetail() {
   // Enabled extended contact fields (UI visibility)
   const [enabledFields, setEnabledFields] = useState<Set<ContactFieldKey>>(() => resolveEnabledFields(null));
   const [hideEmptyFields, setHideEmptyFields] = useState(false);
-  // The contact marked as the user themself; undefined until /users/me has answered.
-  const [selfContactId, setSelfContactIdState] = useState<number | null | undefined>(undefined);
+  // The contact marked as the user themself in Settings, if any.
+  const [selfContactId, setSelfContactId] = useState<number | null>(null);
 
   // Unified refresh function for notes, activities, and completions
   const refreshNotesAndActivities = async () => {
@@ -294,7 +293,7 @@ function ContactDetail() {
         setCustomFieldNames(user?.custom_field_names ?? []);
         setEnabledFields(resolveEnabledFields(user?.enabled_contact_fields ?? null));
         setHideEmptyFields(user?.hide_empty_contact_fields ?? false);
-        setSelfContactIdState(user ? user.self_contact_id ?? null : undefined);
+        setSelfContactId(user?.self_contact_id ?? null);
 
         // Second batch: refresh reminders, relationships, and employment history in parallel
         await Promise.all([
@@ -693,22 +692,6 @@ function ContactDetail() {
 
   const isSelf = contact != null && selfContactId === contact.ID;
 
-  const handleToggleSelf = async () => {
-    if (!contact) return;
-    try {
-      const next = await setSelfContact(isSelf ? null : contact.ID);
-      setSelfContactIdState(next);
-      showSnackbar(next === null ? t('contactDetail.self.unmarked') : t('contactDetail.self.marked'), 'success');
-    } catch (err) {
-      console.error('Error updating self contact:', err);
-      if (err instanceof ApiError) {
-        showError(err.getDisplayMessage());
-      } else {
-        showError(t('contactDetail.updateError'));
-      }
-    }
-  };
-
   const handleUnarchiveContact = async () => {
     if (!contact || !id) return;
 
@@ -829,7 +812,6 @@ function ContactDetail() {
         onExportVcard={handleExportVcard}
         onMergeContact={() => setMergeDialogOpen(true)}
         isSelf={isSelf}
-        onToggleSelf={selfContactId === undefined ? undefined : handleToggleSelf}
       />
 
       {/* General Information and Timeline - Two Column Layout */}

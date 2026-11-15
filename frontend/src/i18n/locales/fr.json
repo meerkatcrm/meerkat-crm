@@ -395,11 +395,7 @@
       "gone": "Ce contact n'est plus dans la liste"
     },
     "self": {
-      "badge": "Moi",
-      "mark": "C'est moi",
-      "unmark": "Ce n'est pas moi",
-      "marked": "Marqué comme vous",
-      "unmarked": "N'est plus marqué comme vous"
+      "badge": "Moi"
     }
   },
   "noteDialog": {
@@ -531,6 +527,15 @@
   },
   "settings": {
     "title": "Paramètres",
+    "self": {
+      "title": "Moi",
+      "label": "Contact qui vous représente",
+      "placeholder": "Rechercher des contacts",
+      "description": "Facultatif. Le contact choisi reçoit un badge « Moi », est exclu des suggestions d'anniversaires et de prise de nouvelles, et le réseau peut être centré sur lui. Videz le champ pour retirer la marque.",
+      "saved": "Contact marqué comme vous",
+      "cleared": "Plus aucun contact n'est marqué comme vous",
+      "error": "Impossible de modifier le contact qui vous représente"
+    },
     "language": {
       "title": "Langue",
       "label": "Langue",

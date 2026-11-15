@@ -11,7 +11,6 @@ import UnarchiveIcon from '@mui/icons-material/Unarchive';
 import ContactMailIcon from '@mui/icons-material/ContactMail';
 import CallMergeIcon from '@mui/icons-material/CallMerge';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
-import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined';
 import { useTranslation } from 'react-i18next';
 import { ContactFieldKey, resolveEnabledFields } from '../contactFields';
 import { contactDisplayName } from '../utils/contactName';
@@ -62,10 +61,8 @@ interface ContactHeaderProps {
   onUnarchiveContact?: () => void;
   onExportVcard?: () => void;
   onMergeContact?: () => void;
-  /** True when this contact is marked as the user themself ("me"). */
+  /** True when this contact is marked as the user themself ("me"); the mark is set in Settings. */
   isSelf?: boolean;
-  /** Marks this contact as "me", or clears the mark when it already is. */
-  onToggleSelf?: () => void;
 }
 
 export default function ContactHeader({
@@ -92,8 +89,7 @@ export default function ContactHeader({
   onUnarchiveContact,
   onExportVcard,
   onMergeContact,
-  isSelf = false,
-  onToggleSelf
+  isSelf = false
 }: ContactHeaderProps) {
   const { t } = useTranslation();
   const enabled = enabledFields ?? resolveEnabledFields(null);
@@ -289,19 +285,6 @@ export default function ContactHeader({
                       <Tooltip title={t('contactDetail.exportVcard')}>
                         <IconButton size="small" onClick={() => onExportVcard()}>
                           <ContactMailIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    )}
-                    {onToggleSelf && (
-                      <Tooltip title={isSelf ? t('contactDetail.self.unmark') : t('contactDetail.self.mark')}>
-                        <IconButton
-                          size="small"
-                          onClick={() => onToggleSelf()}
-                          aria-label={isSelf ? t('contactDetail.self.unmark') : t('contactDetail.self.mark')}
-                          aria-pressed={isSelf}
-                          color={isSelf ? 'primary' : 'default'}
-                        >
-                          {isSelf ? <AccountCircleIcon fontSize="small" /> : <AccountCircleOutlinedIcon fontSize="small" />}
                         </IconButton>
                       </Tooltip>
                     )}

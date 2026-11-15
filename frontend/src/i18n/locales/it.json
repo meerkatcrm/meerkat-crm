@@ -395,11 +395,7 @@
       "gone": "Quel contatto non è più nell'elenco"
     },
     "self": {
-      "badge": "Io",
-      "mark": "Questo sono io",
-      "unmark": "Questo non sono io",
-      "marked": "Contrassegnato come te",
-      "unmarked": "Non più contrassegnato come te"
+      "badge": "Io"
     }
   },
   "noteDialog": {
@@ -531,6 +527,15 @@
   },
   "settings": {
     "title": "Impostazioni",
+    "self": {
+      "title": "Io",
+      "label": "Contatto che ti rappresenta",
+      "placeholder": "Cerca contatti",
+      "description": "Facoltativo. Il contatto scelto riceve un badge «Io», viene escluso dai suggerimenti di compleanni e di restare in contatto, e la rete può essere centrata su di esso. Svuota il campo per rimuovere il contrassegno.",
+      "saved": "Contatto contrassegnato come te",
+      "cleared": "Nessun contatto è più contrassegnato come te",
+      "error": "Impossibile modificare quale contatto sei tu"
+    },
     "language": {
       "title": "Lingua",
       "label": "Lingua",

@@ -395,11 +395,7 @@
       "gone": "Ese contacto ya no está en la lista"
     },
     "self": {
-      "badge": "Yo",
-      "mark": "Este soy yo",
-      "unmark": "Este no soy yo",
-      "marked": "Marcado como tú",
-      "unmarked": "Ya no está marcado como tú"
+      "badge": "Yo"
     }
   },
   "noteDialog": {
@@ -531,6 +527,15 @@
   },
   "settings": {
     "title": "Configuración",
+    "self": {
+      "title": "Yo",
+      "label": "Contacto que te representa",
+      "placeholder": "Buscar contactos",
+      "description": "Opcional. El contacto elegido recibe una insignia «Yo», se excluye de las sugerencias de cumpleaños y de mantener el contacto, y la red puede centrarse en él. Vacía el campo para quitar la marca.",
+      "saved": "Contacto marcado como tú",
+      "cleared": "Ningún contacto está marcado como tú",
+      "error": "No se pudo cambiar qué contacto eres tú"
+    },
     "language": {
       "title": "Idioma",
       "label": "Idioma",

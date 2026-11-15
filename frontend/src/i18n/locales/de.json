@@ -395,11 +395,7 @@
       "gone": "Dieser Kontakt ist nicht mehr in der Liste"
     },
     "self": {
-      "badge": "Ich",
-      "mark": "Das bin ich",
-      "unmark": "Das bin nicht ich",
-      "marked": "Als du markiert",
-      "unmarked": "Nicht mehr als du markiert"
+      "badge": "Ich"
     }
   },
   "noteDialog": {
@@ -531,6 +527,15 @@
   },
   "settings": {
     "title": "Einstellungen",
+    "self": {
+      "title": "Ich",
+      "label": "Kontakt, der dich darstellt",
+      "placeholder": "Kontakte durchsuchen",
+      "description": "Optional. Der gewählte Kontakt erhält ein „Ich“-Abzeichen, wird bei Geburtstags- und Kontaktvorschlägen ausgelassen, und das Netzwerk kann auf ihn zentriert werden. Leere das Feld, um die Markierung zu entfernen.",
+      "saved": "Kontakt als du markiert",
+      "cleared": "Kein Kontakt ist mehr als du markiert",
+      "error": "Konnte nicht ändern, welcher Kontakt du bist"
+    },
     "language": {
       "title": "Sprache",
       "label": "Sprache",

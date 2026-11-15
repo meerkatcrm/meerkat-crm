@@ -395,11 +395,7 @@
       "gone": "That contact is no longer in the list"
     },
     "self": {
-      "badge": "Me",
-      "mark": "This is me",
-      "unmark": "This is not me",
-      "marked": "Marked as you",
-      "unmarked": "No longer marked as you"
+      "badge": "Me"
     }
   },
   "noteDialog": {
@@ -531,6 +527,15 @@
   },
   "settings": {
     "title": "Settings",
+    "self": {
+      "title": "Me",
+      "label": "Contact that represents you",
+      "placeholder": "Search contacts",
+      "description": "Optional. The chosen contact gets a \"Me\" badge, is left out of birthday and stay-in-touch suggestions, and the network graph can center on it. Clear the field to remove the mark.",
+      "saved": "Contact marked as you",
+      "cleared": "No contact is marked as you anymore",
+      "error": "Unable to update which contact is you"
+    },
     "language": {
       "title": "Language",
       "label": "Language",

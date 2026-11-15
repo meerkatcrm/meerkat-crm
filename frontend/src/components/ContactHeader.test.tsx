@@ -1,5 +1,5 @@
-import { test, expect, vi, afterEach, beforeEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { test, expect, afterEach, beforeEach } from 'vitest';
+import { render, screen, cleanup } from '@testing-library/react';
 import { I18nextProvider } from 'react-i18next';
 import i18n from '../i18n/config';
 import ContactHeader, { ProfileValues } from './ContactHeader';
@@ -14,7 +14,7 @@ afterEach(() => {
   cleanup();
 });
 
-function renderHeader(props: { isSelf?: boolean; onToggleSelf?: () => void }) {
+function renderHeader(props: { isSelf?: boolean }) {
   const noop = () => {};
   render(
     <I18nextProvider i18n={i18n}>
@@ -41,25 +41,13 @@ function renderHeader(props: { isSelf?: boolean; onToggleSelf?: () => void }) {
   );
 }
 
-test('a contact that is not "me" offers to mark it and shows no badge', () => {
-  const onToggleSelf = vi.fn();
-  renderHeader({ isSelf: false, onToggleSelf });
-
-  expect(screen.queryByText('Me')).toBeNull();
-  fireEvent.click(screen.getByRole('button', { name: 'This is me' }));
-  expect(onToggleSelf).toHaveBeenCalledTimes(1);
-});
-
-test('the "me" contact shows a badge and offers to clear the mark', () => {
-  const onToggleSelf = vi.fn();
-  renderHeader({ isSelf: true, onToggleSelf });
-
+test('the "me" contact shows a badge', () => {
+  renderHeader({ isSelf: true });
   expect(screen.getByText('Me')).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'This is not me' }));
-  expect(onToggleSelf).toHaveBeenCalledTimes(1);
 });
 
-test('without a handler the toggle is hidden', () => {
-  renderHeader({});
-  expect(screen.queryByRole('button', { name: 'This is me' })).toBeNull();
+test('another contact shows no badge and no way to mark it here (that lives in Settings)', () => {
+  renderHeader({ isSelf: false });
+  expect(screen.queryByText('Me')).toBeNull();
+  expect(screen.queryByRole('button', { name: /me/i })).toBeNull();
 });
