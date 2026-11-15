@@ -393,6 +393,9 @@
       "next": "Successivo",
       "position": "{{position}} di {{total}}",
       "gone": "Quel contatto non è più nell'elenco"
+    },
+    "self": {
+      "badge": "Io"
     }
   },
   "noteDialog": {
@@ -524,6 +527,15 @@
   },
   "settings": {
     "title": "Impostazioni",
+    "self": {
+      "title": "Io",
+      "label": "Contatto che ti rappresenta",
+      "placeholder": "Cerca contatti",
+      "description": "Facoltativo. Il contatto scelto riceve un badge «Io» e viene escluso dai suggerimenti di compleanni e di restare in contatto. Svuota il campo per rimuovere il contrassegno.",
+      "saved": "Contatto contrassegnato come te",
+      "cleared": "Nessun contatto è più contrassegnato come te",
+      "error": "Impossibile modificare quale contatto sei tu"
+    },
     "language": {
       "title": "Lingua",
       "label": "Lingua",
@@ -916,7 +928,8 @@
       "circleEdge": "Appartenenza a Cerchia"
     },
     "filterByContact": "Centra sul Contatto",
-    "showCircles": "Cerchie"
+    "showCircles": "Cerchie",
+    "centerOnMe": "Centra su di me"
   },
   "employmentHistory": {
     "title": "Storico lavorativo",

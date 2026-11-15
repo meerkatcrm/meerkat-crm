@@ -28,6 +28,7 @@ import { isDemoMode } from './auth';
 import { updateLanguage, updateDateFormat } from './api/users';
 import { ThemePreference, useThemePreference } from './AppThemeProvider';
 import { DateFormat, useDateFormat } from './DateFormatProvider';
+import SelfContactSettings from './components/SelfContactSettings';
 
 export default function SettingsPage() {
   const { t, i18n } = useTranslation();
@@ -149,6 +150,8 @@ export default function SettingsPage() {
           </Box>
         </CardContent>
       </Card>
+
+      <SelfContactSettings />
 
       <Card sx={{ mb: 2 }}>
         <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>

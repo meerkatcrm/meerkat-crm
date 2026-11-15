@@ -70,6 +70,8 @@ func RegisterRoutes(router *gin.Engine, cfg *config.Config, db *gorm.DB, oidcPro
 			protected.GET("/users/carddav-circle-filter", controllers.GetCardDAVCircleFilter)
 			protected.PATCH("/users/carddav-circle-filter", middleware.ValidateJSONMiddleware(&models.CardDAVCircleFilterInput{}), controllers.UpdateCardDAVCircleFilter)
 			protected.GET("/users/me", controllers.GetCurrentUser)
+			protected.PUT("/users/self-contact", middleware.ValidateJSONMiddleware(&models.SelfContactInput{}), controllers.SetSelfContact)
+			protected.DELETE("/users/self-contact", controllers.ClearSelfContact)
 
 			// Contact routes
 			protected.GET("/contacts", controllers.GetContacts)

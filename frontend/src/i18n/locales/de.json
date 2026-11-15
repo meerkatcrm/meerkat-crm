@@ -393,6 +393,9 @@
       "next": "Weiter",
       "position": "{{position}} von {{total}}",
       "gone": "Dieser Kontakt ist nicht mehr in der Liste"
+    },
+    "self": {
+      "badge": "Ich"
     }
   },
   "noteDialog": {
@@ -524,6 +527,15 @@
   },
   "settings": {
     "title": "Einstellungen",
+    "self": {
+      "title": "Ich",
+      "label": "Kontakt, der dich darstellt",
+      "placeholder": "Kontakte durchsuchen",
+      "description": "Optional. Der gewählte Kontakt erhält ein „Ich“-Abzeichen und wird bei Geburtstags- und Kontaktvorschlägen ausgelassen. Leere das Feld, um die Markierung zu entfernen.",
+      "saved": "Kontakt als du markiert",
+      "cleared": "Kein Kontakt ist mehr als du markiert",
+      "error": "Konnte nicht ändern, welcher Kontakt du bist"
+    },
     "language": {
       "title": "Sprache",
       "label": "Sprache",
@@ -916,7 +928,8 @@
       "circleEdge": "Kreiszugehörigkeit"
     },
     "filterByContact": "Kontakt zentrieren",
-    "showCircles": "Kreise"
+    "showCircles": "Kreise",
+    "centerOnMe": "Auf mich zentrieren"
   },
   "employmentHistory": {
     "title": "Berufsverlauf",

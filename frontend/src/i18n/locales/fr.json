@@ -393,6 +393,9 @@
       "next": "Suivant",
       "position": "{{position}} sur {{total}}",
       "gone": "Ce contact n'est plus dans la liste"
+    },
+    "self": {
+      "badge": "Moi"
     }
   },
   "noteDialog": {
@@ -524,6 +527,15 @@
   },
   "settings": {
     "title": "Paramètres",
+    "self": {
+      "title": "Moi",
+      "label": "Contact qui vous représente",
+      "placeholder": "Rechercher des contacts",
+      "description": "Facultatif. Le contact choisi reçoit un badge « Moi » et est exclu des suggestions d'anniversaires et de prise de nouvelles. Videz le champ pour retirer la marque.",
+      "saved": "Contact marqué comme vous",
+      "cleared": "Plus aucun contact n'est marqué comme vous",
+      "error": "Impossible de modifier le contact qui vous représente"
+    },
     "language": {
       "title": "Langue",
       "label": "Langue",
@@ -916,7 +928,8 @@
       "circleEdge": "Appartenance à un cercle"
     },
     "filterByContact": "Centrer sur le contact",
-    "showCircles": "Cercles"
+    "showCircles": "Cercles",
+    "centerOnMe": "Centrer sur moi"
   },
   "employmentHistory": {
     "title": "Parcours professionnel",

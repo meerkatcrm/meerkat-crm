@@ -153,6 +153,8 @@ function ContactDetail() {
   // Enabled extended contact fields (UI visibility)
   const [enabledFields, setEnabledFields] = useState<Set<ContactFieldKey>>(() => resolveEnabledFields(null));
   const [hideEmptyFields, setHideEmptyFields] = useState(false);
+  // The contact marked as the user themself in Settings, if any.
+  const [selfContactId, setSelfContactId] = useState<number | null>(null);
 
   // Unified refresh function for notes, activities, and completions
   const refreshNotesAndActivities = async () => {
@@ -291,6 +293,7 @@ function ContactDetail() {
         setCustomFieldNames(user?.custom_field_names ?? []);
         setEnabledFields(resolveEnabledFields(user?.enabled_contact_fields ?? null));
         setHideEmptyFields(user?.hide_empty_contact_fields ?? false);
+        setSelfContactId(user?.self_contact_id ?? null);
 
         // Second batch: refresh reminders, relationships, and employment history in parallel
         await Promise.all([
@@ -687,6 +690,8 @@ function ContactDetail() {
     }
   };
 
+  const isSelf = contact != null && selfContactId === contact.ID;
+
   const handleUnarchiveContact = async () => {
     if (!contact || !id) return;
 
@@ -801,11 +806,12 @@ function ContactDetail() {
         onDeleteCircle={handleDeleteCircle}
         onNewCircleNameChange={setNewCircleName}
         onUploadProfilePicture={isDemoMode() ? undefined : () => setProfilePictureDialogOpen(true)}
-        onStayInTouch={contact.archived ? undefined : handleStayInTouch}
+        onStayInTouch={contact.archived || isSelf ? undefined : handleStayInTouch}
         onArchiveContact={contact.archived ? undefined : handleArchiveContact}
         onUnarchiveContact={contact.archived ? handleUnarchiveContact : undefined}
         onExportVcard={handleExportVcard}
         onMergeContact={() => setMergeDialogOpen(true)}
+        isSelf={isSelf}
       />
 
       {/* General Information and Timeline - Two Column Layout */}
@@ -842,7 +848,7 @@ function ContactDetail() {
           onDeleteRelationship={handleDeleteRelationship}
           customFieldNames={customFieldNames}
           reminders={reminders}
-          onToggleBirthdayReminder={handleToggleBirthdayReminder}
+          onToggleBirthdayReminder={isSelf ? undefined : handleToggleBirthdayReminder}
           employmentHistory={employmentHistory}
           onAddEmploymentHistory={handleAddEmploymentHistory}
           onEditEmploymentHistory={handleEditEmploymentHistory}

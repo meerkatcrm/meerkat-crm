@@ -26,8 +26,10 @@ type User struct {
 	CardDAVCircleMode      string   `gorm:"column:carddav_circle_mode;default:'all'" json:"carddav_circle_mode"`
 	CardDAVCircles         []string `gorm:"column:carddav_circles;type:text;serializer:json" json:"carddav_circles"`
 	HideEmptyContactFields bool     `gorm:"default:false" json:"hide_empty_contact_fields"`
-	OIDCSubject            *string  `gorm:"column:oidc_subject"`
-	OIDCProvider           *string  `gorm:"column:oidc_provider"`
+	// The contact that represents this user ("me"), if they marked one. See SetSelfContact.
+	SelfContactID *uint   `gorm:"column:self_contact_id" json:"self_contact_id"`
+	OIDCSubject   *string `gorm:"column:oidc_subject"`
+	OIDCProvider  *string `gorm:"column:oidc_provider"`
 }
 
 // dummyPasswordHash lets a failed login for an account without a password hash cost the same

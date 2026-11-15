@@ -56,6 +56,7 @@ export default function ContactsPage() {
   const [customFieldNames, setCustomFieldNames] = useState<string[]>([]);
   const [enabledFields, setEnabledFields] = useState<Set<ContactFieldKey>>(() => resolveEnabledFields(null));
   const [showArchived, setShowArchived] = useState(false);
+  const [selfContactId, setSelfContactId] = useState<number | null>(null);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
   const [selectingAll, setSelectingAll] = useState(false);
@@ -132,6 +133,7 @@ export default function ContactsPage() {
         setCircles(Array.isArray(circlesData) ? circlesData : []);
         setCustomFieldNames(user.custom_field_names ?? []);
         setEnabledFields(resolveEnabledFields(user.enabled_contact_fields));
+        setSelfContactId(user.self_contact_id ?? null);
       } catch (err) {
         console.error('Error fetching circles or custom field names:', err);
       }
@@ -476,6 +478,14 @@ export default function ContactsPage() {
                     <Typography variant="body1" sx={{ fontWeight: 500 }}>
                       {contactDisplayName(contact, { nickname: true })}
                     </Typography>
+                    {contact.ID === selfContactId && (
+                      <Chip
+                        label={t('contactDetail.self.badge')}
+                        size="small"
+                        color="primary"
+                        sx={{ height: 20, fontSize: '0.7rem' }}
+                      />
+                    )}
                     {contact.archived && (
                       <Chip
                         label={t('contacts.archived')}

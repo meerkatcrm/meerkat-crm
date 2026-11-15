@@ -616,6 +616,57 @@ func UpdateContactFieldDisplay(c *gin.Context) {
 	})
 }
 
+// SetSelfContact marks one of the caller's contacts as themself ("me"). The id lives on the user
+// row, so marking a contact moves the mark off any other one: there is never more than one.
+func SetSelfContact(c *gin.Context) {
+	input, appErr := middleware.GetValidated[models.SelfContactInput](c)
+	if appErr != nil {
+		apperrors.AbortWithError(c, appErr)
+		return
+	}
+	contactID := input.ContactID
+	writeSelfContact(c, &contactID)
+}
+
+// ClearSelfContact removes the "me" mark. The contact itself is untouched.
+func ClearSelfContact(c *gin.Context) {
+	writeSelfContact(c, nil)
+}
+
+func writeSelfContact(c *gin.Context, contactID *uint) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		return
+	}
+	db := c.MustGet("db").(*gorm.DB)
+
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if contactID != nil {
+			if _, appErr := loadOwned[models.Contact](tx, userID, *contactID, "Contact"); appErr != nil {
+				return appErr
+			}
+		}
+		result := tx.Model(&models.User{}).Where("id = ?", userID).Update("self_contact_id", contactID)
+		if result.Error != nil {
+			return apperrors.ErrDatabase("update user").WithError(result.Error)
+		}
+		if result.RowsAffected == 0 {
+			return apperrors.ErrUnauthorized("Authentication required")
+		}
+		return nil
+	})
+	if err != nil {
+		var appErr *apperrors.AppError
+		if !errors.As(err, &appErr) {
+			appErr = apperrors.ErrDatabase("update user").WithError(err)
+		}
+		apperrors.AbortWithError(c, appErr)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"self_contact_id": contactID})
+}
+
 // GetCardDAVCircleFilter returns which circles the built-in CardDAV server shows the user's devices
 func GetCardDAVCircleFilter(c *gin.Context) {
 	log := logger.FromContext(c)

@@ -10,6 +10,7 @@ import ArchiveIcon from '@mui/icons-material/Archive';
 import UnarchiveIcon from '@mui/icons-material/Unarchive';
 import ContactMailIcon from '@mui/icons-material/ContactMail';
 import CallMergeIcon from '@mui/icons-material/CallMerge';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import { useTranslation } from 'react-i18next';
 import { ContactFieldKey, resolveEnabledFields } from '../contactFields';
 import { contactDisplayName } from '../utils/contactName';
@@ -60,6 +61,8 @@ interface ContactHeaderProps {
   onUnarchiveContact?: () => void;
   onExportVcard?: () => void;
   onMergeContact?: () => void;
+  /** True when this contact is marked as the user themself ("me"); the mark is set in Settings. */
+  isSelf?: boolean;
 }
 
 export default function ContactHeader({
@@ -85,7 +88,8 @@ export default function ContactHeader({
   onArchiveContact,
   onUnarchiveContact,
   onExportVcard,
-  onMergeContact
+  onMergeContact,
+  isSelf = false
 }: ContactHeaderProps) {
   const { t } = useTranslation();
   const enabled = enabledFields ?? resolveEnabledFields(null);
@@ -228,13 +232,24 @@ export default function ContactHeader({
             ) : (
               // View Mode
               <>
-                {contact.archived && (
-                  <Chip
-                    label={t('contactDetail.archivedBadge')}
-                    color="warning"
-                    size="small"
-                    sx={{ mb: 1 }}
-                  />
+                {(isSelf || contact.archived) && (
+                  <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
+                    {isSelf && (
+                      <Chip
+                        icon={<AccountCircleIcon />}
+                        label={t('contactDetail.self.badge')}
+                        color="primary"
+                        size="small"
+                      />
+                    )}
+                    {contact.archived && (
+                      <Chip
+                        label={t('contactDetail.archivedBadge')}
+                        color="warning"
+                        size="small"
+                      />
+                    )}
+                  </Stack>
                 )}
                 <Box
                   sx={{

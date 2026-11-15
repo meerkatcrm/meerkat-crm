@@ -393,6 +393,9 @@
       "next": "Next",
       "position": "{{position}} of {{total}}",
       "gone": "That contact is no longer in the list"
+    },
+    "self": {
+      "badge": "Me"
     }
   },
   "noteDialog": {
@@ -524,6 +527,15 @@
   },
   "settings": {
     "title": "Settings",
+    "self": {
+      "title": "Me",
+      "label": "Contact that represents you",
+      "placeholder": "Search contacts",
+      "description": "Optional. The chosen contact gets a \"Me\" badge and is left out of birthday and stay-in-touch suggestions. Clear the field to remove the mark.",
+      "saved": "Contact marked as you",
+      "cleared": "No contact is marked as you anymore",
+      "error": "Unable to update which contact is you"
+    },
     "language": {
       "title": "Language",
       "label": "Language",
@@ -916,7 +928,8 @@
       "circleEdge": "Circle Membership"
     },
     "filterByContact": "Center on Contact",
-    "showCircles": "Circles"
+    "showCircles": "Circles",
+    "centerOnMe": "Center on me"
   },
   "employmentHistory": {
     "title": "Employment History",
