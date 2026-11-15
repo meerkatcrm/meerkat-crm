@@ -419,7 +419,7 @@ export default function ContactHeader({
                       value={newCircleName}
                       onChange={(e) => onNewCircleNameChange(e.target.value)}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
+                        if (e.key === 'Enter' && !e.nativeEvent.isComposing && e.keyCode !== 229) {
                           onAddCircle();
                         }
                       }}
