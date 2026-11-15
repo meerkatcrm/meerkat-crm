@@ -531,7 +531,7 @@
       "title": "Yo",
       "label": "Contacto que te representa",
       "placeholder": "Buscar contactos",
-      "description": "Opcional. El contacto elegido recibe una insignia «Yo», se excluye de las sugerencias de cumpleaños y de mantener el contacto, y la red puede centrarse en él. Vacía el campo para quitar la marca.",
+      "description": "Opcional. El contacto elegido recibe una insignia «Yo» y se excluye de las sugerencias de cumpleaños y de mantener el contacto. Vacía el campo para quitar la marca.",
       "saved": "Contacto marcado como tú",
       "cleared": "Ningún contacto está marcado como tú",
       "error": "No se pudo cambiar qué contacto eres tú"

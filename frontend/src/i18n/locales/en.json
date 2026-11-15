@@ -531,7 +531,7 @@
       "title": "Me",
       "label": "Contact that represents you",
       "placeholder": "Search contacts",
-      "description": "Optional. The chosen contact gets a \"Me\" badge, is left out of birthday and stay-in-touch suggestions, and the network graph can center on it. Clear the field to remove the mark.",
+      "description": "Optional. The chosen contact gets a \"Me\" badge and is left out of birthday and stay-in-touch suggestions. Clear the field to remove the mark.",
       "saved": "Contact marked as you",
       "cleared": "No contact is marked as you anymore",
       "error": "Unable to update which contact is you"

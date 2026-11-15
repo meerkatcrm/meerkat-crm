@@ -531,7 +531,7 @@
       "title": "Ich",
       "label": "Kontakt, der dich darstellt",
       "placeholder": "Kontakte durchsuchen",
-      "description": "Optional. Der gewählte Kontakt erhält ein „Ich“-Abzeichen, wird bei Geburtstags- und Kontaktvorschlägen ausgelassen, und das Netzwerk kann auf ihn zentriert werden. Leere das Feld, um die Markierung zu entfernen.",
+      "description": "Optional. Der gewählte Kontakt erhält ein „Ich“-Abzeichen und wird bei Geburtstags- und Kontaktvorschlägen ausgelassen. Leere das Feld, um die Markierung zu entfernen.",
       "saved": "Kontakt als du markiert",
       "cleared": "Kein Kontakt ist mehr als du markiert",
       "error": "Konnte nicht ändern, welcher Kontakt du bist"

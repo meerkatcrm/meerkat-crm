@@ -531,7 +531,7 @@
       "title": "Moi",
       "label": "Contact qui vous représente",
       "placeholder": "Rechercher des contacts",
-      "description": "Facultatif. Le contact choisi reçoit un badge « Moi », est exclu des suggestions d'anniversaires et de prise de nouvelles, et le réseau peut être centré sur lui. Videz le champ pour retirer la marque.",
+      "description": "Facultatif. Le contact choisi reçoit un badge « Moi » et est exclu des suggestions d'anniversaires et de prise de nouvelles. Videz le champ pour retirer la marque.",
       "saved": "Contact marqué comme vous",
       "cleared": "Plus aucun contact n'est marqué comme vous",
       "error": "Impossible de modifier le contact qui vous représente"
