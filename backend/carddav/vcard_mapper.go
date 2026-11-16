@@ -148,9 +148,18 @@ func ContactToVCard(contact *models.Contact, photoDir string) vcard.Card {
 		card.Add(vcard.FieldIMPP, &vcard.Field{Value: im.Value, Params: params})
 	}
 
-	// BDAY (birthday) - vCard 3.0 uses YYYY-MM-DD; store as-is (--MM-DD is also accepted)
+	// BDAY (birthday) - vCard 3.0 uses YYYY-MM-DD. It has no form without a
+	// year: iOS misreads --MM-DD (as year 2) and saves that back, so a yearless
+	// birthday is sent the way Apple writes one, with a placeholder year.
 	if contact.Birthday != "" {
-		card.SetValue(vcard.FieldBirthday, contact.Birthday)
+		if isYearlessDate(contact.Birthday) {
+			card.Set(vcard.FieldBirthday, &vcard.Field{
+				Value:  appleOmitYear + contact.Birthday[1:],
+				Params: vcard.Params{"X-APPLE-OMIT-YEAR": []string{appleOmitYear}},
+			})
+		} else {
+			card.SetValue(vcard.FieldBirthday, contact.Birthday)
+		}
 	}
 
 	// ANNIVERSARY
@@ -399,9 +408,14 @@ func VCardToContact(card vcard.Card, existing *models.Contact) (*models.Contact,
 		}
 	}
 
-	// BDAY
-	if bday := card.Value(vcard.FieldBirthday); bday != "" {
-		contact.Birthday = normalizeBirthday(bday)
+	// BDAY. Apple marks a yearless birthday with X-APPLE-OMIT-YEAR, naming the
+	// placeholder year written in the value.
+	if f := card.Get(vcard.FieldBirthday); f != nil && f.Value != "" {
+		bday := normalizeBirthday(f.Value)
+		if omit := f.Params.Get("X-APPLE-OMIT-YEAR"); omit != "" && len(bday) == 10 && bday[:4] == omit {
+			bday = "-" + bday[4:]
+		}
+		contact.Birthday = bday
 	}
 
 	// GENDER
@@ -1034,6 +1048,15 @@ func mapGenderToVCard(gender string) string {
 	default:
 		return ""
 	}
+}
+
+// appleOmitYear is the placeholder year Apple Contacts writes into a yearless
+// date, alongside an X-APPLE-OMIT-YEAR parameter naming it.
+const appleOmitYear = "1604"
+
+// isYearlessDate reports whether a stored date is in the --MM-DD form.
+func isYearlessDate(date string) bool {
+	return len(date) == 7 && strings.HasPrefix(date, "--") && date[4] == '-'
 }
 
 // normalizeBirthday ensures birthday is in YYYY-MM-DD or --MM-DD format for storage

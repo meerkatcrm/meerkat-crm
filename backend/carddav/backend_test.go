@@ -216,3 +216,32 @@ func serveCardDAV(t *testing.T, db *gorm.DB, method, path, body string) *httptes
 	router.ServeHTTP(w, req)
 	return w
 }
+
+// A yearless birthday must survive an iOS round trip: GET sends Apple's
+// X-APPLE-OMIT-YEAR form, and a PUT in that form or as --MM-DD stores --MM-DD.
+func TestYearlessBirthdaySurvivesPut(t *testing.T) {
+	_, _, db := setupCircleFilterBackend(t, models.CardDAVCircleModeAll, nil)
+	if err := db.Model(&models.Contact{}).Where("vcard_uid = ?", "none").Update("birthday", "--11-24").Error; err != nil {
+		t.Fatalf("set birthday: %v", err)
+	}
+	birthday := func() string {
+		var c models.Contact
+		db.Where("vcard_uid = ?", "none").First(&c)
+		return c.Birthday
+	}
+
+	w := serveCardDAV(t, db, http.MethodGet, "/carddav/addressbooks/tester/contacts/none.vcf", "")
+	if !strings.Contains(w.Body.String(), "BDAY;X-APPLE-OMIT-YEAR=1604:1604-11-24") {
+		t.Fatalf("GET did not send the Apple yearless form:\n%s", w.Body.String())
+	}
+
+	for _, bday := range []string{"BDAY;X-APPLE-OMIT-YEAR=1604;VALUE=date:1604-11-24", "BDAY:--11-24"} {
+		card := "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:none\r\nFN:Stranger\r\nN:;Stranger;;;\r\n" + bday + "\r\nEND:VCARD\r\n"
+		if w := serveCardDAV(t, db, http.MethodPut, "/carddav/addressbooks/tester/contacts/none.vcf", card); w.Code >= 300 {
+			t.Fatalf("PUT %s: got %d", bday, w.Code)
+		}
+		if got := birthday(); got != "--11-24" {
+			t.Fatalf("PUT %s stored birthday %q, want --11-24", bday, got)
+		}
+	}
+}

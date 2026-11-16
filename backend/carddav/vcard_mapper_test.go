@@ -528,3 +528,46 @@ func TestContactToVCard_IgnoresStaleNoteInExtra(t *testing.T) {
 		assert.Equal(t, "current", card[vcard.FieldNote][0].Value)
 	}
 }
+
+// iOS reads a vCard 3.0 BDAY of --11-24 as January 24 of year 2 and saves that
+// back, so a yearless birthday goes out in Apple's X-APPLE-OMIT-YEAR form.
+func TestContactToVCard_YearlessBirthdayUsesAppleForm(t *testing.T) {
+	var buf bytes.Buffer
+	if err := vcard.NewEncoder(&buf).Encode(ContactToVCard(&models.Contact{Firstname: "Jane", Birthday: "--11-24"}, "")); err != nil {
+		t.Fatalf("encode: %v", err)
+	}
+	assert.Contains(t, buf.String(), "BDAY;X-APPLE-OMIT-YEAR=1604:1604-11-24\r\n")
+
+	card, err := vcard.NewDecoder(&buf).Decode()
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	back, _, _, _ := VCardToContact(card, nil)
+	assert.Equal(t, "--11-24", back.Birthday)
+}
+
+func TestContactToVCard_FullBirthdayUnchanged(t *testing.T) {
+	card := ContactToVCard(&models.Contact{Firstname: "Jane", Birthday: "1990-11-24"}, "")
+	f := card.Get(vcard.FieldBirthday)
+	assert.Equal(t, "1990-11-24", f.Value)
+	assert.Empty(t, f.Params.Get("X-APPLE-OMIT-YEAR"))
+
+	back, _, _, _ := VCardToContact(card, nil)
+	assert.Equal(t, "1990-11-24", back.Birthday)
+}
+
+func TestVCardToContact_YearlessBirthdayForms(t *testing.T) {
+	for bday, want := range map[string]string{
+		"BDAY;X-APPLE-OMIT-YEAR=1604:1604-11-24":          "--11-24",
+		"BDAY;VALUE=date;X-APPLE-OMIT-YEAR=1604:16041124": "--11-24",
+		"BDAY:--11-24": "--11-24",
+		"BDAY:--1124":  "--11-24",
+		// A real year that only differs from the omitted one is kept.
+		"BDAY;X-APPLE-OMIT-YEAR=1604:1990-11-24": "1990-11-24",
+		"BDAY:1604-11-24":                        "1604-11-24",
+	} {
+		card := decodeVCF(t, "BEGIN:VCARD\nVERSION:3.0\nFN:Jane\n"+bday+"\nEND:VCARD\n")
+		got, _, _, _ := VCardToContact(card, nil)
+		assert.Equal(t, want, got.Birthday, bday)
+	}
+}
