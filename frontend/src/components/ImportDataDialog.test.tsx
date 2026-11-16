@@ -76,6 +76,44 @@ test('checks the file first, then imports it on confirmation', async () => {
   expect(screen.getByRole('columnheader', { name: 'Added' })).toBeInTheDocument();
 });
 
+test('choosing another file drops the old preview until the new one arrives', async () => {
+  mocked.importDataExport.mockResolvedValueOnce(result());
+  renderDialog();
+  choose('first.csv');
+  await screen.findByText('This is what the import will do:');
+  expect(screen.getByRole('button', { name: 'Import' })).toBeEnabled();
+
+  let finish: (value: DataImportResult) => void = () => undefined;
+  mocked.importDataExport.mockReturnValueOnce(new Promise((resolve) => (finish = resolve)));
+  const second = choose('second.csv');
+
+  expect(screen.queryByText('This is what the import will do:')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Import' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+
+  await act(async () => finish(result({ contacts: { created: 7, existing: 0, skipped: 0 } })));
+  const contactsRow = screen.getByRole('row', { name: /Contacts/ });
+  expect(within(contactsRow).getAllByRole('cell')[0]).toHaveTextContent('7');
+
+  mocked.importDataExport.mockResolvedValueOnce(result({ dry_run: false }));
+  fireEvent.click(screen.getByRole('button', { name: 'Import' }));
+  await screen.findByText('Import complete.');
+  expect(mocked.importDataExport).toHaveBeenLastCalledWith(second, false);
+});
+
+test('a failed check of a second file leaves nothing to import', async () => {
+  mocked.importDataExport.mockResolvedValueOnce(result());
+  renderDialog();
+  choose('first.csv');
+  await screen.findByText('This is what the import will do:');
+
+  mocked.importDataExport.mockRejectedValueOnce(new Error('this file is not a Meerkat data export'));
+  choose('second.csv');
+  await screen.findByText('this file is not a Meerkat data export');
+  expect(screen.queryByText('This is what the import will do:')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Import' })).toBeDisabled();
+});
+
 test('does not offer an import when everything is already there', async () => {
   mocked.importDataExport.mockResolvedValueOnce(
     result({ contacts: { created: 0, existing: 3, skipped: 0 }, activities: { created: 0, existing: 2, skipped: 0 } })

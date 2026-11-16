@@ -277,6 +277,11 @@ func TestImportData_RejectsOtherFiles(t *testing.T) {
 	w = doUpload(t, r, "/import", "file", "contacts.vcf", []byte("BEGIN:VCARD\n"))
 	assert.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
 
+	// A dry_run value that can't be read must not turn into a real import.
+	w = doUpload(t, r, "/import?dry_run=yes-please", "file", "meerkat-export.csv",
+		[]byte("=== CONTACTS ===\nID,Firstname\n1,Ann\n"))
+	assert.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+
 	var count int64
 	db.Model(&models.Contact{}).Where("user_id = ?", user.ID).Count(&count)
 	assert.Zero(t, count)

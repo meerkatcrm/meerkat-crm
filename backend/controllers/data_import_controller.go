@@ -38,7 +38,16 @@ func ImportData(c *gin.Context) {
 		apperrors.AbortWithError(c, apperrors.ErrInvalidInput("file", "File must be a CSV file"))
 		return
 	}
-	dryRun, _ := strconv.ParseBool(c.Query("dry_run"))
+	// An unreadable value must not fall back to a real import.
+	dryRun := false
+	if raw := c.Query("dry_run"); raw != "" {
+		parsed, err := strconv.ParseBool(raw)
+		if err != nil {
+			apperrors.AbortWithError(c, apperrors.ErrInvalidInput("dry_run", "dry_run must be true or false"))
+			return
+		}
+		dryRun = parsed
+	}
 
 	f, err := file.Open()
 	if err != nil {
