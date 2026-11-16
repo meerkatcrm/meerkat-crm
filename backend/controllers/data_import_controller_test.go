@@ -381,3 +381,42 @@ func TestImportData_UnresolvedRelatedContactIsReported(t *testing.T) {
 	require.NoError(t, db.Where("user_id = ? AND name = ?", user.ID, "Bo").First(&bo).Error)
 	assert.Nil(t, bo.RelatedContactID)
 }
+
+func TestImportData_SelfLinkedRelationshipKeepsItsLink(t *testing.T) {
+	db := newTestDB(t)
+	user := newTestUser(t, db, "owner", false)
+	file := "=== CONTACTS ===\nID,Firstname\n1,Ann\n\n=== RELATIONSHIPS ===\n" +
+		"ID,Contact ID,Contact Name,Name,Type,Gender,Birthday,Related Contact ID,Related Contact Name,Created At,Updated At\n" +
+		"1,1,Ann ,Ann,Self,,,1,Ann ,,\n"
+
+	result := importCSV(t, db, user.ID, "/import", []byte(file))
+	assert.Equal(t, models.DataImportCount{Created: 1}, result.Relationships)
+	assert.Empty(t, result.Warnings)
+
+	var rel models.Relationship
+	require.NoError(t, db.Where("user_id = ?", user.ID).First(&rel).Error)
+	require.NotNil(t, rel.RelatedContactID)
+	assert.Equal(t, rel.ContactID, *rel.RelatedContactID)
+}
+
+// Two contacts in the file that both match one existing contact: a relationship between
+// them would point back at its own contact, so the link is left out and reported.
+func TestImportData_RelationshipBetweenMergedContactsIsReported(t *testing.T) {
+	db := newTestDB(t)
+	user := newTestUser(t, db, "owner", false)
+	require.NoError(t, db.Create(&models.Contact{UserID: user.ID, Firstname: "Sam", Lastname: "Lee",
+		Emails: []models.ContactEmail{{Value: "sam@example.com"}}}).Error)
+	file := "=== CONTACTS ===\nID,Firstname,Lastname,Email\n1,Sam,Lee,\n2,Samuel,L,sam@example.com\n\n=== RELATIONSHIPS ===\n" +
+		"ID,Contact ID,Contact Name,Name,Type,Gender,Birthday,Related Contact ID,Related Contact Name,Created At,Updated At\n" +
+		"1,1,Sam Lee,Samuel L,Friend,,,2,Samuel L,,\n"
+
+	result := importCSV(t, db, user.ID, "/import", []byte(file))
+	assert.Equal(t, models.DataImportCount{Existing: 2}, result.Contacts)
+	assert.Equal(t, models.DataImportCount{Created: 1}, result.Relationships)
+	require.Len(t, result.Warnings, 1)
+	assert.Contains(t, result.Warnings[0], "matched the same existing contact")
+
+	var rel models.Relationship
+	require.NoError(t, db.Where("user_id = ?", user.ID).First(&rel).Error)
+	assert.Nil(t, rel.RelatedContactID)
+}

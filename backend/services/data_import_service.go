@@ -485,12 +485,19 @@ func (imp *dataImporter) importRelationships(s *exportSection) error {
 			StartDate: strings.TrimSpace(row.get("Start Date")),
 			EndDate:   strings.TrimSpace(row.get("End Date")),
 		}
-		relatedMissing := false
+		relatedMissing, relatedMerged := false, false
 		if fileID := strings.TrimSpace(row.get("Related Contact ID")); fileID != "" {
-			if related, ok := imp.contactFor(fileID); !ok {
+			related, ok := imp.contactFor(fileID)
+			switch {
+			case !ok:
 				relatedMissing = true
-			} else if related != contactID {
+			case related != contactID || fileID == strings.TrimSpace(row.get("Contact ID")):
+				// A link to the relationship's own contact is kept when the file has it so.
 				rel.RelatedContactID = &related
+			default:
+				// Two different contacts in the file matched the same contact here; linking
+				// would point the relationship back at its own contact.
+				relatedMerged = true
 			}
 		}
 		if problems := middleware.ValidateStruct(&rel); len(problems) > 0 {
@@ -524,6 +531,9 @@ func (imp *dataImporter) importRelationships(s *exportSection) error {
 		count.Created++
 		if relatedMissing {
 			imp.result.warn("Relationship %q (row %d): its related contact is not in the import and was not linked", rel.Name, n)
+		}
+		if relatedMerged {
+			imp.result.warn("Relationship %q (row %d): its related contact matched the same existing contact as the relationship's own contact, so it was not linked", rel.Name, n)
 		}
 		return nil
 	})
