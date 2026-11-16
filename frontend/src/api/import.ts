@@ -218,3 +218,34 @@ export async function confirmVCFImport(
     }),
   });
 }
+
+// Per-kind outcome of re-importing a Meerkat data export
+export interface DataImportCount {
+  created: number;
+  existing: number; // already in the account; left unchanged
+  skipped: number; // could not be imported (see warnings)
+}
+
+export interface DataImportResult {
+  dry_run: boolean;
+  contacts: DataImportCount;
+  relationships: DataImportCount;
+  activities: DataImportCount;
+  notes: DataImportCount;
+  reminders: DataImportCount;
+  custom_fields_added: string[];
+  warnings: string[];
+  more_warnings: number;
+}
+
+// Re-import a CSV file from "Export Data". With dryRun nothing is saved; the result says
+// what a real import would do.
+export async function importDataExport(file: File, dryRun: boolean): Promise<DataImportResult> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  return apiJson(`/import${dryRun ? '?dry_run=true' : ''}`, {
+    method: 'POST',
+    body: formData,
+  });
+}

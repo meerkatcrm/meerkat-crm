@@ -103,3 +103,26 @@ type ImportSession struct {
 	PreviewRows   []ImportRowPreview
 	PreviewCached bool
 }
+
+// DataImportCount reports, for one kind of record in a re-imported data export, how
+// many were created, how many were already there (and left unchanged), and how many
+// could not be imported.
+type DataImportCount struct {
+	Created  int `json:"created"`
+	Existing int `json:"existing"`
+	Skipped  int `json:"skipped"`
+}
+
+// ContactExportHeaders are the fixed columns of the CONTACTS section of the data export
+// (GET /export), in order. The export appends one column per custom field after them,
+// and the importer reads every column not listed here as a custom field, so both sides
+// must use this list.
+var ContactExportHeaders = []string{
+	"ID", "Firstname", "Lastname", "Nickname", "Gender", "Email", "Phone",
+	"Birthday", "Address", "How We Met", "Food Preference", "Work Information",
+	"Contact Information", "Note", "Circles",
+	"Prefix", "Middle Name", "Suffix", "Organization", "Department", "Job Title", "Role",
+	"Anniversary", "Deceased", "Deceased Date", "Archived",
+	"Emails", "Phones", "Addresses", "URLs", "Messaging",
+	"Created At", "Updated At",
+}

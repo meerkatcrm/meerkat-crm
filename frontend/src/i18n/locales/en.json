@@ -581,6 +581,41 @@
       "success": "Your data has been exported successfully.",
       "error": "Failed to export data. Please try again."
     },
+    "dataImport": {
+      "title": "Import Data",
+      "description": "Restore a CSV file from \"Export Data\" into this account, for example a backup or an export from another account or Meerkat instance. Contacts you already have are kept as they are, and nothing is added twice.",
+      "button": "Import CSV",
+      "dialogIntro": "Choose a CSV file created with \"Export Data\". It is checked first; nothing is saved until you confirm.",
+      "chooseFile": "Choose file",
+      "chooseAnother": "Choose another file",
+      "analyzing": "Checking file...",
+      "importing": "Importing...",
+      "previewIntro": "This is what the import will do:",
+      "nothingToImport": "Everything in this file is already in your account.",
+      "nothingImportable": "Nothing in this file can be imported. The warnings below explain why.",
+      "success": "Import complete.",
+      "importButton": "Import",
+      "columns": {
+        "toAdd": "To add",
+        "added": "Added",
+        "existing": "Already there",
+        "skipped": "Skipped"
+      },
+      "kinds": {
+        "contacts": "Contacts",
+        "relationships": "Relationships",
+        "activities": "Activities",
+        "notes": "Notes",
+        "reminders": "Reminders"
+      },
+      "existingHint": "\"Already there\" means a matching contact or entry exists in your account; it is left unchanged. Profile photos and images are not part of the export.",
+      "customFieldsAdded": "New custom fields: {{fields}}",
+      "warnings": "Warnings: {{count}}",
+      "moreWarnings": "…and {{count}} more",
+      "notCsv": "Please choose a CSV file.",
+      "tooLarge": "The file is too large. The maximum size is {{size}} MB.",
+      "error": "The import failed. Please try again."
+    },
     "exportVcf": {
       "title": "Export Contacts as VCF",
       "description": "Download all your contacts as a VCF (vCard) file. This format is compatible with most contact apps and includes profile photos.",

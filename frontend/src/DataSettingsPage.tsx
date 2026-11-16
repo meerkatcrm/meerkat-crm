@@ -13,6 +13,7 @@ import {
 } from '@mui/material';
 import DownloadIcon from '@mui/icons-material/Download';
 import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
+import UploadIcon from '@mui/icons-material/Upload';
 import { exportDataAsCsv, exportContactsAsVcf } from './api/export';
 import CustomFieldsSettings from './components/CustomFieldsSettings';
 import ContactFieldSettings from './components/ContactFieldSettings';
@@ -20,10 +21,14 @@ import CalendarSyncSettings from './components/CalendarSyncSettings';
 import ContactSyncSettings from './components/ContactSyncSettings';
 import CardDAVCircleFilterSettings from './components/CardDAVCircleFilterSettings';
 import MonicaImportDialog from './components/MonicaImportDialog';
+import ImportDataDialog from './components/ImportDataDialog';
 
 export default function DataSettingsPage() {
   const { t } = useTranslation();
   const [monicaDialogOpen, setMonicaDialogOpen] = useState(false);
+  const [importDataOpen, setImportDataOpen] = useState(false);
+  // Bumped after an import that added custom fields, so that card loads the new list.
+  const [customFieldsVersion, setCustomFieldsVersion] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState('');
   const [exportSuccess, setExportSuccess] = useState('');
@@ -71,7 +76,7 @@ export default function DataSettingsPage() {
 
       <ContactFieldSettings />
 
-      <CustomFieldsSettings />
+      <CustomFieldsSettings key={customFieldsVersion} />
 
       <CalendarSyncSettings />
 
@@ -143,6 +148,42 @@ export default function DataSettingsPage() {
           </Stack>
         </CardContent>
       </Card>
+
+      <Card sx={{ mb: 2 }}>
+        <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+            <UploadIcon sx={{ mr: 1, color: 'text.secondary', fontSize: 20 }} />
+            <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
+              {t('settings.dataImport.title')}
+            </Typography>
+          </Box>
+          <Divider sx={{ mb: 1.5 }} />
+
+          <Stack spacing={1.5}>
+            <Typography variant="body2" sx={{
+              color: "text.secondary"
+            }}>
+              {t('settings.dataImport.description')}
+            </Typography>
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<UploadIcon />}
+              onClick={() => setImportDataOpen(true)}
+            >
+              {t('settings.dataImport.button')}
+            </Button>
+          </Stack>
+        </CardContent>
+      </Card>
+
+      <ImportDataDialog
+        open={importDataOpen}
+        onClose={() => setImportDataOpen(false)}
+        onImportComplete={(result) => {
+          if (result.custom_fields_added.length > 0) setCustomFieldsVersion((v) => v + 1);
+        }}
+      />
 
       <Card sx={{ mb: 2 }}>
         <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>

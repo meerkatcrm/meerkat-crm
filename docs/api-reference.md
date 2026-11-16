@@ -200,12 +200,15 @@ Creating a contact with these fields, `PUT /contacts/:id`, importing, or a CardD
 | `POST` | `/contacts/import/confirm` | Execute the import with per-row decisions |
 | `POST` | `/contacts/import/vcf/upload` | Upload a VCF file, returns contacts with duplicate detection |
 | `POST` | `/contacts/import/vcf/confirm` | Execute the VCF import |
+| `POST` | `/import` | Import a file from `GET /export` into the current account (multipart field `file`). Add `?dry_run=true` to get the result without saving anything |
+
+`POST /import` returns, for `contacts`, `relationships`, `activities`, `notes` and `reminders`, how many records were `created`, how many were `existing` (already in the account and left unchanged) and how many were `skipped`. It also returns `custom_fields_added`, `warnings` (at most 50) and `more_warnings` (how many more there were). Contacts are matched to existing ones by email, name or phone, as in the CSV import; importing the same file twice adds nothing. A file that is not a data export, or a `dry_run` value other than `true`, `false`, `1`, `0`, `t` or `f` (as written or in capitals), is rejected with `400`.
 
 ### Export
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/export` | Download all data as CSV |
+| `GET` | `/export` | Download all data as CSV, in sections (`=== CONTACTS ===`, `=== RELATIONSHIPS ===`, `=== ACTIVITIES ===`, `=== NOTES ===`, `=== REMINDERS ===`) that `POST /import` reads back |
 | `GET` | `/export/vcf` | Download all contacts as VCF (includes photos) |
 
 ### Network

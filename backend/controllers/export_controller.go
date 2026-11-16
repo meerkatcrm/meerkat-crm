@@ -11,6 +11,7 @@ import (
 	"meerkat/models"
 	"net/http"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -94,15 +95,9 @@ func ExportData(c *gin.Context) {
 	buf.WriteString("=== CONTACTS ===\n")
 	writer.Flush()
 
-	contactHeaders := []string{
-		"ID", "Firstname", "Lastname", "Nickname", "Gender", "Email", "Phone",
-		"Birthday", "Address", "How We Met", "Food Preference", "Work Information",
-		"Contact Information", "Note", "Circles",
-		"Prefix", "Middle Name", "Suffix", "Organization", "Department", "Job Title", "Role",
-		"Anniversary", "Deceased", "Deceased Date", "Archived",
-		"Emails", "Phones", "Addresses", "URLs", "Messaging",
-		"Created At", "Updated At",
-	}
+	// One list shared with the importer (services.ImportDataExport), so a column added
+	// here is read back as that field, not mistaken for a custom field.
+	contactHeaders := slices.Clone(models.ContactExportHeaders)
 	// Add custom field names as additional headers
 	contactHeaders = append(contactHeaders, customFieldNames...)
 	if err := writer.Write(contactHeaders); err != nil {
@@ -218,6 +213,9 @@ func ExportData(c *gin.Context) {
 
 	activityHeaders := []string{
 		"ID", "Title", "Description", "Location", "Date", "Contact Names", "Created At", "Updated At",
+		// Appended last so existing column positions stay stable for consumers. Lets a
+		// re-import link activities to the right contacts when two share a name.
+		"Contact IDs",
 	}
 	if err := writer.Write(activityHeaders); err != nil {
 		log.Error().Err(err).Msg("Failed to write activity headers")
@@ -227,8 +225,10 @@ func ExportData(c *gin.Context) {
 
 	for _, activity := range activities {
 		contactNames := make([]string, len(activity.Contacts))
+		contactIDs := make([]string, len(activity.Contacts))
 		for i, contact := range activity.Contacts {
 			contactNames[i] = fmt.Sprintf("%s %s", contact.Firstname, contact.Lastname)
+			contactIDs[i] = strconv.FormatUint(uint64(contact.ID), 10)
 		}
 		record := []string{
 			fmt.Sprintf("%d", activity.ID),
@@ -239,6 +239,7 @@ func ExportData(c *gin.Context) {
 			strings.Join(contactNames, "; "),
 			activity.CreatedAt.Format(time.RFC3339),
 			activity.UpdatedAt.Format(time.RFC3339),
+			strings.Join(contactIDs, "; "),
 		}
 		if err := writer.Write(record); err != nil {
 			log.Error().Err(err).Msg("Failed to write activity record")
@@ -290,6 +291,10 @@ func ExportData(c *gin.Context) {
 	reminderHeaders := []string{
 		"ID", "Contact ID", "Contact Name", "Message", "Remind At", "Recurrence",
 		"By Mail", "Reoccur From Completion", "Completed", "Last Sent", "Created At", "Updated At",
+		// Appended last so existing column positions stay stable. Whether the current
+		// occurrence was emailed; Last Sent alone can't tell, since a recurring reminder
+		// keeps it after moving on to its next date.
+		"Email Sent",
 	}
 	if err := writer.Write(reminderHeaders); err != nil {
 		log.Error().Err(err).Msg("Failed to write reminder headers")
@@ -333,6 +338,7 @@ func ExportData(c *gin.Context) {
 			lastSent,
 			reminder.CreatedAt.Format(time.RFC3339),
 			reminder.UpdatedAt.Format(time.RFC3339),
+			strconv.FormatBool(reminder.EmailSent),
 		}
 		if err := writer.Write(record); err != nil {
 			log.Error().Err(err).Msg("Failed to write reminder record")

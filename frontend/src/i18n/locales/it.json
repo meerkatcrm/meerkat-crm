@@ -581,6 +581,41 @@
       "success": "I tuoi dati sono stati esportati con successo.",
       "error": "Esportazione dati fallita. Riprova."
     },
+    "dataImport": {
+      "title": "Importa dati",
+      "description": "Ripristina in questo account un file CSV creato con \"Esporta Dati\", ad esempio un backup o un'esportazione da un altro account o da un'altra istanza di Meerkat. I contatti già presenti restano invariati e nulla viene aggiunto due volte.",
+      "button": "Importa CSV",
+      "dialogIntro": "Scegli un file CSV creato con \"Esporta Dati\". Viene prima controllato; nulla viene salvato finché non confermi.",
+      "chooseFile": "Scegli file",
+      "chooseAnother": "Scegli un altro file",
+      "analyzing": "Controllo del file...",
+      "importing": "Importazione...",
+      "previewIntro": "Ecco cosa farà l'importazione:",
+      "nothingToImport": "Tutto il contenuto di questo file è già nel tuo account.",
+      "nothingImportable": "Nulla di questo file può essere importato. Gli avvisi qui sotto spiegano il motivo.",
+      "success": "Importazione completata.",
+      "importButton": "Importa",
+      "columns": {
+        "toAdd": "Da aggiungere",
+        "added": "Aggiunti",
+        "existing": "Già presenti",
+        "skipped": "Saltati"
+      },
+      "kinds": {
+        "contacts": "Contatti",
+        "relationships": "Relazioni",
+        "activities": "Attività",
+        "notes": "Note",
+        "reminders": "Promemoria"
+      },
+      "existingHint": "\"Già presenti\" significa che nel tuo account esiste un contatto o una voce corrispondente; resta invariato. Foto profilo e immagini non fanno parte dell'esportazione.",
+      "customFieldsAdded": "Nuovi campi personalizzati: {{fields}}",
+      "warnings": "Avvisi: {{count}}",
+      "moreWarnings": "…e altri {{count}}",
+      "notCsv": "Scegli un file CSV.",
+      "tooLarge": "Il file è troppo grande. La dimensione massima è {{size}} MB.",
+      "error": "Importazione non riuscita. Riprova."
+    },
     "exportVcf": {
       "title": "Esporta Contatti come VCF",
       "description": "Scarica tutti i tuoi contatti come file VCF (vCard). Questo formato è compatibile con la maggior parte delle app contatti e include le foto profilo.",

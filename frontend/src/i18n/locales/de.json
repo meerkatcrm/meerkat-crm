@@ -581,6 +581,41 @@
       "success": "Ihre Daten wurden erfolgreich exportiert.",
       "error": "Daten konnten nicht exportiert werden. Bitte versuchen Sie es erneut."
     },
+    "dataImport": {
+      "title": "Daten importieren",
+      "description": "Stellen Sie eine CSV-Datei aus \"Daten exportieren\" in diesem Konto wieder her, zum Beispiel ein Backup oder einen Export aus einem anderen Konto oder einer anderen Meerkat-Instanz. Vorhandene Kontakte bleiben unverändert, und nichts wird doppelt angelegt.",
+      "button": "CSV importieren",
+      "dialogIntro": "Wählen Sie eine mit \"Daten exportieren\" erstellte CSV-Datei. Sie wird zuerst geprüft; gespeichert wird erst nach Ihrer Bestätigung.",
+      "chooseFile": "Datei auswählen",
+      "chooseAnother": "Andere Datei auswählen",
+      "analyzing": "Datei wird geprüft...",
+      "importing": "Wird importiert...",
+      "previewIntro": "Der Import wird Folgendes tun:",
+      "nothingToImport": "Alles in dieser Datei ist bereits in Ihrem Konto vorhanden.",
+      "nothingImportable": "Aus dieser Datei kann nichts importiert werden. Die Warnungen unten erklären, warum.",
+      "success": "Import abgeschlossen.",
+      "importButton": "Importieren",
+      "columns": {
+        "toAdd": "Neu",
+        "added": "Hinzugefügt",
+        "existing": "Bereits vorhanden",
+        "skipped": "Übersprungen"
+      },
+      "kinds": {
+        "contacts": "Kontakte",
+        "relationships": "Beziehungen",
+        "activities": "Aktivitäten",
+        "notes": "Notizen",
+        "reminders": "Erinnerungen"
+      },
+      "existingHint": "\"Bereits vorhanden\" heißt, dass ein passender Kontakt oder Eintrag in Ihrem Konto existiert; er bleibt unverändert. Profilfotos und Bilder sind nicht Teil des Exports.",
+      "customFieldsAdded": "Neue benutzerdefinierte Felder: {{fields}}",
+      "warnings": "Warnungen: {{count}}",
+      "moreWarnings": "…und {{count}} weitere",
+      "notCsv": "Bitte wählen Sie eine CSV-Datei.",
+      "tooLarge": "Die Datei ist zu groß. Die maximale Größe beträgt {{size}} MB.",
+      "error": "Der Import ist fehlgeschlagen. Bitte versuchen Sie es erneut."
+    },
     "exportVcf": {
       "title": "Kontakte als VCF exportieren",
       "description": "Laden Sie alle Ihre Kontakte als VCF-Datei (vCard) herunter. Dieses Format ist mit den meisten Kontakt-Apps kompatibel und enthält Profilfotos.",
