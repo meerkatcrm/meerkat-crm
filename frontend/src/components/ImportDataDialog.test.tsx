@@ -38,11 +38,11 @@ function choose(name: string) {
   return file;
 }
 
-function renderDialog() {
+function renderDialog(onImportComplete?: (result: DataImportResult) => void) {
   const onClose = vi.fn();
   render(
     <I18nextProvider i18n={i18n}>
-      <ImportDataDialog open onClose={onClose} />
+      <ImportDataDialog open onClose={onClose} onImportComplete={onImportComplete} />
     </I18nextProvider>
   );
   return onClose;
@@ -112,6 +112,21 @@ test('a failed check of a second file leaves nothing to import', async () => {
   await screen.findByText('this file is not a Meerkat data export');
   expect(screen.queryByText('This is what the import will do:')).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Import' })).toBeDisabled();
+});
+
+test('reports a finished import, but not the check, to the page', async () => {
+  const onImportComplete = vi.fn();
+  mocked.importDataExport.mockResolvedValueOnce(result({ custom_fields_added: ['Pet name'] }));
+  renderDialog(onImportComplete);
+  choose('meerkat-export.csv');
+  await screen.findByText('This is what the import will do:');
+  expect(onImportComplete).not.toHaveBeenCalled();
+
+  const done = result({ dry_run: false, custom_fields_added: ['Pet name'] });
+  mocked.importDataExport.mockResolvedValueOnce(done);
+  fireEvent.click(screen.getByRole('button', { name: 'Import' }));
+  await screen.findByText('Import complete.');
+  expect(onImportComplete).toHaveBeenCalledExactlyOnceWith(done);
 });
 
 test('does not offer an import when everything is already there', async () => {

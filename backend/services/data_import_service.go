@@ -58,6 +58,14 @@ func (r exportRow) get(column string) string {
 	return r.cells[i]
 }
 
+// at returns the cell in column position i ("" when the row is shorter).
+func (r exportRow) at(i int) string {
+	if i < 0 || i >= len(r.cells) {
+		return ""
+	}
+	return r.cells[i]
+}
+
 func (r exportRow) has(column string) bool {
 	_, ok := r.index[column]
 	return ok
@@ -247,6 +255,27 @@ func sameSecond(a, b time.Time) bool {
 	return a.Truncate(time.Second).Equal(b.Truncate(time.Second))
 }
 
+// parseFlag reads a true/false cell. An empty cell gives def; a non-empty cell
+// ParseBool can't read also gives def, with ok false so the caller can report it.
+func parseFlag(cell string, def bool) (value, ok bool) {
+	cell = strings.TrimSpace(cell)
+	if cell == "" {
+		return def, true
+	}
+	v, err := strconv.ParseBool(cell)
+	if err != nil {
+		return def, false
+	}
+	return v, true
+}
+
+// customColumn is a custom-field column of the CONTACTS section, read by position: a
+// custom field named like a fixed column ("Note") shares its header with that column.
+type customColumn struct {
+	name  string
+	index int
+}
+
 // splitTypedList reverses controllers.joinTyped: "type: value; value; type: value".
 // A part is read as typed only when the text before the first ": " looks like a type
 // label (short, no comma), so a value that merely contains ": " stays whole.
@@ -297,7 +326,7 @@ var droppableContactFields = map[string]func(*models.Contact){
 // contactFromExportRow builds a contact from one CONTACTS row. It returns the reason
 // when the row cannot be imported, and the names of the fields whose values had to be
 // dropped.
-func contactFromExportRow(userID uint, row exportRow, customColumns []string) (models.Contact, []string, string) {
+func contactFromExportRow(userID uint, row exportRow, customColumns []customColumn) (models.Contact, []string, string) {
 	text := func(column string) string { return strings.TrimSpace(row.get(column)) }
 	contact := models.Contact{
 		UserID:             userID,
@@ -325,8 +354,9 @@ func contactFromExportRow(userID uint, row exportRow, customColumns []string) (m
 		Anniversary:        text("Anniversary"),
 		DeceasedDate:       text("Deceased Date"),
 	}
-	contact.IsDeceased, _ = strconv.ParseBool(text("Deceased"))
-	contact.Archived, _ = strconv.ParseBool(text("Archived"))
+	var deceasedOK, archivedOK bool
+	contact.IsDeceased, deceasedOK = parseFlag(row.get("Deceased"), false)
+	contact.Archived, archivedOK = parseFlag(row.get("Archived"), false)
 	if len(contact.Circles) == 0 {
 		contact.Circles = nil
 	}
@@ -338,6 +368,12 @@ func contactFromExportRow(userID uint, row exportRow, customColumns []string) (m
 	}
 
 	var dropped []string
+	if !deceasedOK {
+		dropped = append(dropped, "deceased (not true or false)")
+	}
+	if !archivedOK {
+		dropped = append(dropped, "archived (not true or false)")
+	}
 	if noteShortened {
 		dropped = append(dropped, fmt.Sprintf("note shortened to %d characters", models.MaxNoteLength))
 	}
@@ -353,11 +389,11 @@ func contactFromExportRow(userID uint, row exportRow, customColumns []string) (m
 	}
 
 	for _, column := range customColumns {
-		if value := row.get(column); value != "" {
+		if value := row.at(column.index); value != "" {
 			if contact.CustomFields == nil {
 				contact.CustomFields = map[string]string{}
 			}
-			contact.CustomFields[column] = value
+			contact.CustomFields[column.name] = value
 		}
 	}
 
@@ -399,23 +435,32 @@ func (imp *dataImporter) importContacts(s *exportSection) error {
 		return err
 	}
 
-	var customColumns []string
-	for _, h := range s.headers {
-		if strings.TrimSpace(h) != "" && !slices.Contains(models.ContactExportHeaders, h) && !slices.Contains(customColumns, h) {
-			// A custom field name is at most 100 characters (CustomFieldNamesInput), so a
-			// longer column could never be shown; leave it out rather than store hidden data.
-			if utf8.RuneCountInString(h) > maxCustomFieldNameLength {
-				imp.result.warn("Column %q was left out: custom field names are limited to %d characters", h, maxCustomFieldNameLength)
-				continue
-			}
-			customColumns = append(customColumns, h)
+	// The export writes the fixed columns first, then one per custom field. The first
+	// column with a fixed name is that field; a later one with the same name is a custom
+	// field that happens to share it.
+	var customColumns []customColumn
+	fixedSeen := map[string]bool{}
+	for i, h := range s.headers {
+		if slices.Contains(models.ContactExportHeaders, h) && !fixedSeen[h] {
+			fixedSeen[h] = true
+			continue
 		}
+		if strings.TrimSpace(h) == "" || slices.ContainsFunc(customColumns, func(c customColumn) bool { return c.name == h }) {
+			continue
+		}
+		// A custom field name is at most 100 characters (CustomFieldNamesInput), so a
+		// longer column could never be shown; leave it out rather than store hidden data.
+		if utf8.RuneCountInString(h) > maxCustomFieldNameLength {
+			imp.result.warn("Column %q was left out: custom field names are limited to %d characters", h, maxCustomFieldNameLength)
+			continue
+		}
+		customColumns = append(customColumns, customColumn{name: h, index: i})
 	}
 	names := slices.Clone(user.CustomFieldNames)
 	for _, column := range customColumns {
-		if !slices.Contains(names, column) {
-			names = append(names, column)
-			imp.result.CustomFieldsAdded = append(imp.result.CustomFieldsAdded, column)
+		if !slices.Contains(names, column.name) {
+			names = append(names, column.name)
+			imp.result.CustomFieldsAdded = append(imp.result.CustomFieldsAdded, column.name)
 		}
 	}
 	if len(imp.result.CustomFieldsAdded) > 0 {
@@ -728,14 +773,20 @@ func (imp *dataImporter) importReminders(s *exportSection) error {
 			imp.result.warn("Reminder %q (row %d) was skipped: its date is missing or invalid", reminder.Message, n)
 			return nil
 		}
-		byMail, _ := strconv.ParseBool(strings.TrimSpace(row.get("By Mail")))
-		reminder.ByMail = &byMail
-		reoccur, err := strconv.ParseBool(strings.TrimSpace(row.get("Reoccur From Completion")))
-		if err != nil {
-			reoccur = true
+		// Fallbacks are the column defaults; an unreadable value is reported.
+		var unreadable []string
+		flag := func(column string, def bool) bool {
+			v, ok := parseFlag(row.get(column), def)
+			if !ok {
+				unreadable = append(unreadable, column)
+			}
+			return v
 		}
+		byMail := flag("By Mail", false)
+		reminder.ByMail = &byMail
+		reoccur := flag("Reoccur From Completion", true)
 		reminder.ReoccurFromCompletion = &reoccur
-		reminder.Completed, _ = strconv.ParseBool(strings.TrimSpace(row.get("Completed")))
+		reminder.Completed = flag("Completed", false)
 		if lastSent, ok := parseExportTime(row.get("Last Sent")); ok {
 			reminder.LastSent = &lastSent
 			// Its email already went out; don't send it again from the new account.
@@ -770,6 +821,9 @@ func (imp *dataImporter) importReminders(s *exportSection) error {
 			return fmt.Errorf("create reminder: %w", err)
 		}
 		count.Created++
+		if len(unreadable) > 0 {
+			imp.result.warn("Reminder %q (row %d): %s not true or false, the default was used", reminder.Message, n, strings.Join(unreadable, ", "))
+		}
 		return nil
 	})
 }

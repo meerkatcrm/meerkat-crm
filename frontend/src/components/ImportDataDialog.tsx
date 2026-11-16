@@ -26,11 +26,13 @@ const MAX_SIZE = 10 * 1024 * 1024;
 interface ImportDataDialogProps {
   open: boolean;
   onClose: () => void;
+  // Called after a real (not dry-run) import, so the page can reload what it changed.
+  onImportComplete?: (result: DataImportResult) => void;
 }
 
 // Re-imports a CSV file from "Export Data": the file is first analyzed (a dry run on the
 // server), then imported once the user has seen what will be added.
-export default function ImportDataDialog({ open, onClose }: ImportDataDialogProps) {
+export default function ImportDataDialog({ open, onClose, onImportComplete }: ImportDataDialogProps) {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -54,7 +56,9 @@ export default function ImportDataDialog({ open, onClose }: ImportDataDialogProp
     setError('');
     setBusy(true);
     try {
-      setResult(await importDataExport(selected, dryRun));
+      const outcome = await importDataExport(selected, dryRun);
+      setResult(outcome);
+      if (!dryRun) onImportComplete?.(outcome);
     } catch (err) {
       setError(err instanceof Error && err.message ? err.message : t('settings.dataImport.error'));
     } finally {

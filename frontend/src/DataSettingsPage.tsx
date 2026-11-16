@@ -27,6 +27,8 @@ export default function DataSettingsPage() {
   const { t } = useTranslation();
   const [monicaDialogOpen, setMonicaDialogOpen] = useState(false);
   const [importDataOpen, setImportDataOpen] = useState(false);
+  // Bumped after an import that added custom fields, so that card loads the new list.
+  const [customFieldsVersion, setCustomFieldsVersion] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState('');
   const [exportSuccess, setExportSuccess] = useState('');
@@ -74,7 +76,7 @@ export default function DataSettingsPage() {
 
       <ContactFieldSettings />
 
-      <CustomFieldsSettings />
+      <CustomFieldsSettings key={customFieldsVersion} />
 
       <CalendarSyncSettings />
 
@@ -175,7 +177,13 @@ export default function DataSettingsPage() {
         </CardContent>
       </Card>
 
-      <ImportDataDialog open={importDataOpen} onClose={() => setImportDataOpen(false)} />
+      <ImportDataDialog
+        open={importDataOpen}
+        onClose={() => setImportDataOpen(false)}
+        onImportComplete={(result) => {
+          if (result.custom_fields_added.length > 0) setCustomFieldsVersion((v) => v + 1);
+        }}
+      />
 
       <Card sx={{ mb: 2 }}>
         <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>

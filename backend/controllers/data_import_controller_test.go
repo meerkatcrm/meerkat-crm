@@ -453,3 +453,47 @@ func TestImportData_ActivityMatchIgnoresZoneAndSubSecond(t *testing.T) {
 	result := importCSV(t, db, user.ID, "/import", []byte(file))
 	assert.Equal(t, models.DataImportCount{Created: 1, Existing: 1}, result.Activities)
 }
+
+// A custom field named like a fixed column is exported twice under that name; the
+// second column is the custom field and must come back as one.
+func TestImportData_CustomFieldNamedLikeFixedColumn(t *testing.T) {
+	db := newTestDB(t)
+	source := newTestUser(t, db, "source", false)
+	target := newTestUser(t, db, "target", false)
+	require.NoError(t, db.Model(&models.User{}).Where("id = ?", source.ID).
+		Update("custom_field_names", `["Note"]`).Error)
+	require.NoError(t, db.Create(&models.Contact{UserID: source.ID, Firstname: "Ann",
+		Note: "the contact note", CustomFields: map[string]string{"Note": "the custom value"}}).Error)
+
+	result := importCSV(t, db, target.ID, "/import", exportCSV(t, db, source.ID))
+	assert.Equal(t, []string{"Note"}, result.CustomFieldsAdded)
+
+	var ann models.Contact
+	require.NoError(t, db.Where("user_id = ?", target.ID).First(&ann).Error)
+	assert.Equal(t, "the contact note", ann.Note)
+	assert.Equal(t, map[string]string{"Note": "the custom value"}, ann.CustomFields)
+}
+
+func TestImportData_UnreadableFlagsAreReported(t *testing.T) {
+	db := newTestDB(t)
+	user := newTestUser(t, db, "owner", false)
+	file := "=== CONTACTS ===\nID,Firstname,Deceased,Archived\n1,Ann,yes please,true\n\n=== REMINDERS ===\n" +
+		"ID,Contact ID,Contact Name,Message,Remind At,Recurrence,By Mail,Reoccur From Completion,Completed,Last Sent,Created At,Updated At\n" +
+		"1,1,Ann ,Call Ann,2024-09-01T09:00:00Z,once,maybe,,false,,,\n"
+
+	result := importCSV(t, db, user.ID, "/import", []byte(file))
+	assert.Equal(t, models.DataImportCount{Created: 1}, result.Contacts)
+	assert.Equal(t, models.DataImportCount{Created: 1}, result.Reminders)
+	require.Len(t, result.Warnings, 2)
+	assert.Contains(t, result.Warnings[0], "deceased (not true or false)")
+	assert.Contains(t, result.Warnings[1], "By Mail not true or false")
+
+	var ann models.Contact
+	require.NoError(t, db.Where("user_id = ?", user.ID).First(&ann).Error)
+	assert.False(t, ann.IsDeceased)
+	assert.True(t, ann.Archived)
+	var reminder models.Reminder
+	require.NoError(t, db.Where("user_id = ?", user.ID).First(&reminder).Error)
+	assert.False(t, *reminder.ByMail)
+	assert.True(t, *reminder.ReoccurFromCompletion, "an empty cell takes the column default")
+}
