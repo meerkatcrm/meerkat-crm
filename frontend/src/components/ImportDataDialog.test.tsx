@@ -87,6 +87,22 @@ test('does not offer an import when everything is already there', async () => {
   expect(screen.getByRole('button', { name: 'Import' })).toBeDisabled();
 });
 
+test('says nothing can be imported when every record was skipped', async () => {
+  mocked.importDataExport.mockResolvedValueOnce(
+    result({
+      contacts: { created: 0, existing: 0, skipped: 2 },
+      activities: none,
+      warnings: ['Contact "A" (row 1) was skipped', 'Contact "B" (row 2) was skipped'],
+    })
+  );
+  renderDialog();
+  choose('meerkat-export.csv');
+
+  await screen.findByText('Nothing in this file can be imported. The warnings below explain why.');
+  expect(screen.queryByText('Everything in this file is already in your account.')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Import' })).toBeDisabled();
+});
+
 test('shows warnings and how many more there are', async () => {
   mocked.importDataExport.mockResolvedValueOnce(result({ warnings: ['Note (row 3) was skipped'], more_warnings: 4 }));
   renderDialog();

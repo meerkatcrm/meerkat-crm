@@ -82,6 +82,8 @@ export default function ImportDataDialog({ open, onClose }: ImportDataDialogProp
   const done = result !== null && !result.dry_run;
   const nothingToImport =
     result !== null && KINDS.every((kind) => result[kind].created === 0) && result.custom_fields_added.length === 0;
+  // Nothing to add because records were skipped, not because they are all there already.
+  const anySkipped = result !== null && KINDS.some((kind) => result[kind].skipped > 0);
 
   return (
     <AppDialog open={open} onClose={handleClose} busy={busy} maxWidth="sm" fullWidth>
@@ -132,7 +134,11 @@ export default function ImportDataDialog({ open, onClose }: ImportDataDialogProp
                 <Alert severity="success">{t('settings.dataImport.success')}</Alert>
               ) : (
                 <Typography variant="body2">
-                  {nothingToImport ? t('settings.dataImport.nothingToImport') : t('settings.dataImport.previewIntro')}
+                  {!nothingToImport
+                    ? t('settings.dataImport.previewIntro')
+                    : anySkipped
+                      ? t('settings.dataImport.nothingImportable')
+                      : t('settings.dataImport.nothingToImport')}
                 </Typography>
               )}
 

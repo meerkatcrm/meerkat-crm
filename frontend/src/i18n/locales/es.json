@@ -592,6 +592,7 @@
       "importing": "Importando...",
       "previewIntro": "Esto es lo que hará la importación:",
       "nothingToImport": "Todo lo de este archivo ya está en tu cuenta.",
+      "nothingImportable": "No se puede importar nada de este archivo. Las advertencias de abajo explican por qué.",
       "success": "Importación completada.",
       "importButton": "Importar",
       "columns": {

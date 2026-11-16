@@ -592,6 +592,7 @@
       "importing": "正在导入...",
       "previewIntro": "导入将执行以下操作：",
       "nothingToImport": "此文件中的所有内容都已在您的账户中。",
+      "nothingImportable": "此文件中没有可导入的内容。原因请见下方的警告。",
       "success": "导入完成。",
       "importButton": "导入",
       "columns": {

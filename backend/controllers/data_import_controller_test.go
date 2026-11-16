@@ -1,9 +1,11 @@
 package controllers
 
 import (
+	"bytes"
 	"meerkat/models"
 	"meerkat/services"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -278,4 +280,22 @@ func TestImportData_RejectsOtherFiles(t *testing.T) {
 	var count int64
 	db.Model(&models.Contact{}).Where("user_id = ?", user.ID).Count(&count)
 	assert.Zero(t, count)
+}
+
+// The export writes contact values by position, so each row must have exactly one
+// value per header; a header added to models.ContactExportHeaders without its value
+// (or the reverse) would shift every column after it.
+func TestExportData_ContactRowsMatchHeaders(t *testing.T) {
+	db := newTestDB(t)
+	user := newTestUser(t, db, "owner", false)
+	seedExportSource(t, db, user.ID)
+
+	parsed, err := services.ParseDataExport(bytes.NewReader(exportCSV(t, db, user.ID)))
+	require.NoError(t, err)
+	headers, rows := parsed.Section("CONTACTS")
+	assert.Equal(t, append(slices.Clone(models.ContactExportHeaders), "Pet name"), headers)
+	require.NotEmpty(t, rows)
+	for _, row := range rows {
+		assert.Len(t, row, len(headers))
+	}
 }

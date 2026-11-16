@@ -11,6 +11,7 @@ import (
 	"meerkat/models"
 	"net/http"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -94,15 +95,9 @@ func ExportData(c *gin.Context) {
 	buf.WriteString("=== CONTACTS ===\n")
 	writer.Flush()
 
-	contactHeaders := []string{
-		"ID", "Firstname", "Lastname", "Nickname", "Gender", "Email", "Phone",
-		"Birthday", "Address", "How We Met", "Food Preference", "Work Information",
-		"Contact Information", "Note", "Circles",
-		"Prefix", "Middle Name", "Suffix", "Organization", "Department", "Job Title", "Role",
-		"Anniversary", "Deceased", "Deceased Date", "Archived",
-		"Emails", "Phones", "Addresses", "URLs", "Messaging",
-		"Created At", "Updated At",
-	}
+	// One list shared with the importer (services.ImportDataExport), so a column added
+	// here is read back as that field, not mistaken for a custom field.
+	contactHeaders := slices.Clone(models.ContactExportHeaders)
 	// Add custom field names as additional headers
 	contactHeaders = append(contactHeaders, customFieldNames...)
 	if err := writer.Write(contactHeaders); err != nil {

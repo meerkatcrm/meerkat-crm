@@ -35,18 +35,6 @@ const (
 
 var sectionMarkerRe = regexp.MustCompile(`^=== ([A-Z]+) ===$`)
 
-// contactExportHeaders are the fixed columns of the CONTACTS section. Any other column is
-// a custom field (the export appends one column per custom field name).
-var contactExportHeaders = []string{
-	"ID", "Firstname", "Lastname", "Nickname", "Gender", "Email", "Phone",
-	"Birthday", "Address", "How We Met", "Food Preference", "Work Information",
-	"Contact Information", "Note", "Circles",
-	"Prefix", "Middle Name", "Suffix", "Organization", "Department", "Job Title", "Role",
-	"Anniversary", "Deceased", "Deceased Date", "Archived",
-	"Emails", "Phones", "Addresses", "URLs", "Messaging",
-	"Created At", "Updated At",
-}
-
 // exportSection is one "=== NAME ===" block of a data export: its header row and data rows.
 type exportSection struct {
 	headers []string
@@ -139,6 +127,12 @@ func ParseDataExport(r io.Reader) (*ParsedDataExport, error) {
 		return nil, errors.New("this file is not a Meerkat data export")
 	}
 	return parsed, nil
+}
+
+// Section returns the header row and data rows of one section ("CONTACTS", ...).
+func (p *ParsedDataExport) Section(name string) (headers []string, rows [][]string) {
+	s := p.section(name)
+	return s.headers, s.rows
 }
 
 func (p *ParsedDataExport) section(name string) *exportSection {
@@ -395,7 +389,7 @@ func (imp *dataImporter) importContacts(s *exportSection) error {
 
 	var customColumns []string
 	for _, h := range s.headers {
-		if strings.TrimSpace(h) != "" && !slices.Contains(contactExportHeaders, h) && !slices.Contains(customColumns, h) {
+		if strings.TrimSpace(h) != "" && !slices.Contains(models.ContactExportHeaders, h) && !slices.Contains(customColumns, h) {
 			customColumns = append(customColumns, h)
 		}
 	}
