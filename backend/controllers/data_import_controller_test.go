@@ -420,3 +420,36 @@ func TestImportData_RelationshipBetweenMergedContactsIsReported(t *testing.T) {
 	require.NoError(t, db.Where("user_id = ?", user.ID).First(&rel).Error)
 	assert.Nil(t, rel.RelatedContactID)
 }
+
+func TestImportData_RejectsRepeatedSection(t *testing.T) {
+	db := newTestDB(t)
+	user := newTestUser(t, db, "owner", false)
+	r := routerForUser(db, user.ID)
+	r.POST("/import", ImportData)
+	file := "=== CONTACTS ===\nID,Firstname\n1,Ann\n\n=== CONTACTS ===\nID,Firstname\n1,Bea\n"
+
+	w := doUpload(t, r, "/import", "file", "meerkat-export.csv", []byte(file))
+	assert.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+	assert.Contains(t, w.Body.String(), "CONTACTS section appears more than once")
+
+	var count int64
+	db.Model(&models.Contact{}).Where("user_id = ?", user.ID).Count(&count)
+	assert.Zero(t, count)
+}
+
+// Existing activities are matched by title and time to the second, whatever time zone
+// or sub-second precision either side carries.
+func TestImportData_ActivityMatchIgnoresZoneAndSubSecond(t *testing.T) {
+	db := newTestDB(t)
+	user := newTestUser(t, db, "owner", false)
+	berlin := time.FixedZone("CET", 3600)
+	require.NoError(t, db.Create(&models.Activity{UserID: user.ID, Title: "Lunch",
+		Date: time.Date(2024, 1, 2, 13, 0, 0, 400_000_000, berlin)}).Error)
+	file := "=== CONTACTS ===\nID,Firstname\n1,Ann\n\n=== ACTIVITIES ===\n" +
+		"ID,Title,Description,Location,Date,Contact Names,Created At,Updated At,Contact IDs\n" +
+		"1,Lunch,,,2024-01-02T12:00:00Z,,,,\n" +
+		"2,Lunch,,,2024-01-02T12:00:01Z,,,,\n"
+
+	result := importCSV(t, db, user.ID, "/import", []byte(file))
+	assert.Equal(t, models.DataImportCount{Created: 1, Existing: 1}, result.Activities)
+}

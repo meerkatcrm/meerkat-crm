@@ -110,6 +110,10 @@ func ParseDataExport(r io.Reader) (*ParsedDataExport, error) {
 
 		if len(record) == 1 {
 			if m := sectionMarkerRe.FindStringSubmatch(strings.TrimSpace(record[0])); m != nil {
+				if _, seen := parsed.sections[m[1]]; seen {
+					// Two exports pasted together: keeping either copy would silently drop the other.
+					return nil, fmt.Errorf("the %s section appears more than once; import one Meerkat data export at a time", m[1])
+				}
 				current = &exportSection{}
 				parsed.sections[m[1]] = current
 				continue
@@ -576,9 +580,21 @@ func (imp *dataImporter) activityContacts(row exportRow) ([]uint, int) {
 }
 
 func (imp *dataImporter) importActivities(s *exportSection) error {
-	var existing []models.Activity
-	if err := imp.tx.Where("user_id = ?", imp.userID).Select("id", "title", "date").Find(&existing).Error; err != nil {
+	var rows []models.Activity
+	if err := imp.tx.Where("user_id = ?", imp.userID).Select("id", "title", "date").Find(&rows).Error; err != nil {
 		return err
+	}
+	// Keyed like sameSecond compares, so each row is one lookup instead of a scan.
+	type activityKey struct {
+		title  string
+		second int64
+	}
+	keyOf := func(title string, date time.Time) activityKey {
+		return activityKey{title, date.Truncate(time.Second).Unix()}
+	}
+	existing := make(map[activityKey]bool, len(rows))
+	for _, a := range rows {
+		existing[keyOf(a.Title, a.Date)] = true
 	}
 
 	return s.each(func(n int, row exportRow) error {
@@ -601,9 +617,7 @@ func (imp *dataImporter) importActivities(s *exportSection) error {
 			imp.result.warn("Activity %q (row %d) was skipped: %s", activity.Title, n, problems[0].Message)
 			return nil
 		}
-		if slices.ContainsFunc(existing, func(a models.Activity) bool {
-			return a.Title == activity.Title && sameSecond(a.Date, activity.Date)
-		}) {
+		if existing[keyOf(activity.Title, activity.Date)] {
 			count.Existing++
 			return nil
 		}
