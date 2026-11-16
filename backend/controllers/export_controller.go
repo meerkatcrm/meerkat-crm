@@ -218,6 +218,9 @@ func ExportData(c *gin.Context) {
 
 	activityHeaders := []string{
 		"ID", "Title", "Description", "Location", "Date", "Contact Names", "Created At", "Updated At",
+		// Appended last so existing column positions stay stable for consumers. Lets a
+		// re-import link activities to the right contacts when two share a name.
+		"Contact IDs",
 	}
 	if err := writer.Write(activityHeaders); err != nil {
 		log.Error().Err(err).Msg("Failed to write activity headers")
@@ -227,8 +230,10 @@ func ExportData(c *gin.Context) {
 
 	for _, activity := range activities {
 		contactNames := make([]string, len(activity.Contacts))
+		contactIDs := make([]string, len(activity.Contacts))
 		for i, contact := range activity.Contacts {
 			contactNames[i] = fmt.Sprintf("%s %s", contact.Firstname, contact.Lastname)
+			contactIDs[i] = strconv.FormatUint(uint64(contact.ID), 10)
 		}
 		record := []string{
 			fmt.Sprintf("%d", activity.ID),
@@ -239,6 +244,7 @@ func ExportData(c *gin.Context) {
 			strings.Join(contactNames, "; "),
 			activity.CreatedAt.Format(time.RFC3339),
 			activity.UpdatedAt.Format(time.RFC3339),
+			strings.Join(contactIDs, "; "),
 		}
 		if err := writer.Write(record); err != nil {
 			log.Error().Err(err).Msg("Failed to write activity record")

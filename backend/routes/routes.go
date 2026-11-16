@@ -177,6 +177,7 @@ func RegisterRoutes(router *gin.Engine, cfg *config.Config, db *gorm.DB, oidcPro
 
 			// Export routes
 			protected.GET("/export", controllers.ExportData)
+			protected.POST("/import", controllers.ImportData)
 			protected.GET("/export/vcf", func(c *gin.Context) {
 				controllers.ExportContactsAsVCF(c, cfg.ProfilePhotoDir)
 			})

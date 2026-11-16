@@ -581,6 +581,40 @@
       "success": "您的数据已成功导出。",
       "error": "导出数据失败。请重试。"
     },
+    "dataImport": {
+      "title": "导入数据",
+      "description": "将“导出数据”生成的 CSV 文件恢复到此账户，例如备份文件，或来自其他账户或其他 Meerkat 实例的导出文件。已有的联系人保持不变，不会重复添加任何内容。",
+      "button": "导入 CSV",
+      "dialogIntro": "选择通过“导出数据”创建的 CSV 文件。系统会先检查文件，在您确认之前不会保存任何内容。",
+      "chooseFile": "选择文件",
+      "chooseAnother": "选择其他文件",
+      "analyzing": "正在检查文件...",
+      "importing": "正在导入...",
+      "previewIntro": "导入将执行以下操作：",
+      "nothingToImport": "此文件中的所有内容都已在您的账户中。",
+      "success": "导入完成。",
+      "importButton": "导入",
+      "columns": {
+        "toAdd": "待添加",
+        "added": "已添加",
+        "existing": "已存在",
+        "skipped": "已跳过"
+      },
+      "kinds": {
+        "contacts": "联系人",
+        "relationships": "关系",
+        "activities": "活动",
+        "notes": "笔记",
+        "reminders": "提醒"
+      },
+      "existingHint": "“已存在”表示您的账户中已有匹配的联系人或条目，它将保持不变。头像和图片不包含在导出文件中。",
+      "customFieldsAdded": "新增自定义字段：{{fields}}",
+      "warnings": "警告：{{count}}",
+      "moreWarnings": "…另有 {{count}} 条",
+      "notCsv": "请选择 CSV 文件。",
+      "tooLarge": "文件过大。最大为 {{size}} MB。",
+      "error": "导入失败，请重试。"
+    },
     "exportVcf": {
       "title": "将联系人导出为 VCF",
       "description": "将您的所有联系人下载为 VCF（vCard）文件。此格式与大多数通讯录应用兼容，并包含头像。",

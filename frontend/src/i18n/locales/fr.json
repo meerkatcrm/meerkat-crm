@@ -581,6 +581,40 @@
       "success": "Vos données ont été exportées avec succès.",
       "error": "Échec de l'exportation des données. Veuillez réessayer."
     },
+    "dataImport": {
+      "title": "Importer des données",
+      "description": "Restaurez dans ce compte un fichier CSV issu de « Exporter les données », par exemple une sauvegarde ou un export d'un autre compte ou d'une autre instance Meerkat. Les contacts existants restent inchangés et rien n'est ajouté en double.",
+      "button": "Importer un CSV",
+      "dialogIntro": "Choisissez un fichier CSV créé avec « Exporter les données ». Il est d'abord vérifié ; rien n'est enregistré avant votre confirmation.",
+      "chooseFile": "Choisir un fichier",
+      "chooseAnother": "Choisir un autre fichier",
+      "analyzing": "Vérification du fichier...",
+      "importing": "Importation...",
+      "previewIntro": "Voici ce que fera l'importation :",
+      "nothingToImport": "Tout le contenu de ce fichier est déjà dans votre compte.",
+      "success": "Importation terminée.",
+      "importButton": "Importer",
+      "columns": {
+        "toAdd": "À ajouter",
+        "added": "Ajoutés",
+        "existing": "Déjà présents",
+        "skipped": "Ignorés"
+      },
+      "kinds": {
+        "contacts": "Contacts",
+        "relationships": "Relations",
+        "activities": "Activités",
+        "notes": "Notes",
+        "reminders": "Rappels"
+      },
+      "existingHint": "« Déjà présents » signifie qu'un contact ou une entrée correspondante existe dans votre compte ; il reste inchangé. Les photos de profil et les images ne font pas partie de l'export.",
+      "customFieldsAdded": "Nouveaux champs personnalisés : {{fields}}",
+      "warnings": "Avertissements : {{count}}",
+      "moreWarnings": "…et {{count}} de plus",
+      "notCsv": "Veuillez choisir un fichier CSV.",
+      "tooLarge": "Le fichier est trop volumineux. La taille maximale est de {{size}} Mo.",
+      "error": "L'importation a échoué. Veuillez réessayer."
+    },
     "exportVcf": {
       "title": "Exporter les contacts en VCF",
       "description": "Téléchargez tous vos contacts au format VCF (vCard). Ce format est compatible avec la plupart des applications de contacts et inclut les photos de profil.",

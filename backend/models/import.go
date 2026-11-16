@@ -103,3 +103,12 @@ type ImportSession struct {
 	PreviewRows   []ImportRowPreview
 	PreviewCached bool
 }
+
+// DataImportCount reports, for one kind of record in a re-imported data export, how
+// many were created, how many were already there (and left unchanged), and how many
+// could not be imported.
+type DataImportCount struct {
+	Created  int `json:"created"`
+	Existing int `json:"existing"`
+	Skipped  int `json:"skipped"`
+}
