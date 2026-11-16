@@ -304,3 +304,61 @@ func TestExportData_ContactRowsMatchHeaders(t *testing.T) {
 		assert.Len(t, row, len(headers))
 	}
 }
+
+// A contact deleted after the export comes back as a new contact on import: soft-deleted
+// contacts are not duplicate candidates, so nothing gets attached to the deleted row.
+func TestImportData_DeletedContactIsRecreated(t *testing.T) {
+	db := newTestDB(t)
+	user := newTestUser(t, db, "owner", false)
+	alice := models.Contact{UserID: user.ID, Firstname: "Alice", Lastname: "Gone", Emails: []models.ContactEmail{{Value: "alice@example.com"}}}
+	require.NoError(t, db.Create(&alice).Error)
+	require.NoError(t, db.Create(&models.Note{
+		UserID: user.ID, ContactID: &alice.ID, Content: "Met at the fair",
+		Date: time.Date(2024, 5, 1, 9, 0, 0, 0, time.UTC),
+	}).Error)
+	file := exportCSV(t, db, user.ID)
+	require.NoError(t, db.Delete(&alice).Error)
+
+	result := importCSV(t, db, user.ID, "/import", file)
+	assert.Equal(t, models.DataImportCount{Created: 1}, result.Contacts)
+	assert.Equal(t, models.DataImportCount{Created: 1}, result.Notes)
+
+	var live []models.Contact
+	require.NoError(t, db.Where("user_id = ?", user.ID).Find(&live).Error)
+	require.Len(t, live, 1)
+	assert.NotEqual(t, alice.ID, live[0].ID)
+	var note models.Note
+	require.NoError(t, db.Where("user_id = ? AND content = ?", user.ID, "Met at the fair").Order("id DESC").First(&note).Error)
+	assert.Equal(t, live[0].ID, *note.ContactID, "the note belongs to the visible contact")
+}
+
+func TestImportData_OverlongCustomColumnIsLeftOut(t *testing.T) {
+	db := newTestDB(t)
+	user := newTestUser(t, db, "owner", false)
+	long := strings.Repeat("x", 101)
+	file := "=== CONTACTS ===\nID,Firstname,Hobby," + long + "\n1,Ann,Chess,hidden\n"
+
+	result := importCSV(t, db, user.ID, "/import", []byte(file))
+	assert.Equal(t, []string{"Hobby"}, result.CustomFieldsAdded)
+	require.Len(t, result.Warnings, 1)
+	assert.Contains(t, result.Warnings[0], "left out")
+
+	var ann models.Contact
+	require.NoError(t, db.Where("user_id = ?", user.ID).First(&ann).Error)
+	assert.Equal(t, map[string]string{"Hobby": "Chess"}, ann.CustomFields)
+}
+
+func TestImportData_ShortenedContactNoteIsReported(t *testing.T) {
+	db := newTestDB(t)
+	user := newTestUser(t, db, "owner", false)
+	file := "=== CONTACTS ===\nID,Firstname,Note\n1,Ann," + strings.Repeat("n", models.MaxNoteLength+10) + "\n"
+
+	result := importCSV(t, db, user.ID, "/import", []byte(file))
+	assert.Equal(t, models.DataImportCount{Created: 1}, result.Contacts)
+	require.Len(t, result.Warnings, 1)
+	assert.Contains(t, result.Warnings[0], "note shortened")
+
+	var ann models.Contact
+	require.NoError(t, db.Where("user_id = ?", user.ID).First(&ann).Error)
+	assert.Len(t, ann.Note, models.MaxNoteLength)
+}

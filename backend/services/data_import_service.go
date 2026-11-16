@@ -21,6 +21,9 @@ import (
 // request body limit, so a larger file would be cut off before reaching the handler.
 const MaxDataImportSize = 10 * 1024 * 1024
 
+// maxCustomFieldNameLength matches the max=100 on models.CustomFieldNamesInput.
+const maxCustomFieldNameLength = 100
+
 // maxDataImportWarnings bounds the warnings returned to the client; the rest are counted.
 const maxDataImportWarnings = 50
 
@@ -324,11 +327,16 @@ func contactFromExportRow(userID uint, row exportRow, customColumns []string) (m
 		contact.Circles = nil
 	}
 	// The validator's max counts characters, not bytes.
+	noteShortened := false
 	if runes := []rune(contact.Note); len(runes) > models.MaxNoteLength {
 		contact.Note = string(runes[:models.MaxNoteLength])
+		noteShortened = true
 	}
 
 	var dropped []string
+	if noteShortened {
+		dropped = append(dropped, fmt.Sprintf("note shortened to %d characters", models.MaxNoteLength))
+	}
 	var bad bool
 	contact.Emails = typedItems(row.get("Emails"), func(k, v string) models.ContactEmail { return models.ContactEmail{Type: k, Value: v} }, &bad)
 	contact.Phones = typedItems(row.get("Phones"), func(k, v string) models.ContactPhone { return models.ContactPhone{Type: k, Value: v} }, &bad)
@@ -390,12 +398,18 @@ func (imp *dataImporter) importContacts(s *exportSection) error {
 	var customColumns []string
 	for _, h := range s.headers {
 		if strings.TrimSpace(h) != "" && !slices.Contains(models.ContactExportHeaders, h) && !slices.Contains(customColumns, h) {
+			// A custom field name is at most 100 characters (CustomFieldNamesInput), so a
+			// longer column could never be shown; leave it out rather than store hidden data.
+			if utf8.RuneCountInString(h) > maxCustomFieldNameLength {
+				imp.result.warn("Column %q was left out: custom field names are limited to %d characters", h, maxCustomFieldNameLength)
+				continue
+			}
 			customColumns = append(customColumns, h)
 		}
 	}
 	names := slices.Clone(user.CustomFieldNames)
 	for _, column := range customColumns {
-		if len(column) <= 100 && !slices.Contains(names, column) {
+		if !slices.Contains(names, column) {
 			names = append(names, column)
 			imp.result.CustomFieldsAdded = append(imp.result.CustomFieldsAdded, column)
 		}
