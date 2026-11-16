@@ -362,3 +362,22 @@ func TestImportData_ShortenedContactNoteIsReported(t *testing.T) {
 	require.NoError(t, db.Where("user_id = ?", user.ID).First(&ann).Error)
 	assert.Len(t, ann.Note, models.MaxNoteLength)
 }
+
+func TestImportData_UnresolvedRelatedContactIsReported(t *testing.T) {
+	db := newTestDB(t)
+	user := newTestUser(t, db, "owner", false)
+	file := "=== CONTACTS ===\nID,Firstname\n1,Ann\n\n=== RELATIONSHIPS ===\n" +
+		"ID,Contact ID,Contact Name,Name,Type,Gender,Birthday,Related Contact ID,Related Contact Name,Created At,Updated At\n" +
+		"1,1,Ann ,Bo,Friend,,,42,Bo Gone,,\n" +
+		"2,1,Ann ,Cy,Sibling,,,,,,\n"
+
+	result := importCSV(t, db, user.ID, "/import", []byte(file))
+	assert.Equal(t, models.DataImportCount{Created: 2}, result.Relationships)
+	require.Len(t, result.Warnings, 1, "only the relationship whose related contact is missing is reported")
+	assert.Contains(t, result.Warnings[0], `Relationship "Bo"`)
+	assert.Contains(t, result.Warnings[0], "not linked")
+
+	var bo models.Relationship
+	require.NoError(t, db.Where("user_id = ? AND name = ?", user.ID, "Bo").First(&bo).Error)
+	assert.Nil(t, bo.RelatedContactID)
+}

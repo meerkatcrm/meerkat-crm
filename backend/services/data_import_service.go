@@ -485,8 +485,13 @@ func (imp *dataImporter) importRelationships(s *exportSection) error {
 			StartDate: strings.TrimSpace(row.get("Start Date")),
 			EndDate:   strings.TrimSpace(row.get("End Date")),
 		}
-		if related, ok := imp.contactFor(row.get("Related Contact ID")); ok && related != contactID {
-			rel.RelatedContactID = &related
+		relatedMissing := false
+		if fileID := strings.TrimSpace(row.get("Related Contact ID")); fileID != "" {
+			if related, ok := imp.contactFor(fileID); !ok {
+				relatedMissing = true
+			} else if related != contactID {
+				rel.RelatedContactID = &related
+			}
 		}
 		if problems := middleware.ValidateStruct(&rel); len(problems) > 0 {
 			count.Skipped++
@@ -517,6 +522,9 @@ func (imp *dataImporter) importRelationships(s *exportSection) error {
 			return fmt.Errorf("create relationship: %w", err)
 		}
 		count.Created++
+		if relatedMissing {
+			imp.result.warn("Relationship %q (row %d): its related contact is not in the import and was not linked", rel.Name, n)
+		}
 		return nil
 	})
 }
