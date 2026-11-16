@@ -291,6 +291,10 @@ func ExportData(c *gin.Context) {
 	reminderHeaders := []string{
 		"ID", "Contact ID", "Contact Name", "Message", "Remind At", "Recurrence",
 		"By Mail", "Reoccur From Completion", "Completed", "Last Sent", "Created At", "Updated At",
+		// Appended last so existing column positions stay stable. Whether the current
+		// occurrence was emailed; Last Sent alone can't tell, since a recurring reminder
+		// keeps it after moving on to its next date.
+		"Email Sent",
 	}
 	if err := writer.Write(reminderHeaders); err != nil {
 		log.Error().Err(err).Msg("Failed to write reminder headers")
@@ -334,6 +338,7 @@ func ExportData(c *gin.Context) {
 			lastSent,
 			reminder.CreatedAt.Format(time.RFC3339),
 			reminder.UpdatedAt.Format(time.RFC3339),
+			strconv.FormatBool(reminder.EmailSent),
 		}
 		if err := writer.Write(record); err != nil {
 			log.Error().Err(err).Msg("Failed to write reminder record")

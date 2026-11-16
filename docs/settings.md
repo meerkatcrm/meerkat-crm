@@ -48,5 +48,5 @@ What the import does:
 What does not come back exactly:
 
 - Addresses are exported as a single line, so an imported address ends up entirely in the street field.
-- A single email address, phone number, address, website or messaging handle that contains `; ` is split into two entries, because the export uses `; ` to separate entries.
+- A single email address, phone number, address, website or messaging handle that contains `; ` is split into two entries, because the export uses `; ` to separate entries. The same goes for a circle name that contains `;`.
 - Profile photos, note and activity images, employment history and the completion history of reminders are not part of the export, so they cannot be restored. Use the VCF export to move profile photos.

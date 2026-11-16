@@ -177,7 +177,7 @@ func TestImportData_RoundTripIntoAnotherUser(t *testing.T) {
 	assert.Equal(t, alice.ID, *reminder.ContactID)
 	assert.True(t, *reminder.ByMail)
 	assert.False(t, *reminder.ReoccurFromCompletion)
-	assert.True(t, reminder.EmailSent, "an already-sent reminder must not be emailed again")
+	assert.False(t, reminder.EmailSent, "email_sent comes across as exported, not guessed from Last Sent")
 	require.NotNil(t, reminder.LastSent)
 
 	// The source account is untouched.
@@ -496,4 +496,51 @@ func TestImportData_UnreadableFlagsAreReported(t *testing.T) {
 	require.NoError(t, db.Where("user_id = ?", user.ID).First(&reminder).Error)
 	assert.False(t, *reminder.ByMail)
 	assert.True(t, *reminder.ReoccurFromCompletion, "an empty cell takes the column default")
+}
+
+// A recurring reminder that moved on to its next date keeps Last Sent from the previous
+// email but has email_sent reset; the import must not mark the new occurrence as sent.
+func TestImportData_ReminderEmailSentRoundTrips(t *testing.T) {
+	db := newTestDB(t)
+	source := newTestUser(t, db, "source", false)
+	target := newTestUser(t, db, "target", false)
+	ann := newTestContact(t, db, source.ID, "Ann")
+	byMail, reoccur := true, true
+	sent := time.Date(2024, 8, 1, 9, 0, 0, 0, time.UTC)
+	for _, r := range []models.Reminder{
+		{Message: "Moved on", RemindAt: time.Date(2024, 9, 1, 9, 0, 0, 0, time.UTC), EmailSent: false},
+		{Message: "Sent, due", RemindAt: time.Date(2024, 8, 1, 8, 0, 0, 0, time.UTC), EmailSent: true},
+	} {
+		r.UserID, r.ContactID, r.Recurrence, r.ByMail, r.ReoccurFromCompletion, r.LastSent = source.ID, &ann.ID, "monthly", &byMail, &reoccur, &sent
+		require.NoError(t, db.Create(&r).Error)
+	}
+	// Create skips the zero EmailSent default; make sure the first row really is false.
+	require.NoError(t, db.Model(&models.Reminder{}).Where("message = ?", "Moved on").Update("email_sent", false).Error)
+
+	importCSV(t, db, target.ID, "/import", exportCSV(t, db, source.ID))
+
+	var moved, due models.Reminder
+	require.NoError(t, db.Where("user_id = ? AND message = ?", target.ID, "Moved on").First(&moved).Error)
+	require.NoError(t, db.Where("user_id = ? AND message = ?", target.ID, "Sent, due").First(&due).Error)
+	assert.False(t, moved.EmailSent, "the next occurrence must still be emailed")
+	assert.True(t, due.EmailSent, "an occurrence already emailed must not be sent again")
+}
+
+// Exports from before the Email Sent column: sent for this occurrence only when Last
+// Sent is on or after Remind At.
+func TestImportData_OlderExportInfersEmailSent(t *testing.T) {
+	db := newTestDB(t)
+	user := newTestUser(t, db, "owner", false)
+	file := "=== CONTACTS ===\nID,Firstname\n1,Ann\n\n=== REMINDERS ===\n" +
+		"ID,Contact ID,Contact Name,Message,Remind At,Recurrence,By Mail,Reoccur From Completion,Completed,Last Sent,Created At,Updated At\n" +
+		"1,1,Ann ,Moved on,2024-09-01T09:00:00Z,monthly,true,true,false,2024-08-01T09:00:00Z,,\n" +
+		"2,1,Ann ,Sent,2024-08-01T08:00:00Z,once,true,true,false,2024-08-01T09:00:00Z,,\n"
+
+	importCSV(t, db, user.ID, "/import", []byte(file))
+
+	var moved, sent models.Reminder
+	require.NoError(t, db.Where("user_id = ? AND message = ?", user.ID, "Moved on").First(&moved).Error)
+	require.NoError(t, db.Where("user_id = ? AND message = ?", user.ID, "Sent").First(&sent).Error)
+	assert.False(t, moved.EmailSent)
+	assert.True(t, sent.EmailSent)
 }

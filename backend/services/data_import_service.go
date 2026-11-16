@@ -789,8 +789,15 @@ func (imp *dataImporter) importReminders(s *exportSection) error {
 		reminder.Completed = flag("Completed", false)
 		if lastSent, ok := parseExportTime(row.get("Last Sent")); ok {
 			reminder.LastSent = &lastSent
-			// Its email already went out; don't send it again from the new account.
-			reminder.EmailSent = true
+		}
+		// Whether the current occurrence was already emailed, so the new account doesn't
+		// send it again. Older exports have no Email Sent column: there the email went out
+		// for this occurrence if it was sent on or after the reminder's date (moving a
+		// reminder to a later date resets email_sent and leaves Last Sent behind).
+		if row.has("Email Sent") {
+			reminder.EmailSent = flag("Email Sent", false)
+		} else {
+			reminder.EmailSent = reminder.LastSent != nil && !reminder.LastSent.Before(reminder.RemindAt)
 		}
 		if problems := middleware.ValidateStruct(&reminder); len(problems) > 0 {
 			count.Skipped++
