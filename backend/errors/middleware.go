@@ -80,6 +80,10 @@ func RespondWithError(c *gin.Context, err *AppError) {
 	// Log the error with context
 	LogError(c, err)
 
+	// No error response is cacheable, and a 404 has to say so rather than stay silent: RFC
+	// 9111 4.2.2 lets a cache invent a freshness lifetime for one, which would keep a
+	// contact's picture missing after the file came back.
+	c.Header("Cache-Control", "no-store")
 	c.JSON(err.HTTPStatus, response)
 	c.Abort()
 }

@@ -248,6 +248,17 @@ func main() {
 	// Register all routes from routes.go
 	routes.RegisterRoutes(r, cfg, db, oidcProvider)
 
+	// The web app itself. A FRONTEND_DIR that is set but holds no bundle is a broken image,
+	// not a reason to come up serving an API nobody can reach a page from.
+	if err := routes.RegisterStaticRoutes(r, cfg); err != nil {
+		logger.Fatal().Err(err).Msg("FRONTEND_DIR is not a usable frontend build")
+	}
+	if cfg.FrontendDir == "" {
+		logger.Info().Msg("FRONTEND_DIR is unset: serving the API only, no web app")
+	} else {
+		logger.Info().Str("frontend_dir", cfg.FrontendDir).Msg("Serving the web app")
+	}
+
 	// Create HTTP server with timeout configuration
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%s", cfg.Port),

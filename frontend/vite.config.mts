@@ -12,7 +12,7 @@ export default defineConfig(({ mode }) => {
     build: {
       // The Dockerfiles copy the bundle from build/.
       outDir: 'build',
-      // nginx caches content-hashed files under /static/ as immutable.
+      // The Go server caches content-hashed files under /static/ as immutable.
       assetsDir: 'static',
     },
   };

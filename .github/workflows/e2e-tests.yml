@@ -85,7 +85,7 @@ jobs:
       - name: Show container logs on failure
         if: failure()
         run: |
-          echo "=== Meerkat logs (nginx + backend under supervisord) ==="
+          echo "=== Meerkat logs ==="
           docker compose -f docker-compose.test.yml logs meerkat
 
       - name: Stop services

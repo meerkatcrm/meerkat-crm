@@ -56,8 +56,14 @@ func ThumbnailURL(contactID uint, file string) string {
 	if file == "" {
 		return ""
 	}
-	version := strings.TrimSuffix(file, "_thumb.jpg")
-	return fmt.Sprintf("/api/v1/contacts/%d/profile_picture?thumbnail=true&v=%s", contactID, url.QueryEscape(version))
+	return fmt.Sprintf("/api/v1/contacts/%d/profile_picture?thumbnail=true&v=%s", contactID, url.QueryEscape(ThumbnailVersion(file)))
+}
+
+// ThumbnailVersion is the unique name behind a thumbnail file, the part that rides along in
+// its URL as v. serveThumbnail reads it back to decide whether a response may be pinned: the
+// pin is earned by a URL that changes with the picture, not by the handler serving the file.
+func ThumbnailVersion(file string) string {
+	return strings.TrimSuffix(file, "_thumb.jpg")
 }
 
 type Contact struct {

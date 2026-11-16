@@ -65,23 +65,37 @@ func TestThumbnailIsServedFromItsFileWithETagAndCache(t *testing.T) {
 	require.NoError(t, e.db.Create(&[]*models.Contact{&mine, &theirs, &none}).Error)
 	path := func(id uint) string { return "/contacts/" + strconv.Itoa(int(id)) + "/picture?thumbnail=true" }
 
-	w := e.get(path(mine.ID))
+	// The version is what models.ThumbnailURL puts in the URL. Only a request that carries it
+	// asks at a URL that changes with the picture, so only that one may be pinned for a year.
+	w := e.get(path(mine.ID) + "&v=abc")
 	require.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, "jpegbytes", w.Body.String())
 	assert.Equal(t, "image/jpeg", w.Header().Get("Content-Type"))
-	assert.Contains(t, w.Header().Get("Cache-Control"), "max-age=31536000")
-	assert.Contains(t, w.Header().Get("Cache-Control"), "private")
+	assert.Equal(t, "private, max-age=31536000, immutable", w.Header().Get("Cache-Control"))
 	etag := w.Header().Get("ETag")
 	require.NotEmpty(t, etag)
 
-	w = e.get(path(mine.ID), "If-None-Match", etag)
+	w = e.get(path(mine.ID)+"&v=abc", "If-None-Match", etag)
 	assert.Equal(t, http.StatusNotModified, w.Code)
 	assert.Empty(t, w.Body.String())
-	w = e.get(path(mine.ID), "If-None-Match", `"other"`)
+	w = e.get(path(mine.ID)+"&v=abc", "If-None-Match", `"other"`)
 	assert.Equal(t, http.StatusOK, w.Code)
 
+	// Without the version, or with the one a page cached before a re-upload is holding, the
+	// URL outlives the file behind it: the answer has to revalidate against the ETag rather
+	// than be held, or a new picture leaves the old face on the screen for a year.
+	for _, q := range []string{"", "&v=00000000-0000-0000-0000-000000000000"} {
+		w := e.get(path(mine.ID) + q)
+		require.Equal(t, http.StatusOK, w.Code, q)
+		assert.Equal(t, "private, no-cache", w.Header().Get("Cache-Control"), q)
+		assert.Equal(t, etag, w.Header().Get("ETag"), q)
+	}
+
 	assert.Equal(t, http.StatusNotFound, e.get(path(theirs.ID)).Code, "another user's thumbnail")
-	assert.Equal(t, http.StatusNotFound, e.get(path(none.ID)).Code)
+	// A thumbnail 404 is nobody's to keep: the file comes back with the next export.
+	w = e.get(path(none.ID))
+	require.Equal(t, http.StatusNotFound, w.Code)
+	assert.Equal(t, "no-store", w.Header().Get("Cache-Control"))
 }
 
 func TestThumbnailFileNameCannotEscapeTheDirectory(t *testing.T) {

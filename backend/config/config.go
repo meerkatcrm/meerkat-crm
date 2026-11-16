@@ -51,6 +51,7 @@ type Config struct {
 	WriteTimeout             int    // HTTP server write timeout in seconds
 	IdleTimeout              int    // HTTP server idle timeout in seconds
 	ProfilePhotoDir          string // Directory for storing profile photos (must be absolute path)
+	FrontendDir              string // FRONTEND_DIR: built single-page app to serve (index.html, static/); empty serves the API alone
 	CardDAVEnabled           bool   // Enable CardDAV server for contact sync
 	CookieSecure             bool   // Set Secure flag on auth cookie (requires HTTPS)
 	CookieDomain             string // Domain for auth cookie (empty = current domain only)
@@ -116,6 +117,7 @@ func LoadConfig() *Config {
 		WriteTimeout:            writeTimeout,
 		IdleTimeout:             idleTimeout,
 		ProfilePhotoDir:         getEnv("PROFILE_PHOTO_DIR", ""),
+		FrontendDir:             getEnv("FRONTEND_DIR", ""),
 		CardDAVEnabled:          getBoolEnv("CARDDAV_ENABLED", false),
 		CookieSecure:            getBoolEnv("COOKIE_SECURE", false),
 		CookieDomain:            getEnv("COOKIE_DOMAIN", ""),
