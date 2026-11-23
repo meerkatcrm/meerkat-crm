@@ -81,6 +81,10 @@ func GetProfilePicture(c *gin.Context, cfg *config.Config) {
 		return
 	}
 
+	// The URL names the contact, not the picture, so replacing the photo leaves the URL alone:
+	// nothing here may be reused without revalidating, and ServeFile's Last-Modified makes the
+	// revalidation a 304.
+	c.Header("Cache-Control", "private, no-cache")
 	c.File(filePath)
 }
 
@@ -228,9 +232,9 @@ func RemovePhotoFromContact(c *gin.Context, cfg *config.Config) {
 	c.JSON(http.StatusOK, contact)
 }
 
-// serveThumbnail sends the thumbnail file with an ETag and a long private cache: the URL
-// carries the file's unique name (see models.ThumbnailURL), so a new picture is a new URL.
-// A contact whose thumbnail was not exported yet still gets the legacy database copy.
+// serveThumbnail sends the thumbnail file with an ETag and a long private cache -- for the
+// URLs that carry the file's unique name (see models.ThumbnailURL), where a new picture is a
+// new URL. A contact whose thumbnail was not exported yet still gets the legacy database copy.
 func serveThumbnail(c *gin.Context, cfg *config.Config, contact models.Contact) {
 	name := contact.PhotoThumbnailFile
 	if name == "" {
@@ -254,7 +258,14 @@ func serveThumbnail(c *gin.Context, cfg *config.Config, contact models.Contact) 
 	}
 	// The name is unique per picture; size and mtime guard against a file replaced in place.
 	c.Header("ETag", fmt.Sprintf(`"%s-%x-%x"`, strings.TrimSuffix(name, ".jpg"), info.Size(), info.ModTime().UnixNano()))
-	c.Header("Cache-Control", "private, max-age=31536000, immutable")
+	// The pin is earned by the version in the URL, not by the handler: a request that does not
+	// carry it asks at a URL which outlives the picture behind it, so it revalidates against
+	// the ETag instead of holding the old face for a year.
+	if c.Query("v") == models.ThumbnailVersion(name) {
+		c.Header("Cache-Control", "private, max-age=31536000, immutable")
+	} else {
+		c.Header("Cache-Control", "private, no-cache")
+	}
 	c.Header("Content-Type", "image/jpeg")
 	http.ServeContent(c.Writer, c.Request, "", info.ModTime(), file)
 }

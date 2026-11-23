@@ -8,7 +8,7 @@ nav_order: 1
 
 ## Overview
 
-Two codebases: a Go API (`backend/`) and a React SPA (`frontend/`). They communicate over HTTP, the frontend calls `/api/v1/*` endpoints. In production they are bundled into a single all-in-one Docker image where nginx serves the SPA and proxies `/api/` to the backend on `127.0.0.1:8080`; only the nginx port is published.
+Two codebases: a Go API (`backend/`) and a React SPA (`frontend/`). They communicate over HTTP, the frontend calls `/api/v1/*` endpoints. In production they are bundled into a single all-in-one Docker image where the Go binary serves both: the bundle from `FRONTEND_DIR` at `/` and `/static`, and the API on the same port. There is no reverse proxy in the image, and only that one port is published.
 
 ## Backend
 

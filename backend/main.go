@@ -16,10 +16,12 @@ import (
 	"meerkat/middleware"
 	"meerkat/routes"
 	"meerkat/services"
+	"meerkat/storage"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 
 	"time"
@@ -71,6 +73,8 @@ func main() {
 	if fakeClock {
 		logger.Warn().Str("fake_now", cfg.FakeNow).Msg("FAKE_NOW is set: the clock started at this time. Do not use this on a real instance")
 	}
+
+	checkWritableDirs(cfg)
 
 	logger.Info().Msg("Loading database and running migrations...")
 	db, err := database.InitDB(cfg.DBPath)
@@ -248,6 +252,17 @@ func main() {
 	// Register all routes from routes.go
 	routes.RegisterRoutes(r, cfg, db, oidcProvider)
 
+	// The web app itself. A FRONTEND_DIR that is set but holds no bundle is a broken image,
+	// not a reason to come up serving an API nobody can reach a page from.
+	if err := routes.RegisterStaticRoutes(r, cfg); err != nil {
+		logger.Fatal().Err(err).Msg("FRONTEND_DIR is not a usable frontend build")
+	}
+	if cfg.FrontendDir == "" {
+		logger.Info().Msg("FRONTEND_DIR is unset: serving the API only, no web app")
+	} else {
+		logger.Info().Str("frontend_dir", cfg.FrontendDir).Msg("Serving the web app")
+	}
+
 	// Create HTTP server with timeout configuration
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%s", cfg.Port),
@@ -327,6 +342,26 @@ func main() {
 	}
 
 	logger.Info().Msg("Server exited gracefully")
+}
+
+// checkWritableDirs stops the start when a data directory cannot be written to, naming the
+// user Meerkat runs as and the chown that fixes it. Nothing in the container is root, so a
+// bind mount's directory that Docker created on a fresh install stays root-owned; without
+// this the operator gets a SQLite permission error in a restart loop instead.
+func checkWritableDirs(cfg *config.Config) {
+	problems := storage.CheckWritable(
+		storage.Probe{Field: "SQLITE_DB_PATH", HostField: "DATA_PATH", Dir: filepath.Dir(cfg.DBPath), File: cfg.DBPath},
+		storage.Probe{Field: "PROFILE_PHOTO_DIR", HostField: "PHOTOS_PATH", Dir: cfg.ProfilePhotoDir},
+	)
+	if len(problems) == 0 {
+		return
+	}
+	log.Println("❌ Meerkat cannot write to its data:")
+	for _, p := range problems {
+		log.Printf("%s\n", p.Error())
+	}
+	log.Println("")
+	logger.Fatal().Int("paths", len(problems)).Msg("Data directories are not writable")
 }
 
 // schedule logs a failure to register a scheduled job.
