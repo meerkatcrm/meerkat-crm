@@ -66,6 +66,8 @@ mkdir -p data photos && chown -R 1001:1001 data photos
 
 Run `id` on your host to find your own UID and GID and set them as `PUID`/`PGID` in your `.env` file to have the folders owned by your host user instead (optional).
 
+If you run `docker compose up` before those directories exist, the Docker daemon creates them for the bind mount as `root:root` and the container cannot write in them. Meerkat then stops at startup naming the directory, the user it runs as, and the `chown` to run. Named volumes need nothing: they take their ownership from the image.
+
 ## Post-Installation Setup
 
 When running Meerkat-CRM you can access the application under the specified port (default is `7300`). 

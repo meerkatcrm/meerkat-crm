@@ -34,7 +34,7 @@
 - Container defaults (`PORT`, `SQLITE_DB_PATH`, `PROFILE_PHOTO_DIR`, `FRONTEND_DIR`) are set in the root [Dockerfile](Dockerfile); override via `.env` if needed. `PORT` is where the one process listens (8080) and the only port the container publishes.
 - The bundle lives at `FRONTEND_DIR` (`/app/frontend`): `routes.RegisterStaticRoutes` serves its `static/` at `/static` with immutable caching and everything else at the root, falling back to `index.html`. Leave `FRONTEND_DIR` empty to run the API alone behind your own web server.
 - The frontend bundle is built with an empty `REACT_APP_API_URL` so it calls the API on relative paths, same-origin.
-- Because nothing runs as root there is no startup `chown`: whatever uid the container runs as (compose passes `PUID`/`PGID` as `user:`) must own the mounted `data` and `photos` directories.
+- Because nothing runs as root there is no startup `chown`: whatever uid the container runs as (compose passes `PUID`/`PGID` as `user:`) must own the mounted `data` and `photos` directories. `storage.CheckWritable` probes both before the database opens and stops with the `chown` to run when one is not writable.
 
 **Testing**
 - Backend Go tests (`go test ./...` or `make test`) spin up in-memory SQLite in helpers like [backend/controllers/activity_controller_test.go](backend/controllers/activity_controller_test.go); mirror that pattern for new suites.

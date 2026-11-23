@@ -21,7 +21,9 @@ services:
     # Nothing in the container runs as root, so whatever uid this runs as has to own the
     # two directories below. Unlike a named volume, a bind mount keeps the host's ownership:
     #   chown -R 1001:1001 data photos
-    # Run `id` on the host to use your own uid instead of the default.
+    # Run `id` on the host to use your own uid instead of the default. Creating them on the
+    # first `up` instead makes Docker hand them over as root:root, and the server stops at
+    # startup naming the chown it needs.
     user: "${PUID:-1001}:${PGID:-1001}"
     volumes:
       - ${DATA_PATH:-./data}:/app/data

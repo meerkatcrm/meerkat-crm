@@ -68,7 +68,8 @@ RUN addgroup -g 1001 -S appgroup && adduser -u 1001 -S appuser -G appgroup
 
 # Both data directories exist in the image, owned by the run-as uid, so that Docker seeds
 # that ownership into a fresh named volume. A bind mount gets the host's ownership instead
-# and has to be chowned on the host.
+# and has to be chowned on the host; the server checks both at startup and names the chown
+# when it was not done.
 RUN mkdir -p /app/data /app/static/photos && \
     chown -R appuser:appgroup /app/data /app/static
 
